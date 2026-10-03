@@ -61,7 +61,10 @@ class Organization(PublishableModel):
     logo = models.ImageField(upload_to="organizations/logos/", blank=True,
                              validators=[validate_image_extension, validate_upload_size])
     college = models.ForeignKey(College, on_delete=models.PROTECT, related_name="organizations", verbose_name="collège")
-    sector = models.ForeignKey(Sector, on_delete=models.PROTECT, related_name="organizations", verbose_name="secteur")
+    sector = models.CharField(
+    max_length=255,
+    verbose_name="secteur"
+)
     commissions = models.ManyToManyField(Commission, blank=True, related_name="organizations")
     pole = models.CharField("pôle", max_length=12, choices=Pole.choices)
     neighborhood = models.CharField("quartier", max_length=120, blank=True)

@@ -16,7 +16,7 @@ export default function Membership() {
     { name: "organization_or_name", label: "Organisation ou nom", type: "text", required: true },
     { name: "category", label: "Catégorie d'adhésion", type: "select", required: true, options: opt(cats.data) },
     { name: "college", label: "Collège", type: "select", options: opt(filters.data?.colleges) },
-    { name: "sector", label: "Secteur", type: "select", options: opt(filters.data?.sectors) },
+    { name: "sector", label: "Secteur", type: "text", required: true },
     { name: "pole", label: "Pôle", type: "select", options: filters.data?.poles.map((p) => ({ value: p.value, label: p.label })) },
     { name: "representative", label: "Représentant", type: "text", required: true }, { name: "role", label: "Fonction", type: "text" },
     { name: "phone", label: "Téléphone", type: "tel", required: true }, { name: "email", label: "E-mail", type: "email", required: true },
@@ -27,7 +27,7 @@ export default function Membership() {
   ];
   return (
     <>
-      <PageHero title="Adhérer au réseau" intro="Choisissez la catégorie qui correspond à votre structure." />
+      <PageHero title="Adhérer à Urban Hub Connect" intro="Choisissez la catégorie qui correspond à votre structure." />
       <Section>
         <Async state={cats} empty="Les catégories d'adhésion seront publiées prochainement.">
           {(list) => (

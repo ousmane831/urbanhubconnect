@@ -13,7 +13,7 @@ from apps.core.sitemaps import SITEMAPS
 from apps.core.forms_urls import urlpatterns as form_urls
 from apps.map.api import MapCategoryListView, MapPlaceViewSet
 from apps.organizations.api import OrganizationViewSet
-
+from apps.core import coordination_api as co
 admin.site.site_header = "Urban Hub Connect · Coordination"
 admin.site.site_title = "Urban Hub Connect"
 admin.site.index_title = "Tableau de bord de la Coordination"
@@ -51,6 +51,17 @@ urlpatterns = [
     path("api/volunteers/missions/", c.VolunteerMissionList, name="volunteer-missions"),
     path("api/", include(form_urls)),
     path("api/", include(router.urls)),
-]
+
+    # b) dans urlpatterns, AVANT le path("api/", include(...)) général
+    path("api/coordination/csrf/", co.csrf, name="coord-csrf"),
+    path("api/coordination/login/", co.LoginView.as_view(), name="coord-login"),
+    path("api/coordination/logout/", co.logout_view, name="coord-logout"),
+    path("api/coordination/me/", co.me, name="coord-me"),
+    path("api/coordination/summary/", co.summary, name="coord-summary"),
+    path("api/coordination/queue/<str:kind>/", co.queue, name="coord-queue"),
+    path("api/coordination/queue/<str:kind>/<int:pk>/<str:action>/", co.queue_action, name="coord-queue-action"),
+    path("api/coordination/content/", co.content, name="coord-content"),
+    path("api/coordination/content/<str:kind>/<int:pk>/<str:action>/", co.content_action, name="coord-content-action")
+    ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -41,7 +41,7 @@ export default function NetworkPage() {
       <section className="relative overflow-hidden bg-navy text-white">
         <HexPattern className="text-white/[0.05]" />
         <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold">Le réseau</h1>
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold">Le réseau Urban Hub Connect </h1>
           <p className="mt-5 max-w-2xl text-xl text-white/85">
             Urban Hub Connect fédère les acteurs des pôles urbains de Diamniadio et du Lac Rose autour d'une vision commune : construire ensemble un territoire dynamique et inclusif.
           </p>

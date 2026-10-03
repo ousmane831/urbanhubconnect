@@ -14,7 +14,7 @@ DETAIL_FIELDS = LIST_FIELDS + ("description", "address", "latitude", "longitude"
 
 class _Base(serializers.ModelSerializer):
     college = TaxonomySerializer(read_only=True)
-    sector = TaxonomySerializer(read_only=True)
+    sector = serializers.CharField(read_only=True)
     short_description = serializers.SerializerMethodField()
 
     def get_short_description(self, obj):
@@ -37,7 +37,7 @@ class OrganizationDetailSerializer(_Base):
 
 class OrganizationFilter(django_filters.FilterSet):
     college = django_filters.CharFilter(field_name="college__slug")
-    sector = django_filters.CharFilter(field_name="sector__slug")
+    sector = django_filters.CharFilter(field_name="sector")
     commission = django_filters.CharFilter(field_name="commissions__slug", distinct=True)
     founder = django_filters.BooleanFilter(field_name="member_founder")
 
@@ -55,7 +55,7 @@ class OrganizationViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return (Organization.objects.public()
-                .select_related("college", "sector").prefetch_related("commissions"))
+                .select_related("college").prefetch_related("commissions"))
 
     def get_serializer_class(self):
         return OrganizationDetailSerializer if self.action == "retrieve" else OrganizationListSerializer

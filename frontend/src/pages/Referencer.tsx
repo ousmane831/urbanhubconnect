@@ -67,8 +67,7 @@ export default function Referencer() {
           <div className={group}>
             <FormField id="college" label="Collège" required error={e("college")}><select className="field" {...fieldProps("college", e("college"))} {...register("college")}>
               <option value="">Choisir…</option>{filters.data?.colleges.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}</select></FormField>
-            <FormField id="sector" label="Secteur" required error={e("sector")}><select className="field" {...fieldProps("sector", e("sector"))} {...register("sector")}>
-              <option value="">Choisir…</option>{filters.data?.sectors.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}</select></FormField>
+            <FormField id="sector" label="Secteur" required error={e("sector")}><input className="field" {...fieldProps("sector", e("sector"))} {...register("sector")}/></FormField> 
             <FormField id="pole" label="Pôle" required error={e("pole")}><select className="field" {...fieldProps("pole", e("pole"))} {...register("pole")}>
               <option value="">Choisir…</option>{filters.data?.poles.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</select></FormField>
             <FormField id="neighborhood" label="Quartier" error={e("neighborhood")}><input className="field" {...fieldProps("neighborhood", e("neighborhood"))} {...register("neighborhood")} /></FormField>

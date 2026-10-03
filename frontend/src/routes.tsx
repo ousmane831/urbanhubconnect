@@ -14,7 +14,9 @@ const stub = (title: string) => ({ element: <PageStub title={title} /> });
  * L'ordre compte : les routes statiques sont déclarées avant les routes à paramètre (:slug).
  */
 export const router = createBrowserRouter([
+  { path: "coordination", ...lazyPage(() => import("./pages/Coordination")), errorElement: <ServerError /> },
   {
+    
     element: <MainLayout />,
     errorElement: <ServerError />,
     children: [

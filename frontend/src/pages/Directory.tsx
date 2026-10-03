@@ -39,7 +39,7 @@ export default function Directory() {
     <>
       <Section tone="navy" className="!py-12">
         <h1 className="text-3xl sm:text-5xl">Annuaire du réseau</h1>
-        <p className="mt-3 max-w-2xl text-lg text-white/85">Les acteurs de Diamniadio et du Lac Rose, classés par collège, secteur et commission.</p>
+        <p className="mt-3 max-w-2xl text-lg text-white/85">Trouvez les institutions, entreprises, écoles, associations et talents des pôles de Diamniadio et du Lac Rose : activités, offres, besoins et contacts</p>
         <Button to="/annuaire/referencer" variant="light" className="mt-6">Référencer mon organisation</Button>
       </Section>
       <Section>

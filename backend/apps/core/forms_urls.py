@@ -15,7 +15,7 @@ from .forms_api import (CleanedModelSerializer, SubmissionCreateView, build_seri
                         submission_view)
 
 active = lambda m: m.objects.filter(is_active=True)
-college, sector = (active(College), False), (active(Sector), False)
+college = (active(College), False)
 commissions = (active(Commission), False)
 CONSENT = lambda *n: {k: serializers.BooleanField(write_only=True) for k in n}
 
@@ -24,14 +24,14 @@ membership = build_serializer(
     MembershipApplication,
     ["organization_or_name", "category", "college", "sector", "pole", "representative", "role", "phone",
      "email", "commissions", "offers", "needs", "accept_charter", "accept_privacy"],
-    slugs={"category": (active(MembershipCategory), True), "college": college, "sector": sector},
+    slugs={"category": (active(MembershipCategory), True), "college": college},
     many_slugs={"commissions": commissions},
     extra=CONSENT("accept_charter", "accept_privacy"))
 
 # -- Annuaire : demande de référencement -> fiche "pending", jamais publiée
 class OrganizationSubmitSerializer(CleanedModelSerializer):
     college = serializers.SlugRelatedField(slug_field="slug", queryset=active(College))
-    sector = serializers.SlugRelatedField(slug_field="slug", queryset=active(Sector))
+    sector = serializers.CharField()
     commissions = serializers.SlugRelatedField(slug_field="slug", many=True, required=False, queryset=active(Commission))
     accept_charter = serializers.BooleanField(write_only=True)
     accept_privacy = serializers.BooleanField(write_only=True)

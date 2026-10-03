@@ -32,7 +32,7 @@ class OrganizationAdmin(admin.ModelAdmin):
     search_fields = ("name", "neighborhood", "description", "representative_name", "email")
     ordering = ("-created_at",)
     date_hierarchy = "created_at"
-    list_select_related = ("college", "sector")
+    list_select_related = ("college",)
     filter_horizontal = ("commissions",)
     readonly_fields = ("logo_preview", "osm_link", "reviewed_at", "reviewed_by", "created_at", "updated_at")
     actions = ["mark_reviewing", "accept", "reject", "publish", "unpublish"]

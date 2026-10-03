@@ -68,6 +68,7 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.AnonRateThrottle"],
     "DEFAULT_THROTTLE_RATES": {"anon": "120/min", "form": "10/hour"},
+    "DEFAULT_THROTTLE_RATES": {"anon": "120/min", "form": "10/hour", "login": "20/hour"},
 }
 SIMPLE_JWT = {"ACCESS_TOKEN_LIFETIME": timedelta(minutes=config("JWT_ACCESS_MINUTES", default=15, cast=int)),
               "REFRESH_TOKEN_LIFETIME": timedelta(days=7), "ROTATE_REFRESH_TOKENS": True}
@@ -88,3 +89,4 @@ GEO_BOUNDS = {"lat_min": 12.0, "lat_max": 17.0, "lon_min": -18.0, "lon_max": -11
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default=EMAIL_HOST_USER or "noreply@urbanhubconnect.com")
 
 SITE_URL = config("SITE_URL", default="https://www.urbanhubconnect.com").rstrip("/")
+

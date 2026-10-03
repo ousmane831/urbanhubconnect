@@ -3,13 +3,12 @@ import { Countdown } from "../components/Countdown";
 import { Button } from "../components/ui/Button";
 import { Container, Section, SectionHeading } from "../components/ui/Container";
 import { HexPattern } from "../components/ui/HexPattern";
-import { ImagePlaceholder } from "../components/ui/ImagePlaceholder";
 import { EmptyState, ErrorState, Loading } from "../components/ui/States";
 import { useAsync } from "../hooks/useAsync";
 import { useSeo } from "../hooks/useSeo";
 import { getFeaturedEvents, getOrganizationFilters } from "../services/api";
 import { Network, Users, HandHeart, MapPin, Building2, Calendar, FileText, Briefcase, GraduationCap, Users2 } from "lucide-react";
-
+import heroImage from "../assets/banner.png";
 const fmt = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeZone: "Africa/Dakar" });
 
 const PROFILES = [
@@ -78,13 +77,17 @@ export default function Home() {
         <Container className="relative grid gap-10 py-16 sm:py-24 lg:grid-cols-[1.2fr_1fr] lg:items-center">
           <div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl">Urban Hub Connect</h1>
-            <p className="mt-5 max-w-xl text-xl text-white/85">Le réseau des acteurs des pôles urbains de Diamniadio et du Lac Rose.</p>
+            <p className="mt-5 max-w-xl text-xl text-white/85">Institutions, entreprises, écoles, associations et talents des pôles urbains de Diamniadio et du Lac Rose se connectent pour agir ensemble.</p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button to="/adherer" variant="light">Rejoindre le réseau</Button>
               <Button to="/annuaire" variant="ghost">Explorer l'Annuaire</Button>
             </div>
           </div>
-          <ImagePlaceholder label="photo principale du réseau" className="aspect-[4/3] w-full rounded-md border-white/30 bg-white/5 text-white/70" />
+          <img
+  src={heroImage}
+  alt="Urban Hub Connect"
+  className="w-full rounded-md"
+/>
         </Container>
       </section>
 
