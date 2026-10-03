@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    env_file: .env
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+      retries: 10
+  backend:
+    build: ./backend
+    env_file: .env
+    depends_on:
+      postgres: {condition: service_healthy}
+    volumes: [media:/app/media, static:/app/staticfiles]
+  frontend:
+    build: ./frontend
+    volumes: [frontend_dist:/out]
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on: [backend, frontend]
+    ports: ["80:80","443:443"]
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - frontend_dist:/usr/share/nginx/html:ro
+      - media:/media:ro
+      - static:/static:ro
+volumes: {pgdata: {}, media: {}, static: {}, frontend_dist: {}}

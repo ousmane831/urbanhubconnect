@@ -1,0 +1,170 @@
+# =========================================================
+# URBAN HUB CONNECT
+# Root .gitignore
+# Backend Django + Frontend React/Vite
+# =========================================================
+
+
+# =========================================================
+# BACKEND — PYTHON / DJANGO
+# =========================================================
+
+# Environnements virtuels
+backend/env/
+backend/venv/
+backend/.venv/
+backend/ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Python test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Django
+backend/db.sqlite3
+backend/db.sqlite3-journal
+
+# Django static/media générés localement
+backend/staticfiles/
+backend/media/
+
+# Django local settings
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# Logs
+backend/*.log
+backend/logs/
+*.log
+
+
+# =========================================================
+# FRONTEND — NODE / REACT / VITE
+# =========================================================
+
+# Node
+frontend/node_modules/
+
+# Vite / production build
+frontend/dist/
+frontend/.vite/
+
+# Frontend environment variables
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# Logs npm / yarn / pnpm
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/.pnpm-debug.log*
+
+# Package manager caches
+frontend/.npm/
+frontend/.yarn/
+frontend/.pnp.*
+
+# Coverage
+frontend/coverage/
+
+
+# =========================================================
+# EDITORS / IDE
+# =========================================================
+
+# VS Code
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# IntelliJ / WebStorm
+.idea/
+*.iml
+
+# Cursor
+.cursor/
+
+# Windsurf
+.windsurf/
+
+# Devin
+.devin/
+
+
+# =========================================================
+# OPERATING SYSTEM
+# =========================================================
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+
+
+# =========================================================
+# TEMPORARY / BACKUP FILES
+# =========================================================
+
+*.tmp
+*.temp
+*.bak
+*.backup
+*.swp
+*.swo
+
+# Patch files generated locally
+*.patch
+
+# Local exports / dumps
+*.dump
+*.sql
+
+
+# =========================================================
+# ENVIRONMENT / SECRETS
+# =========================================================
+
+# Generic environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Secrets / credentials
+*.pem
+*.key
+*.crt
+
+# Service account / credentials files
+credentials.json
+service-account.json
+
+.github
