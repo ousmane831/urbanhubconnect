@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from apps.core.admin import PublishActionsMixin, SubmissionAdminMixin, TaxonomyAdmin
-from .models import (AwardApplication, AwardCategory, BusinessConnectRegistration, Event, EventCategory,
+from .models import (EventRequest, EventSection, AwardApplication, AwardCategory, BusinessConnectRegistration, Event, EventCategory,
                      VolunteerApplication, VolunteerMission)
 
 
@@ -10,8 +10,15 @@ class EventCategoryAdmin(TaxonomyAdmin):
     pass
 
 
+class EventSectionInline(admin.StackedInline):
+    model = EventSection
+    extra = 0
+    fields = ("slug", "title", "order", "is_published", "body")
+
+
 @admin.register(Event)
 class EventAdmin(PublishActionsMixin, admin.ModelAdmin):
+    inlines = [EventSectionInline]
     list_display = ("title", "category", "start_date", "location", "is_featured", "publication")
     list_filter = ("is_published", "is_featured", "category")
     search_fields = ("title", "location", "description")
@@ -53,4 +60,12 @@ class VolunteerApplicationAdmin(SubmissionAdminMixin, admin.ModelAdmin):
     list_filter = ("status", "missions")
     search_fields = ("name", "email", "organization")
     filter_horizontal = ("missions",)
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(EventRequest)
+class EventRequestAdmin(SubmissionAdminMixin, admin.ModelAdmin):
+    list_display = ("name", "kind", "organization", "email", "status_badge", "created_at")
+    list_filter = ("status", "kind")
+    search_fields = ("name", "organization", "email")
     readonly_fields = ("created_at", "updated_at")

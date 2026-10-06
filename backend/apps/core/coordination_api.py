@@ -16,7 +16,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from apps.events.models import (AwardApplication, BusinessConnectRegistration, Event, VolunteerApplication)
+from apps.events.models import (AwardApplication, BusinessConnectRegistration, Event, EventRequest, VolunteerApplication)
 from apps.contact.models import ContactMessage
 from apps.map.models import MapPlace, PlaceSuggestion
 from apps.memberships.models import MembershipApplication
@@ -147,6 +147,12 @@ KINDS = {
         details=lambda o: rows(("Organisation", get(o, "organization")), ("E-mail", get(o, "email")), ("Téléphone", get(o, "phone")),
                                ("Propose", get(o, "what_offers")), ("Recherche", get(o, "what_needs")),
                                ("Rencontres souhaitées", get(o, "preferred_meetings")))),
+    "event-requests": dict(
+        label="Demandes liées aux événements", model=EventRequest, qs=lambda: EventRequest.objects.filter(status__in=OPEN),
+        title=lambda o: get(o, "name"), subtitle=lambda o: " · ".join(x for x in (label(o, "kind"), get(o, "organization")) if x),
+        actions=_status_actions,
+        details=lambda o: rows(("E-mail", get(o, "email")), ("Téléphone", get(o, "phone")), ("Circuit", label(o, "circuit")),
+                               ("Décharge acceptée", "oui" if get(o, "accept_waiver", False) else ""), ("Message", get(o, "message")))),
     "volunteers": dict(
         label="Candidatures de bénévoles", model=VolunteerApplication, qs=lambda: VolunteerApplication.objects.filter(status__in=OPEN),
         title=lambda o: get(o, "name"), subtitle=lambda o: ", ".join(names(o, "missions")) or "Aucune mission précisée", actions=_status_actions,

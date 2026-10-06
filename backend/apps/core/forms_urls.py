@@ -3,7 +3,7 @@ from rest_framework import serializers, status
 from rest_framework.response import Response
 
 from apps.contact.models import ContactMessage
-from apps.events.models import (AwardApplication, AwardCategory, BusinessConnectRegistration, Event,
+from apps.events.models import (AwardApplication, AwardCategory, BusinessConnectRegistration, Event, EventRequest,
                                 VolunteerApplication, VolunteerMission)
 from apps.map.models import MapCategory, PlaceSuggestion
 from apps.memberships.models import MembershipApplication, MembershipCategory
@@ -15,7 +15,7 @@ from .forms_api import (CleanedModelSerializer, SubmissionCreateView, build_seri
                         submission_view)
 
 active = lambda m: m.objects.filter(is_active=True)
-college = (active(College), False)
+college, sector = (active(College), False), (active(Sector), False)
 commissions = (active(Commission), False)
 CONSENT = lambda *n: {k: serializers.BooleanField(write_only=True) for k in n}
 
@@ -24,14 +24,14 @@ membership = build_serializer(
     MembershipApplication,
     ["organization_or_name", "category", "college", "sector", "pole", "representative", "role", "phone",
      "email", "commissions", "offers", "needs", "accept_charter", "accept_privacy"],
-    slugs={"category": (active(MembershipCategory), True), "college": college},
+    slugs={"category": (active(MembershipCategory), True), "college": college, "sector": sector},
     many_slugs={"commissions": commissions},
     extra=CONSENT("accept_charter", "accept_privacy"))
 
 # -- Annuaire : demande de référencement -> fiche "pending", jamais publiée
 class OrganizationSubmitSerializer(CleanedModelSerializer):
     college = serializers.SlugRelatedField(slug_field="slug", queryset=active(College))
-    sector = serializers.CharField()
+    sector = serializers.SlugRelatedField(slug_field="slug", queryset=active(Sector))
     commissions = serializers.SlugRelatedField(slug_field="slug", many=True, required=False, queryset=active(Commission))
     accept_charter = serializers.BooleanField(write_only=True)
     accept_privacy = serializers.BooleanField(write_only=True)
@@ -85,9 +85,10 @@ urlpatterns = [
     path("press/accreditation/", submission_view(build_serializer(
         PressAccreditation, ["media", "name", "role", "phone", "email", "attendance_days"]), name="AccreditationCreate")),
     path("map/suggest/", submission_view(build_serializer(
-        PlaceSuggestion, ["name", "category", "address", "latitude", "longitude", "description", "website", "phone", "email", "opening_hours", "photo", "submitter_name", "submitter_email"],
+        PlaceSuggestion, ["name", "category", "address", "latitude", "longitude", "description", "website", "phone",
+                          "email", "opening_hours", "photo", "submitter_name", "submitter_email"],
         slugs={"category": (active(MapCategory), True)}),
-        "Merci. Votre suggestion a bien été transmise.", "PlaceSuggest")),
+        "Merci. Votre proposition a bien été transmise : la Coordination vérifie chaque information avant publication.", "PlaceSuggest")),
     path("awards/applications/", submission_view(build_serializer(
         AwardApplication, ["category", "applicant_name", "organization", "email", "phone", "description",
                            "supporting_document", "accept_privacy"],
@@ -96,6 +97,9 @@ urlpatterns = [
         BusinessConnectRegistration, ["event", "participant_name", "organization", "email", "phone", "what_offers",
                                       "what_needs", "preferred_meetings", "accept_privacy"],
         slugs={"event": (Event.objects.public(), True)}, extra=CONSENT("accept_privacy")), name="BusinessConnect")),
+    path("event-requests/", submission_view(build_serializer(
+        EventRequest, ["kind", "name", "organization", "email", "phone", "circuit", "message", "accept_waiver", "accept_privacy"],
+        extra=CONSENT("accept_privacy")), "Merci. Votre demande a bien été transmise. La Coordination vous recontactera rapidement.", "EventRequestCreate")),
     path("volunteers/", submission_view(build_serializer(
         VolunteerApplication, ["name", "email", "phone", "organization", "missions", "availability", "message"],
         many_slugs={"missions": (active(VolunteerMission), False)}), name="VolunteerApply")),

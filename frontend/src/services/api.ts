@@ -1,5 +1,5 @@
 import { http } from "./http";
-import type { Article, DocumentItem, EventItem, Partner, PressRelease, Priced, RefItem, MapCategory, MapPlace, OrganizationDetail, OrganizationFilters, OrganizationListItem, Paginated, SiteSettings } from "../types/api";
+import type { EventDetail, PageContent, Article, DocumentItem, EventItem, Partner, PressRelease, Priced, RefItem, MapCategory, MapPlace, OrganizationDetail, OrganizationFilters, OrganizationListItem, Paginated, SiteSettings } from "../types/api";
 
 export const getSiteSettings = () => http.get<SiteSettings>("/site-settings/").then((r) => r.data);
 export const getFeaturedEvents = () =>
@@ -25,7 +25,8 @@ export const submitMultipart = (path: string, form: FormData) => http.post<{ det
 const get = <T,>(url: string, params?: object) => http.get<T>(url, { params: params ? clean(params) : undefined }).then((r) => r.data);
 export const listEvents = (q: { category?: string; upcoming?: boolean; page?: number }) =>
   get<Paginated<EventItem>>("/events/", { ...q, upcoming: q.upcoming === false ? "false" : "true" });
-export const getEvent = (slug: string) => get<EventItem>(`/events/${slug}/`);
+export const getEvent = (slug: string) => get<EventDetail>(`/events/${slug}/`);
+export const getPage = (slug: string) => get<PageContent>(`/pages/${slug}/`);
 export const getEventCategories = () => get<RefItem[]>("/events/categories/");
 export const listArticles = (q: { category__slug?: string; page?: number }) => get<Paginated<Article>>("/articles/", q);
 export const getArticle = (slug: string) => get<Article>(`/articles/${slug}/`);

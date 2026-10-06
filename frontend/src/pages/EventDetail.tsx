@@ -2,6 +2,7 @@ import { CalendarDays, MapPin } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/ui/Button";
 import { Container } from "../components/ui/Container";
+import { RichText } from "../components/ui/RichText";
 import { ErrorState, Loading } from "../components/ui/States";
 import { useAsync } from "../hooks/useAsync";
 import { useSeo } from "../hooks/useSeo";
@@ -25,6 +26,7 @@ export default function EventDetail() {
       {e.location && <p className="mt-1 flex items-center gap-2 text-lg"><MapPin className="h-5 w-5" aria-hidden />{e.location}</p>}
       {e.image && <img src={e.image} alt="" className="mt-8 w-full rounded" />}
       {e.description && <div className="mt-8 whitespace-pre-line text-lg leading-relaxed">{e.description}</div>}
+      {e.sections.map((s) => <section key={s.slug} className="mt-10"><h2 className="mb-4 text-2xl">{s.title}</h2><RichText text={s.body} /></section>)}
       {e.registration_url && <Button to={e.registration_url} target="_blank" rel="noopener noreferrer" className="mt-8">S'inscrire<span className="sr-only"> (nouvel onglet)</span></Button>}
     </Container>
   );

@@ -1,33 +1,49 @@
-import { CalendarDays, MapPin } from "lucide-react";
+import { CalendarDays, Download, MapPin } from "lucide-react";
+import type { ReactNode } from "react";
 import { Countdown } from "../components/Countdown";
 import { ConfigForm, type FieldDef } from "../components/forms/ConfigForm";
+import { Button } from "../components/ui/Button";
 import { Container, Section } from "../components/ui/Container";
 import { HexPattern } from "../components/ui/HexPattern";
+import { Reveal } from "../components/ui/Reveal";
+import { RichText } from "../components/ui/RichText";
 import { ErrorState, Loading } from "../components/ui/States";
+import { EventRequestForm } from "../features/events/EventRequestForm";
 import { useAsync } from "../hooks/useAsync";
 import { useSeo } from "../hooks/useSeo";
-import { getAwardCategories, getEvent, getVolunteerMissions } from "../services/api";
-import { fmtDay, fmtRange } from "../utils/format";
+import { getAwardCategories, getDocuments, getEvent, getVolunteerMissions } from "../services/api";
+import { fmtDate, fmtRange } from "../utils/format";
+import { parseBlocks } from "../utils/richtext";
 import { NotFound } from "./ErrorPage";
 
 const SLUG = "grand-week-end-du-pole-2026";
-// Composantes du Grand Week-End citées dans le cahier des charges ; les textes détaillés se saisissent dans l'admin.
-const COMPONENTS = ["Awards", "Business Connect", "Défis Partenaires", "Portes Ouvertes", "Caravane verte"];
-const DAY = 86_400_000;
+const Block = ({ id, title, tone, children }: { id: string; title: string; tone?: "offwhite"; children: ReactNode }) => (
+  <Section id={id} tone={tone}><h2 className="mb-6 text-2xl sm:text-3xl">{title}</h2><div className="space-y-6">{children}</div></Section>);
+const DocLink = ({ doc, label, missing }: { doc?: { file: string }; label: string; missing: string }) =>
+  doc ? <a href={doc.file} download className="link inline-flex items-center gap-2 font-semibold"><Download className="h-4 w-4" aria-hidden />{label}<span className="sr-only"> (PDF)</span></a>
+    : <p className="text-navy/65">{missing}</p>;
 
 export default function GrandWeekEnd() {
   const ev = useAsync(() => getEvent(SLUG));
   const awards = useAsync(getAwardCategories);
   const missions = useAsync(getVolunteerMissions);
+  const program = useAsync(() => getDocuments("program"));
+  const rules = useAsync(() => getDocuments("awards_rules"));
+  useSeo("Le Grand Week-End du Pôle 2026 – 11 au 13 décembre, Diamniadio et Lac Rose",
+    "Première édition : Rencontre des décideurs, Forum du Pôle, Business Connect, Portes Ouvertes, Gala des Awards et Caravane verte.", undefined, true);
   const e = ev.data;
-  useSeo("Grand Week-End du Pôle 2026", "Le Grand Week-End du Pôle 2026 : programme, Awards, Business Connect, Portes Ouvertes, Caravane verte, bénévoles.");
   if (ev.notFound) return <NotFound />;
   if (ev.loading) return <Loading />;
   if (ev.error || !e) return <Container className="py-16"><ErrorState message={ev.error ?? "Événement indisponible."} onRetry={ev.retry} /></Container>;
 
-  const start = new Date(e.start_date).getTime();
-  const days = [0, 1, 2].map((i) => new Date(start + i * DAY).toISOString());
+  const sec = (slug: string) => e.sections.find((s) => s.slug === slug);
   const opt = (l?: { slug: string; name: string }[]) => l?.map((x) => ({ value: x.slug, label: x.name })) ?? [];
+  const intro = parseBlocks(sec("presentation")?.body ?? "");
+  const tagline = intro[0]?.type === "p" ? intro[0].text : "";
+  const rest = (sec("presentation")?.body ?? "").split(/\n{2,}/).slice(1).join("\n\n");
+  const opens = e.registration_opens_at ? new Date(e.registration_opens_at) : null;
+  const registrationOpen = !opens || opens.getTime() <= Date.now();
+
   const bc: FieldDef[] = [
     { name: "participant_name", label: "Nom", type: "text", required: true }, { name: "organization", label: "Organisation", type: "text" },
     { name: "email", label: "E-mail", type: "email", required: true }, { name: "phone", label: "Téléphone", type: "tel" },
@@ -45,6 +61,10 @@ export default function GrandWeekEnd() {
     { name: "phone", label: "Téléphone", type: "tel", required: true }, { name: "organization", label: "Organisation", type: "text" },
     { name: "missions", label: "Missions souhaitées", type: "multi", options: opt(missions.data) },
     { name: "availability", label: "Disponibilités", type: "text", full: true }, { name: "message", label: "Message", type: "textarea" }];
+  const simple = (slug: string, title: string, action: ReactNode, tone?: "offwhite") => {
+    const s = sec(slug);
+    return s ? <Block id={slug} title={title || s.title} tone={tone}><RichText text={s.body} />{action}</Block> : null;
+  };
 
   return (
     <>
@@ -52,27 +72,49 @@ export default function GrandWeekEnd() {
         <HexPattern className="text-white/[0.05]" />
         <Container className="relative py-14 sm:py-20">
           <h1 className="text-4xl sm:text-6xl">{e.title}</h1>
-          <p className="mt-5 flex items-center gap-2 text-xl"><CalendarDays className="h-6 w-6" aria-hidden />{fmtRange(e.start_date, e.end_date)}</p>
-          {e.location && <p className="mt-1 flex items-center gap-2 text-xl"><MapPin className="h-6 w-6" aria-hidden />{e.location}</p>}
+          {tagline && <p className="mt-4 text-xl text-white/90">{tagline}</p>}
+          <p className="mt-5 flex items-center gap-2 text-lg"><CalendarDays className="h-5 w-5" aria-hidden />{fmtRange(e.start_date, e.end_date)}</p>
+          {e.location && <p className="mt-1 flex items-center gap-2 text-lg"><MapPin className="h-5 w-5" aria-hidden />{e.location}</p>}
           <div className="mt-8"><Countdown target={e.start_date} /></div>
+          <div className="mt-8 flex flex-wrap gap-3">
+            {registrationOpen
+              ? <Button to={e.registration_url || "/contact"} variant="light" {...(e.registration_url ? { target: "_blank", rel: "noopener noreferrer" } : {})}>S'inscrire</Button>
+              : <button disabled aria-disabled className="min-h-[44px] cursor-not-allowed rounded-md bg-white/20 px-5 font-semibold text-white/90">S'inscrire (à partir du {opens && fmtDate(opens.toISOString()).replace(/ \d{4}$/, "")})</button>}
+            <Button to="/partenaires" variant="ghost">Devenir partenaire</Button>
+          </div>
         </Container>
       </section>
-      {e.description && <Section><div className="max-w-3xl whitespace-pre-line text-lg leading-relaxed">{e.description}</div></Section>}
-      <Section tone="offwhite">
+
+      {rest && <Section><h2 className="mb-6 text-2xl sm:text-3xl">Présentation</h2><RichText text={rest} /></Section>}
+
+      <Section tone="offwhite" id="programme">
         <h2 className="mb-8 text-2xl sm:text-3xl">Programme</h2>
-        <ul className="grid gap-6 md:grid-cols-3">{days.map((d) => (
-          <li key={d} className="border-t-4 border-green pt-4"><h3 className="text-xl capitalize">{fmtDay(d)}</h3>
-            <p className="mt-2 text-navy/75">Le programme détaillé sera publié prochainement.</p></li>))}</ul>
-        <h2 className="mb-5 mt-14 text-2xl sm:text-3xl">Au cœur du week-end</h2>
-        <ul className="grid gap-x-10 sm:grid-cols-2 lg:grid-cols-3">{COMPONENTS.map((c) => <li key={c} className="border-t border-navy/15 py-4 text-lg font-semibold">{c}</li>)}</ul>
+        <div className="grid gap-10 lg:grid-cols-3">
+          {["programme-vendredi", "programme-samedi", "programme-dimanche"].map((k) => sec(k) && (
+            <div key={k} className="border-t-4 border-green pt-4"><h3 className="mb-4 text-xl">{sec(k)!.title}</h3><RichText text={sec(k)!.body} /></div>))}
+        </div>
+        <div className="mt-8"><DocLink doc={program.data?.[0]} label="Télécharger le programme" missing="Le programme à télécharger sera disponible prochainement." /></div>
       </Section>
-      <Section id="business-connect"><div className="max-w-3xl"><h2 className="mb-6 text-2xl sm:text-3xl">S'inscrire à Business Connect</h2>
-        <ConfigForm endpoint="/business-connect/" extra={{ event: SLUG }} fields={bc} submitLabel="Envoyer mon inscription" successFallback="Merci. Votre inscription a bien été transmise." /></div></Section>
-      <Section tone="offwhite" id="awards"><div className="max-w-3xl"><h2 className="mb-6 text-2xl sm:text-3xl">Candidater aux Awards</h2>
-        {awards.data?.length ? <ConfigForm key={awards.data.length} endpoint="/awards/applications/" fields={aw} submitLabel="Envoyer ma candidature" successFallback="Merci. Votre candidature a bien été transmise." />
-          : <p className="text-lg text-navy/75">Les candidatures ouvriront prochainement.</p>}</div></Section>
-      <Section id="benevoles"><div className="max-w-3xl"><h2 className="mb-6 text-2xl sm:text-3xl">Devenir bénévole</h2>
-        <ConfigForm key={missions.data?.length ?? 0} endpoint="/volunteers/" fields={vol} submitLabel="Proposer mon aide" successFallback="Merci. Votre candidature de bénévole a bien été transmise." /></div></Section>
+
+      {sec("awards") && (
+        <Block id="awards" title={sec("awards")!.title}>
+          <RichText text={sec("awards")!.body} />
+          {!!awards.data?.length && (
+            <ul className="grid gap-x-10 sm:grid-cols-2">{awards.data.map((c) => (
+              <li key={c.slug} className="border-t border-navy/15 py-4"><h3 className="text-lg">{c.name}</h3>{c.description && <p className="mt-1 text-navy/80">{c.description}</p>}</li>))}</ul>)}
+          {sec("awards-calendrier") && <><h3 className="text-xl">{sec("awards-calendrier")!.title}</h3><RichText text={sec("awards-calendrier")!.body} /></>}
+          <div className="flex flex-wrap items-center gap-6">
+            {awards.data?.length ? <Reveal label="Déposer une candidature"><ConfigForm key={awards.data.length} endpoint="/awards/applications/" fields={aw} submitLabel="Envoyer ma candidature" successFallback="Merci. Votre candidature a bien été transmise." /></Reveal> : <p className="text-navy/75">Les candidatures ouvriront prochainement.</p>}
+            <DocLink doc={rules.data?.[0]} label="Télécharger le règlement" missing="Le règlement sera disponible prochainement." />
+          </div>
+        </Block>)}
+
+      {simple("business-connect", "", <Reveal label="M'inscrire au Business Connect"><ConfigForm endpoint="/business-connect/" extra={{ event: SLUG }} fields={bc} submitLabel="Envoyer mon inscription" successFallback="Merci. Votre inscription a bien été transmise." /></Reveal>, "offwhite")}
+      {simple("defis-partenaires", "", <Reveal label="Voir les défis et proposer une solution"><EventRequestForm kind="challenge" /></Reveal>)}
+      {simple("portes-ouvertes", "", <div className="flex flex-wrap gap-4"><Reveal label="Réserver ma visite"><EventRequestForm kind="book_visit" /></Reveal><Reveal label="Ouvrir les portes de mon organisation"><EventRequestForm kind="open_doors" /></Reveal></div>, "offwhite")}
+      {simple("caravane-verte", "", <Reveal label="M'inscrire à la Caravane verte"><EventRequestForm kind="caravan" /></Reveal>)}
+      {simple("benevoles", "", <Reveal label="Devenir bénévole"><ConfigForm key={missions.data?.length ?? 0} endpoint="/volunteers/" fields={vol} submitLabel="Proposer mon aide" successFallback="Merci. Votre candidature de bénévole a bien été transmise." /></Reveal>, "offwhite")}
+      {simple("infos-pratiques", "", null)}
     </>
   );
 }

@@ -28,9 +28,13 @@ PageSer = ser(PageContent, ["title", "slug", "meta_title", "meta_description", "
 MembershipSer = ser(MembershipCategory, ["name", "slug", "description", "amount_fcfa"])
 TierSer = ser(PartnershipTier, ["name", "slug", "description", "amount_fcfa", "benefits"])
 PartnerSer = ser(Partner, ["name", "logo", "website", "partnership_type"], partnership_type=serializers.StringRelatedField())
-EventSer = ser(Event, ["title", "slug", "category", "category_name", "description", "audience", "start_date",
-                       "end_date", "location", "image", "registration_url", "is_featured"],
-               category=cat(), category_name=cat_name())
+EVENT_FIELDS = ["title", "slug", "category", "category_name", "description", "audience", "start_date", "end_date",
+                "location", "image", "registration_url", "registration_opens_at", "is_featured"]
+EventSer = ser(Event, EVENT_FIELDS, category=cat(), category_name=cat_name())
+EventDetailSer = ser(Event, EVENT_FIELDS + ["sections"], category=cat(), category_name=cat_name(),
+                     sections=serializers.SerializerMethodField(),
+                     get_sections=lambda self, obj: [{"slug": s.slug, "title": s.title, "body": s.body}
+                                                     for s in obj.sections.filter(is_published=True)])
 ArticleSer = ser(Article, ["title", "slug", "category", "category_name", "excerpt", "content", "featured_image", "author",
                            "published_at", "meta_title", "meta_description"], category=cat(), category_name=cat_name())
 DocumentSer = ser(Document, ["title", "file", "category", "description"])
@@ -71,9 +75,11 @@ class EventFilter(django_filters.FilterSet):
 
 
 class EventViewSet(ReadOnly):
-    serializer_class = EventSer
     filterset_class = EventFilter
     search_fields = ["title", "location", "description"]
+
+    def get_serializer_class(self):
+        return EventDetailSer if self.action == "retrieve" else EventSer
 
     def get_queryset(self):
         return Event.objects.public().select_related("category")

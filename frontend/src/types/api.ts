@@ -8,8 +8,10 @@ export interface SiteSettings {
 export interface EventItem {
   title: string; slug: string; category: string; category_name: string; description: string; audience: string;
   start_date: string; end_date: string | null; location: string; image: string | null;
-  registration_url: string; is_featured: boolean;
+  registration_url: string; registration_opens_at: string | null; is_featured: boolean;
 }
+export interface EventDetail extends EventItem { sections: { slug: string; title: string; body: string }[] }
+export interface PageContent { title: string; slug: string; content: string }
 export interface OrganizationFilters {
   poles: { value: string; label: string }[]; colleges: Taxonomy[]; sectors: Taxonomy[]; commissions: Taxonomy[];
 }

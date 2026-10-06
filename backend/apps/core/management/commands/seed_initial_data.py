@@ -6,6 +6,7 @@ from django.db import transaction
 from django.utils.text import slugify
 
 from apps.core.roles import sync_coordination_group
+from apps.core.seed_event_content import seed_event_content
 from apps.events.models import Event, EventCategory, VolunteerMission
 from apps.map.models import MapCategory
 from apps.memberships.models import MembershipCategory
@@ -82,7 +83,7 @@ class Command(BaseCommand):
     def _seed_content(self):
         dakar = ZoneInfo("Africa/Dakar")
         # Dates fournies par le cahier des charges ; description/lieu/programme laissés vides (à saisir dans l'admin).
-        _, ev = Event.objects.get_or_create(
+        event, ev = Event.objects.get_or_create(
             slug="grand-week-end-du-pole-2026",
             defaults={"title": "Grand Week-End du Pôle 2026",
                       "category": EventCategory.objects.get(slug=slugify("Grand Week-End du Pôle")),
@@ -97,4 +98,5 @@ class Command(BaseCommand):
                       "category": ArticleCategory.objects.get(slug=slugify("Le réseau")),
                       "content": "[à compléter : texte de l'article fourni dans le cahier des charges]",
                       "is_published": False})
+        self.stdout.write(f"{'contenus événement':<28} +{seed_event_content(event)}")
         self.stdout.write(f"{'événement / article':<28} +{int(ev)} / +{int(art)} (article en brouillon masqué)")
