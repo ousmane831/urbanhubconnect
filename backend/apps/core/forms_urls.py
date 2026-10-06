@@ -85,8 +85,7 @@ urlpatterns = [
     path("press/accreditation/", submission_view(build_serializer(
         PressAccreditation, ["media", "name", "role", "phone", "email", "attendance_days"]), name="AccreditationCreate")),
     path("map/suggest/", submission_view(build_serializer(
-        PlaceSuggestion, ["name", "category", "address", "latitude", "longitude", "description", "website",
-                          "submitter_name", "submitter_email"],
+        PlaceSuggestion, ["name", "category", "address", "latitude", "longitude", "description", "website", "phone", "email", "opening_hours", "photo", "submitter_name", "submitter_email"],
         slugs={"category": (active(MapCategory), True)}),
         "Merci. Votre suggestion a bien été transmise.", "PlaceSuggest")),
     path("awards/applications/", submission_view(build_serializer(

@@ -30,6 +30,17 @@ MAP_CATEGORIES = [("Institutions et administrations", "landmark"), ("Entreprises
                   ("Tourisme et patrimoine", "tree-palm"), ("Initiatives et communautés", "users")]
 EVENT_CATEGORIES = ["After Work Connect", "Commission", "Visite", "Grand Week-End du Pôle"]
 MISSIONS = ["Accueil et accréditations", "Orientation", "Forum et Business Connect", "Portes Ouvertes", "Gala et protocole", "Caravane verte et reboisement"]
+MAP_DESCRIPTIONS = {
+    "Institutions et administrations": "Ministères, agences, collectivités, services techniques",
+    "Entreprises et zones d'activité": "Sièges, sites de production, parcs et zones d'activité, membres du réseau",
+    "Enseignement et formation": "Universités, écoles, centres de formation",
+    "Santé": "Hôpitaux, centres et postes de santé, pharmacies",
+    "Grands équipements": "Centres de conférences et d'expositions, équipements sportifs et culturels",
+    "Services de proximité": "Commerces, restauration, banques, services aux habitants et aux entreprises",
+    "Mobilité": "Gares, arrêts, stations, parkings, navettes",
+    "Tourisme et patrimoine": "Sites naturels, hébergements, artisanat, lieux culturels",
+    "Initiatives et communautés": "Associations, groupements de femmes et de jeunes, projets communautaires, plantations de la Forêt Urban Hub Connect",
+}
 ARTICLE_CATEGORIES = ["Le réseau", "Événements", "Les visages du Pôle", "Opportunités"]
 MEMBERSHIP = [("Grande entreprise, institution, banque, promoteur", 500_000),
               ("PME, établissement d'enseignement supérieur", 150_000),
@@ -55,7 +66,9 @@ class Command(BaseCommand):
         self._seed(Commission, [(n, {"number": i}) for i, n in enumerate(COMMISSIONS, 1)])
         self._seed(College, [(n, {}) for n in COLLEGES])
         self._seed(Sector, [(n, {}) for n in SECTORS])
-        self._seed(MapCategory, [(n, {"icon": i}) for n, i in MAP_CATEGORIES])
+        self._seed(MapCategory, [(n, {"icon": i, "description": MAP_DESCRIPTIONS[n]}) for n, i in MAP_CATEGORIES])
+        for name, text in MAP_DESCRIPTIONS.items():  # complète les descriptions encore vides, sans écraser l'admin
+            MapCategory.objects.filter(slug=slugify(name), description="").update(description=text)
         self._seed(EventCategory, [(n, {}) for n in EVENT_CATEGORIES])
         self._seed(VolunteerMission, [(n, {}) for n in MISSIONS])
         self._seed(ArticleCategory, [(n, {}) for n in ARTICLE_CATEGORIES])

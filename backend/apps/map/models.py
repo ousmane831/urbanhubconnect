@@ -92,6 +92,12 @@ class PlaceSuggestion(Submission):
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, validators=LONGITUDE_VALIDATORS)
     description = models.TextField(blank=True)
     website = models.URLField(blank=True)
+
+    phone = models.CharField("téléphone du lieu", max_length=30, blank=True)
+    email = models.EmailField("e-mail du lieu", blank=True)
+    opening_hours = models.CharField("horaires", max_length=255, blank=True)
+    photo = models.ImageField(upload_to="map/suggestions/", blank=True,
+                             validators=[validate_image_extension, validate_upload_size])
     submitter_name = models.CharField(max_length=150)
     submitter_email = models.EmailField()
 
@@ -104,5 +110,8 @@ class PlaceSuggestion(Submission):
     def clean(self):
         super().clean()
         errors = coordinate_errors(self.latitude, self.longitude)
+        
+        if not errors and not self.address and self.latitude is None:
+            errors["address"] = "Indiquez une adresse ou placez un point sur la carte."
         if errors:
             raise ValidationError(errors)

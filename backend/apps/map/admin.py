@@ -54,8 +54,9 @@ class PlaceSuggestionAdmin(SubmissionAdminMixin, admin.ModelAdmin):
     def create_place(self, request, queryset):
         total, created = queryset.count(), 0
         for s in queryset.exclude(latitude=None).exclude(longitude=None):
-            MapPlace.objects.create(name=s.name, category=s.category, address=s.address, latitude=s.latitude,
-                                    longitude=s.longitude, description=s.description, website=s.website, is_published=False)
+            MapPlace.objects.create(name=s.name, category=s.category, address=s.address, latitude=s.latitude, longitude=s.longitude,
+                                    description=s.description, website=s.website, phone=s.phone, email=s.email,
+                                    opening_hours=s.opening_hours, image=s.photo.name if s.photo else "", is_published=False)
             s.status = "accepted"
             s.save(update_fields=["status", "updated_at"])
             created += 1

@@ -155,7 +155,8 @@ KINDS = {
     "suggestions": dict(
         label="Lieux suggérés pour la carte", model=PlaceSuggestion, qs=lambda: PlaceSuggestion.objects.filter(status__in=OPEN).select_related(),
         title=lambda o: get(o, "name"), subtitle=lambda o: label(o, "category"), actions=_status_actions,
-        details=lambda o: rows(("Adresse", get(o, "address")), ("Description", get(o, "description")),
+        details=lambda o: rows(("Adresse", get(o, "address")), ("Horaires", get(o, "opening_hours")), ("Téléphone du lieu", get(o, "phone")),
+                               ("E-mail du lieu", get(o, "email")), ("Description", get(o, "description")),
                                ("Proposé par", f"{get(o, 'submitter_name')} ({get(o, 'submitter_email')})"))),
     "messages": dict(
         label="Messages reçus", model=ContactMessage, qs=lambda: ContactMessage.objects.filter(is_handled=False),
@@ -201,7 +202,8 @@ def _apply(kind, obj, action, user):
     msg = {"accepted": "Demande acceptée.", "rejected": "Demande refusée.", "reviewing": "Demande marquée « en cours d'examen »."}[status]
     if kind == "suggestions" and status == "accepted" and obj.latitude is not None and obj.longitude is not None:
         MapPlace.objects.create(name=obj.name, category=obj.category, address=obj.address, latitude=obj.latitude,
-                                longitude=obj.longitude, description=obj.description, website=obj.website, is_published=False)
+                                longitude=obj.longitude, description=obj.description, website=obj.website, phone=obj.phone,
+                                email=obj.email, opening_hours=obj.opening_hours, image=obj.photo.name if obj.photo else "", is_published=False)
         msg += " Un lieu a été créé en brouillon pour la carte."
     return msg
 
