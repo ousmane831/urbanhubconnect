@@ -12,9 +12,9 @@ const meta = (key: "name" | "property", name: string, content: string) =>
   upsert(`meta[${key}="${name}"]`, () => { const m = document.createElement("meta"); m.setAttribute(key, name); return m; }, "content", content);
 
 /** Title, description, canonical, Open Graph et Twitter Card pour chaque page. */
-export function useSeo(title: string, description: string = DEFAULT_DESC, path?: string) {
+export function useSeo(title: string, description: string = DEFAULT_DESC, path?: string, exact = false) {
   useEffect(() => {
-    const full = title === "Urban Hub Connect" ? title : `${title} · Urban Hub Connect`;
+    const full = exact || title === "Urban Hub Connect" ? title : `${title} · Urban Hub Connect`;
     const url = SITE + (path ?? window.location.pathname);
     document.title = full;
     meta("name", "description", description);
@@ -23,5 +23,5 @@ export function useSeo(title: string, description: string = DEFAULT_DESC, path?:
     meta("property", "og:url", url); meta("property", "og:type", "website"); meta("property", "og:locale", "fr_FR");
     meta("name", "twitter:card", "summary_large_image"); meta("name", "twitter:title", full);
     meta("name", "twitter:description", description);
-  }, [title, description, path]);
+  }, [title, description, path, exact]);
 }
