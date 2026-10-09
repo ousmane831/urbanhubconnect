@@ -1,11 +1,10 @@
-import { Container, Section } from "../components/ui/Container";
-import { PageHero } from "../components/ui/PageHero";
+import { Section } from "../components/ui/Container";
 import { ConfigForm, type FieldDef } from "../components/forms/ConfigForm";
 import { HexPattern } from "../components/ui/HexPattern";
 import { useSiteSettings } from "../hooks/useSiteSettings";
 import { useSeo } from "../hooks/useSeo";
 import { Button } from "../components/ui/Button";
-import { MapPin, Phone, Mail, Building2, Send, Clock } from "lucide-react";
+import { MapPin, Phone, Mail, Send, Clock } from "lucide-react";
 
 const SUBJECTS = [["membership", "Adhésion"], ["partnership", "Partenariat"], ["events", "Événements"], ["press", "Presse"],
   ["volunteer", "Bénévolat"], ["directory", "Annuaire"], ["map", "Cartographie"], ["other", "Autre"]].map(([value, label]) => ({ value, label }));

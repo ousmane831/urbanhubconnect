@@ -15,7 +15,7 @@ export function Footer() {
       <HexPattern className="text-white/[0.04]" />
       <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-8">
         <div className="space-y-4">
-          <Logo onDark />
+          <Logo />
           <address className="not-italic text-white/85">{s.address.split(",").map((l) => <span key={l} className="block">{l.trim()}</span>)}</address>
           <p><a className="underline-offset-4 hover:underline" href={`tel:${s.phone.replace(/\s/g, "")}`}>{s.phone}</a></p>
           <p><a className="underline-offset-4 hover:underline" href={`mailto:${s.email}`}>{s.email}</a></p>

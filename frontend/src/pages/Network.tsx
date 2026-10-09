@@ -2,7 +2,7 @@ import { Section, SectionHeading } from "../components/ui/Container";
 import { Button } from "../components/ui/Button";
 import { HexPattern } from "../components/ui/HexPattern";
 import { useSeo } from "../hooks/useSeo";
-import { Network, Users, HandHeart, Target, Award, Globe, Building2, Calendar, FileText, Briefcase, GraduationCap, Users2, Heart, Sparkles, TrendingUp } from "lucide-react";
+import { Network, Users, HandHeart, Target, Award, Globe, Building2, FileText, Briefcase, GraduationCap, Users2, Sparkles, TrendingUp } from "lucide-react";
 
 const MISSIONS = [
   { title: "Connecter", description: "Faciliter les rencontres et les échanges entre tous les acteurs du territoire", icon: Network, color: "bg-green" },
@@ -74,7 +74,7 @@ export default function NetworkPage() {
       <Section tone="offwhite">
         <SectionHeading title="Nos valeurs" intro="Les principes qui fondent notre démarche collective." />
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {VALEURS.map((valeur, index) => {
+          {VALEURS.map((valeur) => {
             const Icon = valeur.icon;
             return (
               <div key={valeur.title} className="group relative overflow-hidden rounded-xl border border-navy/10 bg-white p-6 shadow-soft transition-all hover:border-green hover:shadow-lg">
