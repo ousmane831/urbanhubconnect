@@ -23,4 +23,16 @@ describe("NewsletterForm", () => {
     await userEvent.click(screen.getByRole("button", { name: "S'abonner" }));
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("inscription"));
   });
+
+  it("la version complète propose nom, e-mail, organisation et le bouton « Je m'abonne »", async () => {
+    const spy = vi.spyOn(api, "submitForm").mockResolvedValue("Merci, votre inscription à la newsletter est enregistrée.");
+    render(<NewsletterForm variant="full" />);
+    await userEvent.click(screen.getByRole("button", { name: "Je m'abonne" }));
+    expect(await screen.findByText("Saisissez votre adresse e-mail.")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Nom"), "Awa");
+    await userEvent.type(screen.getByLabelText(/E-mail/), "awa@x.org");
+    await userEvent.type(screen.getByLabelText("Organisation"), "Exemple SA");
+    await userEvent.click(screen.getByRole("button", { name: "Je m'abonne" }));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith("/newsletter/", expect.objectContaining({ email: "awa@x.org", name: "Awa", organization: "Exemple SA" })));
+  });
 });
