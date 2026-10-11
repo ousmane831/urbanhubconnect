@@ -56,12 +56,34 @@ PARTNERSHIP = [("Partenaire Fondateur", 7_500_000), ("Partenaire Officiel", 4_00
 class Command(BaseCommand):
     help = "Crée les données institutionnelles de référence (idempotent, n'écrase jamais les modifications faites dans l'admin)."
 
+
     def _seed(self, model, rows):
         created = 0
+
         for order, (name, defaults) in enumerate(rows, start=1):
-            _, new = model.objects.get_or_create(slug=slugify(name), defaults={"name": name, "display_order": order, **defaults})
-            created += new
-        self.stdout.write(f"{model._meta.verbose_name_plural:<28} +{created} (total {model.objects.count()})")
+            slug = slugify(name)
+
+            # Rechercher d'abord par slug
+            obj = model.objects.filter(slug=slug).first()
+
+            # Si le slug n'existe pas, rechercher par nom
+            if obj is None:
+                obj = model.objects.filter(name=name).first()
+
+            # Créer uniquement si l'enregistrement n'existe pas
+            if obj is None:
+                model.objects.create(
+                    name=name,
+                    slug=slug,
+                    display_order=order,
+                    **defaults,
+                )
+                created += 1
+
+        self.stdout.write(
+            f"{model._meta.verbose_name_plural:<28} "
+            f"+{created} (total {model.objects.count()})"
+        )
 
     @transaction.atomic
     def handle(self, *args, **opts):
