@@ -1,13 +1,13 @@
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
 import { Forbidden, NotFound, ServerError } from "./pages/ErrorPage";
-import { PageStub } from "./pages/PageStub";
+
 
 type Loader = () => Promise<{ default: React.ComponentType }>;
 const lazyPage = (load: Loader): Pick<RouteObject, "lazy"> => ({ lazy: async () => ({ Component: (await load()).default }) });
 const lazyNamed = (load: () => Promise<Record<string, React.ComponentType>>, name: string): Pick<RouteObject, "lazy"> =>
   ({ lazy: async () => ({ Component: (await load())[name] }) });
-const stub = (title: string) => ({ element: <PageStub title={title} /> });
+
 
 /**
  * Pages restant à construire (lots suivants) : remplacer chaque stub() par lazyPage(() => import("./pages/…")).
