@@ -1,9 +1,10 @@
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogOut } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { Button } from "../ui/Button";
 import { Logo } from "./Logo";
 import { NAV_LINKS } from "./nav";
+import { useMaintenanceAuth } from "../../hooks/useMaintenanceAuth";
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
   `rounded px-2 py-2 text-[0.95rem] font-semibold hover:text-green ${isActive ? "text-green underline decoration-2 underline-offset-8" : "text-navy"}`;
@@ -13,6 +14,7 @@ export function Header() {
   const toggle = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
+  const { isAuthenticated, logout } = useMaintenanceAuth();
 
   useEffect(() => setOpen(false), [pathname]);
   useEffect(() => {
@@ -33,6 +35,16 @@ export function Header() {
         <nav aria-label="Navigation principale" className="hidden items-center gap-1 xl:flex">
           {NAV_LINKS.map((l) => <NavLink key={l.to} to={l.to} className={linkCls}>{l.label}</NavLink>)}
           <Button to="/adherer" className="ml-3 !min-h-[40px] !py-2">Adhérer</Button>
+          {isAuthenticated && (
+            <button
+              onClick={logout}
+              className="ml-3 flex items-center gap-2 px-3 py-2 text-sm font-semibold text-navy hover:text-red-600 transition-colors"
+              title="Déconnexion mode maintenance"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden lg:inline">Quitter maintenance</span>
+            </button>
+          )}
         </nav>
         <button ref={toggle} className="flex h-11 w-11 items-center justify-center rounded-md border border-navy/20 xl:hidden"
           aria-expanded={open} aria-controls="menu-mobile" aria-label={open ? "Fermer le menu" : "Ouvrir le menu"} onClick={() => setOpen((o) => !o)}>
@@ -46,6 +58,15 @@ export function Header() {
               <NavLink key={l.to} to={l.to} className={({ isActive }) => `border-b border-navy/10 py-3.5 text-lg font-semibold ${isActive ? "text-green" : ""}`}>{l.label}</NavLink>
             ))}
             <Button to="/adherer" className="mt-5">Adhérer</Button>
+            {isAuthenticated && (
+              <button
+                onClick={logout}
+                className="mt-4 flex items-center gap-2 py-3.5 text-lg font-semibold text-navy hover:text-red-600 transition-colors"
+              >
+                <LogOut className="h-5 w-5" />
+                Quitter maintenance
+              </button>
+            )}
           </nav>
         </div>
       )}

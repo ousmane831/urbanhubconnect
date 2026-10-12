@@ -1,6 +1,7 @@
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
 import { Forbidden, NotFound, ServerError } from "./pages/ErrorPage";
+import { MaintenanceGuard } from "./components/MaintenanceGuard";
 
 
 type Loader = () => Promise<{ default: React.ComponentType }>;
@@ -14,10 +15,11 @@ const lazyNamed = (load: () => Promise<Record<string, React.ComponentType>>, nam
  * L'ordre compte : les routes statiques sont déclarées avant les routes à paramètre (:slug).
  */
 export const router = createBrowserRouter([
+  { path: "maintenance", ...lazyPage(() => import("./pages/Maintenance")) },
   { path: "coordination", ...lazyPage(() => import("./pages/Coordination")), errorElement: <ServerError /> },
   {
     
-    element: <MainLayout />,
+    element: <MaintenanceGuard><MainLayout /></MaintenanceGuard>,
     errorElement: <ServerError />,
     children: [
       { index: true, ...lazyPage(() => import("./pages/Home")) },
