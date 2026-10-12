@@ -40,6 +40,7 @@ urlpatterns = [
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
     path("api/site-settings/", c.SiteSettingsView.as_view(), name="site-settings"),
+    path("api/actions/", c.ActionsView.as_view(), name="actions"),
     path("api/documents/", c.DocumentList.as_view(), name="documents"),
     path("api/press/", c.PressList.as_view(), name="press"),
     path("api/memberships/categories/", c.MembershipCategoryList.as_view(), name="membership-categories"),

@@ -91,3 +91,17 @@ class Submission(TimeStampedModel):
     class Meta:
         abstract = True
         ordering = ["-created_at"]
+
+class ActionItem(Taxonomy):
+    """Programmes, cercles et outils du réseau (page « Nos actions »), modifiables dans l'admin."""
+    class Kind(models.TextChoices):
+        PROGRAMME = "programme", "Programme"
+        CERCLE = "cercle", "Cercle"
+        OUTIL = "outil", "Outil du réseau"
+
+    kind = models.CharField("type", max_length=10, choices=Kind.choices, db_index=True)
+    link = models.CharField("lien", max_length=200, blank=True, help_text="Page du site (ex. /annuaire) ou adresse web complète.")
+
+    class Meta(Taxonomy.Meta):
+        ordering = ["kind", "display_order", "name"]
+        verbose_name, verbose_name_plural = "programme, cercle ou outil", "programmes, cercles et outils"

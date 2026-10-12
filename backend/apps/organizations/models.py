@@ -19,7 +19,7 @@ class Sector(Taxonomy):
 
 class Commission(Taxonomy):
     number = models.PositiveSmallIntegerField("numéro", unique=True)
-
+    actions = models.TextField("exemples d'actions", blank=True)
     class Meta(Taxonomy.Meta):
         ordering = ["number"]
         verbose_name, verbose_name_plural = "commission", "commissions"

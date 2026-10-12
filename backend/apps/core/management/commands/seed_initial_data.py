@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils.text import slugify
-
+from apps.core.seed_actions import seed_actions
 from apps.core.roles import sync_coordination_group
 from apps.core.seed_article import seed_first_article
 from apps.core.seed_event_content import seed_event_content
@@ -116,3 +116,4 @@ class Command(BaseCommand):
         art_created, art_updated = seed_first_article()
         self.stdout.write(f"{'contenus événement':<28} +{seed_event_content(event)}")
         self.stdout.write(f"{'événement / article':<28} +{int(ev)} / +{art_created} (mis à jour : {art_updated})")
+        self.stdout.write(f"{'nos actions':<28} +{seed_actions()}")

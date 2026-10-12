@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils import timezone
 from django.utils.html import format_html
 
-from .models import PageContent, SiteSettings
+from .models import PageContent, SiteSettings,ActionItem
 
 GREEN, GOLD, PURPLE, RED, GREY = "#1E5C3F", "#C39A3E", "#4E2A84", "#9B2C2C", "#6B7280"
 
@@ -88,3 +88,9 @@ class SubmissionAdminMixin:
     @admin.action(description="Refuser")
     def reject(self, request, queryset):
         self._set_status(request, queryset, "rejected", "refusée(s)")
+
+
+@admin.register(ActionItem)
+class ActionItemAdmin(TaxonomyAdmin):
+    list_display = ("name", "kind", "display_order", "is_active")
+    list_filter = ("kind", "is_active")

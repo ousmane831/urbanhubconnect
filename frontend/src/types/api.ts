@@ -40,3 +40,11 @@ export interface Priced extends RefItem { amount_fcfa: number; benefits?: string
 export interface Partner { name: string; logo: string; website: string; partnership_type: string | null }
 export interface PressRelease { title: string; slug: string; summary: string; document: string | null; published_at: string }
 export interface DocumentItem { title: string; file: string; category: string; description: string }
+
+
+export interface CommissionAction { name: string; slug: string; description: string; actions: string }
+export interface ActionItem { name: string; slug: string; description: string; link: string }
+export interface ActionsData {
+  commissions: CommissionAction[]; programmes: ActionItem[]; cercles: ActionItem[]; outils: ActionItem[];
+  pages: Record<string, { title: string; content: string }>;
+}

@@ -1,5 +1,5 @@
 import { http } from "./http";
-import type { EventDetail, PageContent, Article, DocumentItem, EventItem, Partner, PressRelease, Priced, RefItem, MapCategory, MapPlace, OrganizationDetail, OrganizationFilters, OrganizationListItem, Paginated, SiteSettings } from "../types/api";
+import type {ActionsData, EventDetail, PageContent, Article, DocumentItem, EventItem, Partner, PressRelease, Priced, RefItem, MapCategory, MapPlace, OrganizationDetail, OrganizationFilters, OrganizationListItem, Paginated, SiteSettings } from "../types/api";
 
 export const getSiteSettings = () => http.get<SiteSettings>("/site-settings/").then((r) => r.data);
 export const getFeaturedEvents = () =>
@@ -38,3 +38,5 @@ export const getPressReleases = () => get<PressRelease[]>("/press/");
 export const getDocuments = (category?: string) => get<DocumentItem[]>("/documents/", { category });
 export const getAwardCategories = () => get<RefItem[]>("/awards/categories/");
 export const getVolunteerMissions = () => get<RefItem[]>("/volunteers/missions/");
+
+export const getActions = () => get<ActionsData>("/actions/");

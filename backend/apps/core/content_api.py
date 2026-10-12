@@ -11,8 +11,9 @@ from apps.memberships.models import MembershipCategory
 from apps.news.models import Article, ArticleCategory
 from apps.partnerships.models import Partner, PartnershipTier
 from apps.press.models import PressRelease
-from .models import PageContent, SiteSettings
+from apps.organizations.models import Commission
 
+from .models import ActionItem, PageContent, SiteSettings
 
 def ser(model, fields, **declared):
     meta = type("Meta", (), {"model": model, "fields": fields})
@@ -135,3 +136,19 @@ EventCategoryList = taxonomy_list(EventCategory)
 ArticleCategoryList = taxonomy_list(ArticleCategory)
 AwardCategoryList = taxonomy_list(AwardCategory, ("criteria",))
 VolunteerMissionList = taxonomy_list(VolunteerMission)
+
+
+ActionItemSer = ser(ActionItem, ["name", "slug", "description", "link"])
+CommissionActionSer = ser(Commission, ["name", "slug", "description", "actions"])
+
+
+class ActionsView(APIView):
+    """Page « Nos actions » : commissions, programmes, cercles, outils et textes d'introduction."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        items = lambda kind: ActionItemSer(ActionItem.objects.filter(kind=kind, is_active=True), many=True).data
+        pages = {p.slug.removeprefix("nos-actions-"): {"title": p.title, "content": p.content}
+                 for p in PageContent.objects.filter(is_published=True, slug__startswith="nos-actions-")}
+        return Response({"commissions": CommissionActionSer(Commission.objects.filter(is_active=True), many=True).data,
+                         "programmes": items("programme"), "cercles": items("cercle"), "outils": items("outil"), "pages": pages})

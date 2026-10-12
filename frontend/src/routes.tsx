@@ -23,7 +23,7 @@ export const router = createBrowserRouter([
       { index: true, ...lazyPage(() => import("./pages/Home")) },
       { path: "espace-membres", ...lazyPage(() => import("./pages/MembersSoon")) },
       { path: "le-reseau", ...lazyPage(() => import("./pages/Network")) },
-      { path: "nos-actions", ...stub("Nos actions") },
+      { path: "nos-actions", ...lazyPage(() => import("./pages/OurActions")) },
       { path: "annuaire", ...lazyPage(() => import("./pages/Directory")) },
       { path: "annuaire/referencer", ...lazyPage(() => import("./pages/Referencer")) },
       { path: "annuaire/:slug", ...lazyPage(() => import("./pages/OrganizationDetail")) },
