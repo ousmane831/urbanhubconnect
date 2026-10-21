@@ -37,6 +37,12 @@ class FormSubmissionTests(FormsBase):
         self.assertEqual(r.status_code, 201)
         self.assertEqual(MembershipApplication.objects.get().status, "pending")
 
+    def test_membership_accepts_sector_slug(self):
+        sector = Sector.objects.first()
+        r = self.post("/api/memberships/", self.membership_payload(sector=sector.slug))
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(MembershipApplication.objects.get().sector, sector)
+
     def test_membership_requires_consents_and_valid_email(self):
         r = self.post("/api/memberships/", self.membership_payload(accept_privacy=False))
         self.assertEqual(r.status_code, 400)

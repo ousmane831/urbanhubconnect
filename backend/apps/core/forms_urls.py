@@ -43,6 +43,7 @@ MembershipApplication,
 slugs={
 "category": (active(MembershipCategory), True),
 "college": college,
+"sector": sector,
 },
 many_slugs={"commissions": commissions},
 extra=CONSENT("accept_charter", "accept_privacy"),
