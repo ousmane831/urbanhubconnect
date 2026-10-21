@@ -1,4 +1,4 @@
-import { LocateFixed, Map, Filter, Search } from "lucide-react";
+import { LocateFixed, Map, Filter, Search, Route } from "lucide-react";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "../components/ui/Button";
@@ -11,6 +11,7 @@ import { useDebounce } from "../hooks/useDebounce";
 import { useSeo } from "../hooks/useSeo";
 import { useSiteSettings } from "../hooks/useSiteSettings";
 import { getMapCategories, listPlaces } from "../services/api";
+import type { MapPlace } from "../types/api";
 import { POLE_LABELS } from "../utils/constants";
 import { distanceKm } from "../utils/geo";
 
@@ -27,6 +28,7 @@ export default function MapPage() {
   const search = useDebounce(text);
   const [selected, setSelected] = useState<string | null>(null);
   const [user, setUser] = useState<[number, number] | null>(null);
+  const [routeTarget, setRouteTarget] = useState<string | null>(null);
   const [geoMsg, setGeoMsg] = useState("");
   const categories = useAsync(getMapCategories);
   const { data, error, loading, retry } = useAsync(() => listPlaces({ category, pole, search }), [category, pole, search]);
@@ -47,6 +49,34 @@ export default function MapPage() {
     return user ? [...list].sort((a, b) => distanceKm(user, [a.latitude, a.longitude]) - distanceKm(user, [b.latitude, b.longitude])) : list;
   }, [data, user]);
   const reset = () => { setText(""); setParams({}, { replace: true }); };
+  const showRoute = (place: MapPlace) => {
+    setSelected(place.slug);
+    if (user) {
+      setRouteTarget(place.slug);
+      setGeoMsg(`Tracé direct vers ${place.name} affiché à titre indicatif. Il ne suit pas les routes.`);
+      return;
+    }
+    if (!("geolocation" in navigator)) {
+      setGeoMsg("La géolocalisation n'est pas disponible sur cet appareil. Activez-la pour afficher le tracé.");
+      return;
+    }
+    setGeoMsg("Autorisez la localisation pour afficher un tracé direct vers ce lieu…");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUser([pos.coords.latitude, pos.coords.longitude]);
+        setRouteTarget(place.slug);
+        setGeoMsg(`Tracé direct vers ${place.name} affiché à titre indicatif. Il ne suit pas les routes.`);
+      },
+      (err) => setGeoMsg(err.code === err.PERMISSION_DENIED
+        ? "Localisation refusée. Autorisez-la pour afficher le tracé vers ce lieu."
+        : "Votre position n'a pas pu être déterminée. Réessayez."),
+      { enableHighAccuracy: false, timeout: 10000 },
+    );
+  };
+  const routePlace = places.find((p) => p.slug === routeTarget);
+  const route = useMemo<[[number, number], [number, number]] | null>(() => user && routePlace
+    ? [user, [routePlace.latitude, routePlace.longitude]]
+    : null, [user, routePlace]);
 
   return (
     <>
@@ -105,9 +135,15 @@ export default function MapPage() {
             <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
               <div className="relative overflow-hidden rounded-2xl border border-navy/10 shadow-soft">
                 <Suspense fallback={<Loading label="Chargement de la carte…" />}>
-                  <MapView places={places} selected={selected} user={user} className="h-[50vh] min-h-[300px] w-full sm:h-[60vh] lg:h-[70vh]" />
+                  <MapView places={places} selected={selected} user={user} route={route} onRoutePlace={showRoute} className="h-[50vh] min-h-[300px] w-full sm:h-[60vh] lg:h-[70vh]" />
                 </Suspense>
               </div>
+              {route && routePlace && (
+                <p className="rounded-xl border border-green/20 bg-green/5 p-4 text-sm text-navy/80 lg:col-span-2">
+                  <span className="flex items-center gap-2 font-semibold text-green"><Route className="h-4 w-4" aria-hidden="true" />Tracé indicatif vers {routePlace.name}</span>
+                  <span className="mt-1 block">Ligne directe d'environ {distanceKm(route[0], route[1]).toFixed(1)} km, à vol d'oiseau. Ce tracé ne suit pas les routes et ne fournit pas de guidage vocal.</span>
+                </p>
+              )}
               <section aria-label="Liste des lieux" className="relative overflow-hidden rounded-2xl border border-navy/10 bg-white p-4 shadow-soft max-h-[60vh] sm:max-h-[70vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-3">
                   <p className="font-semibold text-navy">{places.length} lieu{places.length > 1 ? "x" : ""}</p>
@@ -116,10 +152,15 @@ export default function MapPage() {
                 <ul className="divide-y divide-navy/10">
                   {places.map((p) => (
                     <li key={p.slug}>
-                      <button onClick={() => setSelected(p.slug)} aria-pressed={selected === p.slug} className={`w-full px-3 py-4 text-left transition-colors hover:bg-offwhite ${selected === p.slug ? "bg-offwhite border-l-4 border-l-green" : ""}`}>
-                        <span className="block font-semibold text-navy">{p.name}{p.is_member && <span className="ml-2 text-sm text-purple">Membre</span>}</span>
-                        <span className="block text-sm text-navy/70 mt-1">{p.category.name}{user && ` · ${distanceKm(user, [p.latitude, p.longitude]).toFixed(1)} km`}</span>
-                      </button>
+                      <div className={`px-3 py-4 transition-colors hover:bg-offwhite ${selected === p.slug ? "border-l-4 border-l-green bg-offwhite" : ""}`}>
+                        <button type="button" onClick={() => setSelected(p.slug)} aria-pressed={selected === p.slug} className="w-full text-left">
+                          <span className="block font-semibold text-navy">{p.name}{p.is_member && <span className="ml-2 text-sm text-purple">Membre</span>}</span>
+                          <span className="mt-1 block text-sm text-navy/70">{p.category.name}{user && ` · ${distanceKm(user, [p.latitude, p.longitude]).toFixed(1)} km`}</span>
+                        </button>
+                        <button type="button" onClick={() => showRoute(p)} className="mt-2 inline-flex min-h-10 items-center gap-2 rounded-md border border-green/30 px-3 text-sm font-semibold text-green transition-colors hover:bg-green/5">
+                          <Route className="h-4 w-4" aria-hidden="true" />Voir l'itinéraire
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>

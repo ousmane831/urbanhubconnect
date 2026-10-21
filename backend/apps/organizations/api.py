@@ -41,6 +41,15 @@ class OrganizationFilter(django_filters.FilterSet):
     commission = django_filters.CharFilter(field_name="commissions__slug", distinct=True)
     founder = django_filters.BooleanFilter(field_name="member_founder")
 
+    propose = django_filters.BooleanFilter(method="filter_propose")
+    recherche = django_filters.BooleanFilter(method="filter_recherche")
+
+    def filter_propose(self, qs, name, value):
+        return qs.exclude(offers="") if value else qs
+
+    def filter_recherche(self, qs, name, value):
+        return qs.exclude(needs="") if value else qs
+
     class Meta:
         model = Organization
         fields = ["pole"]

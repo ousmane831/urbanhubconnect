@@ -13,7 +13,10 @@ api.interceptors.response.use((r) => r, (e) => {
 
 export interface Me { username: string; name: string; role: string }
 export interface Summary { queues: { kind: string; label: string; count: number }[]; stats: { label: string; value: number }[]; to_handle: number }
-export interface ActionDef { id: string; label: string; tone: "primary" | "danger" | "neutral" }
+export interface ActionDef {
+  id: string; label: string; tone: "primary" | "danger" | "neutral";
+  form?: "payment" | "category"; amount?: number | null; options?: { value: string; label: string }[];
+}
 export interface QueueItem { id: number; title: string; subtitle: string; created_at: string; state: string | null; details: [string, string][]; actions: ActionDef[] }
 export interface ContentItem { id: number; title: string; state: string; actions: ActionDef[]; admin_url: string }
 
@@ -24,7 +27,7 @@ export const coordApi = {
   me: () => api.get<Me>("/me/").then((r) => r.data),
   summary: () => api.get<Summary>("/summary/").then((r) => r.data),
   queue: (kind: string) => api.get<{ label: string; items: QueueItem[] }>(`/queue/${kind}/`).then((r) => r.data),
-  act: (kind: string, id: number, action: string) => api.post<{ detail: string }>(`/queue/${kind}/${id}/${action}/`).then((r) => r.data.detail),
+  act: (kind: string, id: number, action: string, data: Record<string, string> = {}) => api.post<{ detail: string }>(`/queue/${kind}/${id}/${action}/`, data).then((r) => r.data.detail),
   content: () => api.get<{ articles: ContentItem[]; events: ContentItem[] }>("/content/").then((r) => r.data),
   contentAct: (kind: string, id: number, action: string) => api.post<{ detail: string }>(`/content/${kind}/${id}/${action}/`).then((r) => r.data.detail),
 };

@@ -13,6 +13,8 @@ from apps.partnerships.models import PartnershipApplication, PartnershipTier
 from apps.press.models import PressAccreditation
 from .forms_api import (CleanedModelSerializer, SubmissionCreateView, build_serializer, notify_contact,
                         submission_view)
+from apps.memberships.services import link_org_submission, open_dossier
+
 
 active = lambda m: m.objects.filter(is_active=True)
 college, sector = (active(College), False), (active(Sector), False)
@@ -59,6 +61,7 @@ class OrganizationSubmitSerializer(CleanedModelSerializer):
 
     class Meta:  # liste blanche : validation_status, is_published, member_founder ne sont jamais modifiables ici
         model = Organization
+        extra_kwargs = {"description": {"max_length": 500}}
         fields = ["name", "logo", "college", "sector", "commissions", "pole", "neighborhood", "address",
                   "latitude", "longitude", "description", "website", "linkedin", "facebook", "instagram",
                   "representative_name", "representative_role", "phone", "email", "representative_phone",
@@ -91,9 +94,9 @@ class NewsletterView(SubmissionCreateView):
 
 
 urlpatterns = [
-    path("memberships/", submission_view(membership, name="MembershipCreate")),
+    path("memberships/", submission_view(membership, name="MembershipCreate", after=open_dossier)),  
     path("organizations/submit/", submission_view(
-        OrganizationSubmitSerializer, name="OrganizationSubmit",
+        OrganizationSubmitSerializer, name="OrganizationSubmit", after=link_org_submission,
         message="Merci. Votre fiche a bien été transmise. La Coordination vous contactera sous 72 heures "
                 "pour finaliser votre adhésion et publier votre fiche.")),
     path("partnerships/", submission_view(build_serializer(

@@ -1,5 +1,5 @@
 import { http } from "./http";
-import type {ActionsData, EventDetail, PageContent, Article, DocumentItem, EventItem, Partner, PressRelease, Priced, RefItem, MapCategory, MapPlace, OrganizationDetail, OrganizationFilters, OrganizationListItem, Paginated, SiteSettings } from "../types/api";
+import type {ActionsData, EventDetail, PageContent, Article, DocumentItem, EventItem, Partner, PressRelease, Priced, RefItem, MapCategory, MapPlace, OrganizationDetail, OrganizationFilters, OrganizationListItem, Paginated, SiteSettings, MembershipCategoryItem } from "../types/api";
 
 export const getSiteSettings = () => http.get<SiteSettings>("/site-settings/").then((r) => r.data);
 export const getFeaturedEvents = () =>
@@ -13,7 +13,7 @@ export const submitForm = (path: string, data: Record<string, unknown>) =>
 const clean = <T extends object>(o: T) =>
   Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== "" && v !== false));
 
-export interface OrgQuery { search?: string; pole?: string; college?: string; sector?: string; commission?: string; founder?: boolean; page?: number }
+export interface OrgQuery { search?: string; pole?: string; college?: string; sector?: string; commission?: string; founder?: boolean; page?: number; propose?: boolean; recherche?: boolean }
 export const listOrganizations = (q: OrgQuery) =>
   http.get<Paginated<OrganizationListItem>>("/organizations/", { params: clean(q) }).then((r) => r.data);
 export const getOrganization = (slug: string) => http.get<OrganizationDetail>(`/organizations/${slug}/`).then((r) => r.data);
@@ -27,11 +27,12 @@ export const listEvents = (q: { category?: string; upcoming?: boolean; page?: nu
   get<Paginated<EventItem>>("/events/", { ...q, upcoming: q.upcoming === false ? "false" : "true" });
 export const getEvent = (slug: string) => get<EventDetail>(`/events/${slug}/`);
 export const getPage = (slug: string) => get<PageContent>(`/pages/${slug}/`);
+export const getPages = (prefix: string) => get<PageContent[]>("/pages/", { prefix });
 export const getEventCategories = () => get<RefItem[]>("/events/categories/");
 export const listArticles = (q: { category__slug?: string; page?: number }) => get<Paginated<Article>>("/articles/", q);
 export const getArticle = (slug: string) => get<Article>(`/articles/${slug}/`);
 export const getArticleCategories = () => get<RefItem[]>("/articles/categories/");
-export const getMembershipCategories = () => get<Priced[]>("/memberships/categories/");
+export const getMembershipCategories = () => get<MembershipCategoryItem[]>("/memberships/categories/");
 export const getTiers = () => get<Priced[]>("/partnerships/tiers/");
 export const getPartners = () => get<Partner[]>("/partnerships/partners/");
 export const getPressReleases = () => get<PressRelease[]>("/press/");

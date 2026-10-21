@@ -36,6 +36,7 @@ export interface Article {
   featured_image: string | null; author: string; published_at: string; meta_title: string; meta_description: string;
 }
 export interface RefItem { name: string; slug: string; description: string }
+export interface MembershipCategoryItem extends RefItem { amount_fcfa: number | null; public_listing: boolean }
 export interface Priced extends RefItem { amount_fcfa: number; benefits?: string }
 export interface Partner { name: string; logo: string; website: string; partnership_type: string | null }
 export interface PressRelease { title: string; slug: string; summary: string; document: string | null; published_at: string }

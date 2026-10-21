@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 from apps.contact.models import ContactMessage
 from apps.core.testing import make_org
 from apps.memberships.models import MembershipApplication, MembershipCategory
+from apps.memberships.services import open_dossier
 from apps.news.models import Article, ArticleCategory
 from apps.organizations.models import Organization, ValidationStatus as VS
 from apps.users.models import User
@@ -45,8 +46,8 @@ class CoordinationTests(APITestCase):
     def test_summary_counts_pending_work(self):
         make_org("En attente", status=VS.PENDING, published=False)
         ContactMessage.objects.create(name="N", email="n@x.org", subject="other", message="m", consent=True)
-        MembershipApplication.objects.create(organization_or_name="X", category=MembershipCategory.objects.first(), representative="R",
-                                             phone="1", email="a@x.org", accept_charter=True, accept_privacy=True)
+        open_dossier(MembershipApplication.objects.create(organization_or_name="X", category=MembershipCategory.objects.first(), representative="R",
+                                                          phone="1", email="a@x.org", accept_charter=True, accept_privacy=True))
         self.login()
         data = self.client.get("/api/coordination/summary/").json()
         counts = {q["kind"]: q["count"] for q in data["queues"]}
@@ -70,14 +71,15 @@ class CoordinationTests(APITestCase):
     def test_reject_and_handle_actions(self):
         app = MembershipApplication.objects.create(organization_or_name="X", category=MembershipCategory.objects.first(), representative="R",
                                                    phone="1", email="a@x.org", accept_charter=True, accept_privacy=True)
+        dossier = open_dossier(app)
         msg = ContactMessage.objects.create(name="N", email="n@x.org", subject="other", message="m", consent=True)
         self.login()
-        self.assertEqual(self.client.post(f"/api/coordination/queue/memberships/{app.pk}/reject/").status_code, 200)
+        self.assertEqual(self.client.post(f"/api/coordination/queue/memberships/{dossier.pk}/reject/").status_code, 200)
         self.assertEqual(self.client.post(f"/api/coordination/queue/messages/{msg.pk}/handle/").status_code, 200)
-        app.refresh_from_db(); msg.refresh_from_db()
-        self.assertEqual((app.status, msg.is_handled), ("rejected", True))
-        self.assertEqual(self.client.post(f"/api/coordination/queue/memberships/{app.pk}/reject/").status_code, 404)  # déjà traité
-        self.assertEqual(self.client.post(f"/api/coordination/queue/memberships/{app.pk}/delete/").status_code, 404)
+        app.refresh_from_db(); msg.refresh_from_db(); dossier.refresh_from_db()
+        self.assertEqual((app.status, dossier.status, msg.is_handled), ("rejected", "rejected", True))
+        self.assertEqual(self.client.post(f"/api/coordination/queue/memberships/{dossier.pk}/reject/").status_code, 404)  # déjà traité
+        self.assertEqual(self.client.post(f"/api/coordination/queue/memberships/{dossier.pk}/delete/").status_code, 404)
 
     def test_unknown_action_is_refused(self):
         org = make_org("X", status=VS.PENDING, published=False)
@@ -87,9 +89,10 @@ class CoordinationTests(APITestCase):
     def test_publish_and_unpublish_article(self):
         a = Article.objects.create(title="Brouillon", category=ArticleCategory.objects.first())
         self.login()
-        self.assertEqual(self.client.get("/api/coordination/content/").json()["articles"][0]["state"], "Brouillon")
+        states = {x["title"]: x["state"] for x in self.client.get("/api/coordination/content/").json()["articles"]}
+        self.assertEqual(states["Brouillon"], "Brouillon")
         self.client.post(f"/api/coordination/content/articles/{a.pk}/publish/")
-        self.assertEqual(list(Article.objects.public()), [a])
+        self.assertIn(a, Article.objects.public())
         self.client.post(f"/api/coordination/content/articles/{a.pk}/unpublish/")
-        self.assertEqual(Article.objects.public().count(), 0)
+        self.assertNotIn(a, Article.objects.public())
         self.assertEqual(self.client.post(f"/api/coordination/content/users/{a.pk}/publish/").status_code, 404)

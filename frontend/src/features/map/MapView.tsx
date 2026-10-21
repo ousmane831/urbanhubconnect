@@ -1,6 +1,6 @@
 import L from "leaflet";
 import { useEffect } from "react";
-import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
+import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
 import { Link } from "react-router-dom";
 import type { MapPlace } from "../../types/api";
 
@@ -18,24 +18,32 @@ const icon = (active: boolean, member: boolean) => {
   });
 };
 
-function Viewport({ places, focus, user }: { places: MapPlace[]; focus: [number, number] | null; user: [number, number] | null }) {
+function Viewport({ places, focus, user, route }: {
+  places: MapPlace[]; focus: [number, number] | null; user: [number, number] | null;
+  route: [[number, number], [number, number]] | null;
+}) {
   const map = useMap();
   useEffect(() => {
+    if (route) { map.fitBounds(L.latLngBounds(route), { padding: [60, 60], maxZoom: 15 }); return; }
     if (user) { map.flyTo(user, 14); return; }
     if (focus) { map.flyTo(focus, 16); return; }
     if (places.length) map.fitBounds(L.latLngBounds(places.map((p) => [p.latitude, p.longitude] as [number, number])), { padding: [40, 40], maxZoom: 15 });
-  }, [places, focus, user, map]);
+  }, [places, focus, user, route, map]);
   return null;
 }
 
-interface Props { places: MapPlace[]; selected: string | null; user: [number, number] | null; className?: string }
+interface Props {
+  places: MapPlace[]; selected: string | null; user: [number, number] | null;
+  route: [[number, number], [number, number]] | null;
+  onRoutePlace: (place: MapPlace) => void; className?: string;
+}
 
-export default function MapView({ places, selected, user, className = "" }: Props) {
+export default function MapView({ places, selected, user, route, onRoutePlace, className = "" }: Props) {
   const focusPlace = places.find((p) => p.slug === selected);
   return (
     <MapContainer center={DEFAULT_CENTER} zoom={11} scrollWheelZoom={false} className={`z-0 ${className}`} aria-label="Carte interactive du Hub">
       <TileLayer attribution='&copy; contributeurs <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      <Viewport places={places} focus={focusPlace ? [focusPlace.latitude, focusPlace.longitude] : null} user={user} />
+      <Viewport places={places} focus={focusPlace ? [focusPlace.latitude, focusPlace.longitude] : null} user={user} route={route} />
       {places.map((p) => (
         <Marker key={p.slug} position={[p.latitude, p.longitude]} icon={icon(p.slug === selected, p.is_member)} title={p.name}>
           <Popup>
@@ -47,10 +55,14 @@ export default function MapView({ places, selected, user, className = "" }: Prop
             {p.email && <a className="link block" href={`mailto:${p.email}`}>{p.email}</a>}
             {p.website && <a className="link block" href={p.website} target="_blank" rel="noopener noreferrer">Site web<span className="sr-only"> (nouvel onglet)</span></a>}
             {p.organization && <Link to={`/annuaire/${p.organization.slug}`} className="link mt-1 block font-semibold">Voir la fiche Annuaire</Link>}
+            <button type="button" onClick={() => onRoutePlace(p)} className="mt-2 min-h-10 rounded-md bg-green px-3 font-semibold text-white hover:bg-green-2">
+              Voir l'itinéraire
+            </button>
           </Popup>
         </Marker>
       ))}
       {user && <CircleMarker center={user} radius={9} pathOptions={{ color: "#0E2240", fillColor: "#0E2240", fillOpacity: 0.8 }}><Popup>Vous êtes ici</Popup></CircleMarker>}
+      {route && <Polyline positions={route} pathOptions={{ color: "#1E5C3F", weight: 5, opacity: 0.85, dashArray: "10 8" }} />}
     </MapContainer>
   );
 }

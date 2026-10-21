@@ -26,7 +26,9 @@ cat_name = lambda: serializers.CharField(source="category.name", read_only=True)
 SiteSettingsSer = ser(SiteSettings, ["site_name", "phone", "whatsapp", "email", "address", "linkedin", "facebook",
                                      "instagram", "footer_text", "legal_information", "privacy_policy"])
 PageSer = ser(PageContent, ["title", "slug", "meta_title", "meta_description", "content", "updated_at"])
-MembershipSer = ser(MembershipCategory, ["name", "slug", "description", "amount_fcfa"])
+MembershipSer = ser(MembershipCategory, ["name", "slug", "description", "amount_fcfa", "public_listing"],
+                    amount_fcfa=serializers.SerializerMethodField(),
+                    get_amount_fcfa=lambda self, o: o.amount_fcfa if self.context.get("show_fees") else None)
 TierSer = ser(PartnershipTier, ["name", "slug", "description", "amount_fcfa", "benefits"])
 PartnerSer = ser(Partner, ["name", "logo", "website", "partnership_type"], partnership_type=serializers.StringRelatedField())
 EVENT_FIELDS = ["title", "slug", "category", "category_name", "description", "audience", "start_date", "end_date",
@@ -59,7 +61,9 @@ class PageViewSet(ReadOnly):
     pagination_class = None
 
     def get_queryset(self):
-        return PageContent.objects.filter(is_published=True)
+        qs = PageContent.objects.filter(is_published=True)
+        prefix = self.request.query_params.get("prefix")
+        return qs.filter(slug__startswith=prefix) if prefix else qs
 
 
 class EventFilter(django_filters.FilterSet):
@@ -109,6 +113,8 @@ class PressList(generics.ListAPIView):
 class MembershipCategoryList(generics.ListAPIView):
     permission_classes, serializer_class, pagination_class = [AllowAny], MembershipSer, None
     queryset = MembershipCategory.objects.filter(is_active=True)
+    def get_serializer_context(self):
+        return {**super().get_serializer_context(), "show_fees": SiteSettings.load().show_membership_fees}
 
 
 class TierList(generics.ListAPIView):

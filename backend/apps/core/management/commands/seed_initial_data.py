@@ -1,6 +1,6 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
-
+from apps.core.seed_membership import seed_membership_content
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils.text import slugify
@@ -96,7 +96,7 @@ class Command(BaseCommand):
         self._seed(EventCategory, [(n, {}) for n in EVENT_CATEGORIES])
         self._seed(VolunteerMission, [(n, {}) for n in MISSIONS])
         self._seed(ArticleCategory, [(n, {}) for n in ARTICLE_CATEGORIES])
-        self._seed(MembershipCategory, [(n, {"amount_fcfa": a}) for n, a in MEMBERSHIP])
+        self._seed(MembershipCategory, [(n, {"amount_fcfa": a, "public_listing": not n.startswith(("Membre individuel", "Étudiant"))}) for n, a in MEMBERSHIP])
         self._seed(PartnershipTier, [(n, {"amount_fcfa": a}) for n, a in PARTNERSHIP])
         self._seed_content()
         group = sync_coordination_group()
@@ -117,3 +117,5 @@ class Command(BaseCommand):
         self.stdout.write(f"{'contenus événement':<28} +{seed_event_content(event)}")
         self.stdout.write(f"{'événement / article':<28} +{int(ev)} / +{art_created} (mis à jour : {art_updated})")
         self.stdout.write(f"{'nos actions':<28} +{seed_actions()}")
+        texts, dossiers = seed_membership_content()
+        self.stdout.write(f"{'adhésion / annuaire':<28} +{texts} (dossiers créés : {dossiers})")

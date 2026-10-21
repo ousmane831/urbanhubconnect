@@ -30,6 +30,11 @@ class SiteSettings(models.Model):
     legal_information = models.TextField("mentions légales", blank=True, help_text="[à compléter]")
     privacy_policy = models.TextField("confidentialité", blank=True, help_text="[à compléter]")
 
+    show_membership_fees = models.BooleanField("afficher les montants de cotisation", default=False,
+                                               help_text="À cocher une fois les montants confirmés par l'Assemblée générale.")
+    payment_instructions = models.TextField("modalités de paiement de la cotisation", blank=True,
+                                            help_text="Texte envoyé avec le bulletin d'adhésion (virement, Wave, Orange Money…).")
+
     class Meta:
         verbose_name = verbose_name_plural = "Paramètres du site"
 

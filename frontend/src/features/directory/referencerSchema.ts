@@ -14,7 +14,7 @@ export const referencerSchema = z.object({
   address: z.string().trim().max(255),
   latitude: coord(-90, 90, "Latitude"),
   longitude: coord(-180, 180, "Longitude"),
-  description: z.string().trim().min(20, "Présentez votre organisation en quelques phrases (20 caractères minimum)."),
+  description: z.string().trim().min(20, "Présentez votre organisation en quelques phrases (20 caractères minimum).").max(500, "500 caractères maximum."),
   website: optionalUrl, linkedin: optionalUrl, facebook: optionalUrl, instagram: optionalUrl,
   representative_name: z.string().trim().min(2, "Indiquez le nom du représentant."),
   representative_role: z.string().trim().max(150),
