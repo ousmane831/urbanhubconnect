@@ -23,7 +23,9 @@ export const router = createBrowserRouter([
     errorElement: <ServerError />,
     children: [
       { index: true, ...lazyPage(() => import("./pages/Home")) },
-      { path: "espace-membres", ...lazyPage(() => import("./pages/MembersSoon")) },
+      { path: "espace-membres", ...lazyPage(() => import("./pages/MembersArea")) },
+      { path: "espace-membres/mot-de-passe", ...lazyPage(() => import("./pages/SetPassword")) },
+      { path: "espace-membres/mot-de-passe-oublie", ...lazyPage(() => import("./pages/ForgotPassword")) },
       { path: "le-reseau", ...lazyPage(() => import("./pages/Network")) },
       { path: "nos-actions", ...lazyPage(() => import("./pages/OurActions")) },
       { path: "annuaire", ...lazyPage(() => import("./pages/Directory")) },

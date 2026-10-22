@@ -68,13 +68,18 @@ class OrganizationSubmitSerializer(CleanedModelSerializer):
                   "representative_name", "representative_role", "phone", "email", "representative_phone",
                   "representative_email", "offers", "needs", "accept_charter", "accept_privacy"]
 
+    
     def create(self, data):
-        data.pop("accept_charter"), data.pop("accept_privacy")
+        data.pop("accept_charter", None)
+        data.pop("accept_privacy", None)
+
         comms = data.pop("commissions", [])
+
+        # Keep text fields as text; don't access .slug on a string.
         org = Organization.objects.create(**data)
         org.commissions.set(comms)
-        return org
 
+        return org
 
 class NewsletterView(SubmissionCreateView):
     """Idempotent : une adresse déjà inscrite reçoit la même réponse (pas d'énumération d'abonnés)."""

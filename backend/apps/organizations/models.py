@@ -78,6 +78,7 @@ class Organization(PublishableModel):
     instagram = models.URLField(blank=True)
     member_founder = models.BooleanField("membre fondateur", default=False)
     membership_status = models.CharField(max_length=10, choices=MembershipStatus.choices, default=MembershipStatus.NONE)
+    hidden_by_member = models.BooleanField("retirée par l'organisation", default=False)
     # --- Données PRIVÉES ---
     phone = models.CharField("téléphone de l'organisation", max_length=30, blank=True)
     email = models.EmailField("email de l'organisation", blank=True)

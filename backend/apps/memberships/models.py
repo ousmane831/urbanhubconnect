@@ -4,6 +4,7 @@ from django.db import models
 from django.utils import timezone
 
 from apps.core.models import Submission, Taxonomy, TimeStampedModel
+from apps.core.validators import validate_image_extension, validate_upload_size
 from apps.organizations.models import College, Commission, Organization, Pole, Sector
 
 
@@ -75,6 +76,8 @@ class Membership(TimeStampedModel):
     activated_at = models.DateField("membre depuis le", null=True, blank=True)
     valid_until = models.DateField("cotisation valable jusqu'au", null=True, blank=True)
     notes = models.TextField("notes internes", blank=True)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="membership",
+                                verbose_name="compte membre")
 
     class Meta:
         ordering = ["-created_at"]
@@ -117,3 +120,37 @@ class Payment(TimeStampedModel):
 
     def __str__(self):
         return f"{self.amount_fcfa} FCFA · {self.get_method_display()} · {self.paid_on}"
+
+
+class ProfileChange(TimeStampedModel):
+    """Modification de la partie publique d'une fiche, proposée par le membre : elle n'est visible qu'après validation."""
+    class Status(models.TextChoices):
+        PENDING = "pending", "En attente de validation"
+        APPROVED = "approved", "Approuvée"
+        REJECTED = "rejected", "Refusée"
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="profile_changes")
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    changes = models.JSONField("champs modifiés", default=dict)
+    logo = models.ImageField(upload_to="organizations/pending-logos/", blank=True,
+                             validators=[validate_image_extension, validate_upload_size])
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING, db_index=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name, verbose_name_plural = "modification de fiche", "modifications de fiches"
+
+    def __str__(self):
+        return f"{self.organization} · {self.get_status_display()}"
+
+
+class ContactReveal(TimeStampedModel):
+    """Journal des affichages de coordonnées directes (limite anti-prospection massive, preuve en cas d'abus)."""
+    member = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="+")
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name, verbose_name_plural = "affichage de coordonnées", "affichages de coordonnées"

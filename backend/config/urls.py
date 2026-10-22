@@ -8,6 +8,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from apps.core import members_api as mb
 from apps.core import content_api as c
 from apps.core.sitemaps import SITEMAPS
 from apps.core.forms_urls import urlpatterns as form_urls
@@ -50,6 +51,19 @@ urlpatterns = [
     path("api/articles/categories/", c.ArticleCategoryList, name="article-categories"),
     path("api/awards/categories/", c.AwardCategoryList, name="award-categories"),
     path("api/volunteers/missions/", c.VolunteerMissionList, name="volunteer-missions"),
+    
+    path("api/members/csrf/", co.csrf, name="member-csrf"),
+    path("api/members/login/", mb.LoginView.as_view(), name="member-login"),
+    path("api/members/logout/", mb.logout_view, name="member-logout"),
+    path("api/members/me/", mb.me, name="member-me"),
+    path("api/members/password-reset/", mb.PasswordResetRequestView.as_view(), name="member-password-reset"),
+    path("api/members/set-password/", mb.SetPasswordView.as_view(), name="member-set-password"),
+    path("api/members/profile/", mb.profile, name="member-profile"),
+    path("api/members/listing/", mb.listing, name="member-listing"),
+    path("api/members/directory/", mb.MemberDirectoryList.as_view(), name="member-directory"),
+    path("api/members/directory/<slug:slug>/", mb.MemberDirectoryDetail.as_view(), name="member-directory-detail"),
+    path("api/members/directory/<slug:slug>/contact/", mb.reveal_contact, name="member-reveal"),
+    
     path("api/", include(form_urls)),
     path("api/", include(router.urls)),
 

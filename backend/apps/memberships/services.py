@@ -67,7 +67,7 @@ def sync_organization(m):
     if m.status == S.ACTIVE:
         org.membership_status = OrgMembership.ACTIVE
         org.member_founder = m.is_founder
-        if m.category and m.category.public_listing and org.validation_status == VS.ACCEPTED:
+        if m.category and m.category.public_listing and org.validation_status == VS.ACCEPTED and not org.hidden_by_member:
             org.is_published = True
     elif m.status in (S.RECEIVED, S.REVIEWING, S.ACCEPTED):
         org.membership_status = OrgMembership.PENDING
@@ -215,10 +215,19 @@ def settle(m):
     m.save()
     _sync_application(m, "accepted")
     sync_organization(m)
-    notify(m, "Votre cotisation Urban Hub Connect est enregistrée",
-           f"Bonjour {m.representative},\n\nNous avons bien reçu votre cotisation. Vous êtes membre à jour jusqu'au {fmt_date(m.valid_until)}."
-           "\nVotre fiche est publiée dans l'Annuaire et vos accès à l'Espace membres vous seront communiqués.\n\nUrban Hub Connect")
-    return f"Cotisation enregistrée. Membre à jour jusqu'au {fmt_date(m.valid_until)}."
+    from . import accounts  # import tardif : accounts dépend de ce module
+    note = ""
+    try:
+        user, _ = accounts.ensure_account(m)
+    except accounts.AccountError as e:
+        user, note = None, f" Attention : {e}"
+    if user is not None and not user.has_usable_password():  # accès pas encore activé : (ré)envoi du lien de création du mot de passe
+        accounts.send_invitation(m, user)
+    else:
+        notify(m, "Votre cotisation Urban Hub Connect est enregistrée",
+               f"Bonjour {m.representative},\n\nNous avons bien reçu votre cotisation. Vous êtes membre à jour jusqu'au {fmt_date(m.valid_until)}."
+               "\nVotre fiche est publiée dans l'Annuaire. Vous pouvez vous connecter à l'Espace membres avec votre adresse e-mail.\n\nUrban Hub Connect")
+    return f"Cotisation enregistrée. Membre à jour jusqu'au {fmt_date(m.valid_until)}." + note
 
 
 def record_payment(m, *, amount, method, reference="", paid_on=None, user=None, notes=""):

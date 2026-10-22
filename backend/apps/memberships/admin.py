@@ -2,7 +2,8 @@ from django.contrib import admin, messages
 
 from apps.core.admin import GOLD, GREEN, GREY, PURPLE, RED, SubmissionAdminMixin, TaxonomyAdmin, badge
 from . import services
-from .models import Membership, MembershipApplication, MembershipCategory, Payment
+from . import accounts
+from .models import ContactReveal, Membership, MembershipApplication, MembershipCategory, Payment, ProfileChange
 
 S = Membership.Status
 COLORS = {S.RECEIVED: GOLD, S.REVIEWING: PURPLE, S.ACCEPTED: GOLD, S.ACTIVE: GREEN, S.EXPIRED: RED, S.SUSPENDED: GREY, S.REJECTED: RED}
@@ -44,11 +45,11 @@ class MembershipAdmin(admin.ModelAdmin):
     date_hierarchy = "created_at"
     list_select_related = ("category", "organization")
     inlines = [PaymentInline]
-    readonly_fields = ("reference", "activated_at", "valid_until", "charter_sent_at", "is_founder", "created_at", "updated_at")
+    readonly_fields = ("reference", "user", "activated_at", "valid_until", "charter_sent_at", "is_founder", "created_at", "updated_at")
     autocomplete_fields = ("organization",)
-    actions = ["do_review", "do_accept", "do_reject", "do_bulletin", "do_suspend", "do_reinstate", "do_expire"]
+    actions = ["do_review", "do_accept", "do_reject", "do_bulletin", "do_suspend", "do_reinstate", "do_expire", "do_invite"]
     fieldsets = (
-        ("Dossier", {"fields": ("reference", "status", "name", "category", "organization", "application")}),
+        ("Dossier", {"fields": ("reference", "status", "name", "category", "organization", "application", "user")}),
         ("Demandeur", {"fields": ("representative", "role", "phone", "email")}),
         ("Cotisation", {"fields": ("charter_sent_at", "charter_signed_on", "activated_at", "valid_until", "is_founder")}),
         ("Notes", {"fields": ("notes",)}),
@@ -105,3 +106,59 @@ class MembershipAdmin(admin.ModelAdmin):
     @admin.action(description="Constater les cotisations échues (tous les dossiers)")
     def do_expire(self, request, queryset):
         self.message_user(request, f"{services.expire_overdue()} cotisation(s) passée(s) en « échue ».")
+
+    @admin.action(description="Envoyer ou renvoyer l'invitation à l'Espace membres (membres à jour)")
+    def do_invite(self, request, queryset):
+        for m in queryset.filter(status=S.ACTIVE):
+            try:
+                user, _ = accounts.ensure_account(m)
+                sent = accounts.send_invitation(m, user)
+                self.message_user(request, f"{m.name} : invitation {'envoyée' if sent else 'non envoyée (e-mail impossible)'}.",
+                                  messages.SUCCESS if sent else messages.WARNING)
+            except accounts.AccountError as e:
+                self.message_user(request, f"{m.name} : {e}", messages.WARNING)
+
+
+@admin.register(ProfileChange)
+class ProfileChangeAdmin(admin.ModelAdmin):
+    list_display = ("organization", "status", "requested_by", "created_at", "reviewed_by")
+    list_filter = ("status",)
+    search_fields = ("organization__name",)
+    readonly_fields = ("organization", "requested_by", "changes", "logo", "status", "reviewed_by", "reviewed_at", "created_at", "updated_at")
+    actions = ["approve", "reject"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def _each(self, request, queryset, fn, ok):
+        for c in queryset:
+            try:
+                fn(c, request.user)
+                self.message_user(request, f"{c.organization} : {ok}.")
+            except accounts.AccountError as e:
+                self.message_user(request, f"{c.organization} : {e}", messages.WARNING)
+
+    @admin.action(description="Approuver et publier")
+    def approve(self, request, queryset):
+        self._each(request, queryset, accounts.approve_change, "modification appliquée")
+
+    @admin.action(description="Refuser")
+    def reject(self, request, queryset):
+        self._each(request, queryset, accounts.reject_change, "modification refusée")
+
+
+@admin.register(ContactReveal)
+class ContactRevealAdmin(admin.ModelAdmin):
+    """Journal d'audit en lecture seule : qui a consulté les coordonnées de qui, et quand."""
+    list_display = ("member", "organization", "created_at")
+    search_fields = ("member__email", "organization__name")
+    date_hierarchy = "created_at"
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

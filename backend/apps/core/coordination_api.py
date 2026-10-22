@@ -20,8 +20,9 @@ from rest_framework.views import APIView
 from apps.events.models import (AwardApplication, BusinessConnectRegistration, Event, EventRequest, VolunteerApplication)
 from apps.contact.models import ContactMessage
 from apps.map.models import MapPlace, PlaceSuggestion
+from apps.memberships import accounts as acc
 from apps.memberships import services as ms
-from apps.memberships.models import Membership, MembershipCategory
+from apps.memberships.models import Membership, MembershipCategory, ProfileChange
 from apps.news.models import Article
 from apps.newsletter.models import NewsletterSubscriber
 from apps.organizations.models import Organization, ValidationStatus as VS
@@ -132,6 +133,12 @@ KINDS = {
         title=lambda o: o.name, subtitle=lambda o: _membership_subtitle(o),
         state=lambda o: "Cotisation échue" if o.status == Membership.Status.EXPIRED else f"Échéance le {o.valid_until:%d/%m/%Y}",
         actions=lambda o: _membership_actions(o), details=lambda o: _membership_details(o)),
+    "profile-changes": dict(
+        label="Modifications de fiches", model=ProfileChange,
+        qs=lambda: ProfileChange.objects.filter(status=ProfileChange.Status.PENDING).select_related("organization", "requested_by"),
+        title=lambda o: o.organization.name, subtitle=lambda o: "Modification de la fiche demandée par le membre",
+        actions=lambda o: [{"id": "accept", "label": "Approuver et publier", "tone": "primary"}, {"id": "reject", "label": "Refuser", "tone": "danger"}],
+        details=lambda o: _change_details(o)),
     "partnerships": dict(
         label="Demandes de partenariat", model=PartnershipApplication, qs=lambda: PartnershipApplication.objects.filter(status__in=OPEN).select_related(),
         title=lambda o: get(o, "company"), subtitle=lambda o: label(o, "tier") or "Formule non précisée", actions=_status_actions,
@@ -256,6 +263,29 @@ def _apply_membership(obj, action, user, data):
     raise ValidationError("Action inconnue.")
 
 
+def _change_details(c):
+    out = []
+    for field, new in c.changes.items():
+        before = acc._norm(field, getattr(c.organization, field)) or "(vide)"
+        out += [[f"{acc.LABELS[field]} · avant", str(before)[:300]], [f"{acc.LABELS[field]} · après", str(new or "(vide)")[:300]]]
+    if c.logo:
+        out.append(["Logo", "Nouveau logo proposé"])
+    return out
+
+
+def _apply_profile_change(obj, action, user):
+    try:
+        if action == "accept":
+            acc.approve_change(obj, user)
+            return "Modification approuvée : la fiche publique est à jour."
+        if action == "reject":
+            acc.reject_change(obj, user)
+            return "Modification refusée : la fiche publique reste inchangée."
+    except acc.AccountError as e:
+        raise ValidationError(str(e))
+    raise ValidationError("Action inconnue.")
+
+
 def _item(kind, o):
     k = KINDS[kind]
     return {"id": o.pk, "title": k["title"](o), "subtitle": k["subtitle"](o), "created_at": o.created_at.isoformat(),
@@ -266,6 +296,8 @@ def _apply(kind, obj, action, user, data=None):
     """Applique l'action ; retourne le message de confirmation. Lève ValidationError si interdit."""
     if kind in ("memberships", "renewals"):
         return _apply_membership(obj, action, user, data)
+    if kind == "profile-changes":
+        return _apply_profile_change(obj, action, user)
     if kind == "messages":
         if action != "handle":
             raise ValidationError("Action inconnue.")

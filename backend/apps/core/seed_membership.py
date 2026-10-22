@@ -12,6 +12,12 @@ RENAMES = [
 ]
 
 PAGES = [
+    ("espace-membres", "Espace membres", """Accès réservé aux membres à jour de leur cotisation, avec identifiant et mot de passe.
+
+- Mon profil : modifier la fiche Annuaire et le point sur la Cartographie.
+- Annuaire complet et demandes de mise en relation.
+- Urban Opportunities : publier et consulter partenariats, appels d'offres, sous-traitance, emplois, stages.
+- Documents réservés : comptes rendus des commissions, Urban Notes, résultats du Baromètre, documents de l'Assemblée générale."""),
     ("adherer-intro", "Rejoignez le réseau", "Entreprise, institution, école, association, investisseur, professionnel ou étudiant : si vous travaillez, investissez, étudiez ou vivez à Diamniadio ou au Lac Rose, Urban Hub Connect est votre réseau. Les organisations qui adhèrent avant le 11 décembre 2026 ont le statut de membre fondateur et signent la Charte lors de la soirée officielle de lancement."),
     ("adherer-avantages", "Ce que vous apporte l'adhésion", """- Une place dans l'Annuaire et sur la Cartographie du Hub.
 - L'accès aux After Work Connect, aux commissions et aux cercles du réseau.
