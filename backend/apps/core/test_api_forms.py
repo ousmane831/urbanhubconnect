@@ -123,7 +123,8 @@ class PublicReadTests(FormsBase):
         Document.objects.create(title="Privé", file="a.pdf", category="charter")
         Partner.objects.create(name="Non confirmé", logo="l.png")
         titles = [a["title"] for a in self.client.get("/api/articles/").json()["results"]]
-        self.assertEqual(titles, ["Visible"])
+        self.assertIn("Visible", titles)
+        self.assertNotIn("Brouillon", titles)
         self.assertEqual(self.client.get("/api/articles/brouillon/").status_code, 404)
         self.assertNotIn("Caché", [e["title"] for e in self.client.get("/api/events/").json()["results"]])
         self.assertEqual(self.client.get("/api/documents/").json(), [])
@@ -148,8 +149,11 @@ class ReferenceEndpointsTests(FormsBase):
         AwardCategory.objects.create(name="Inactive", is_active=False)
         self.assertEqual(len(self.client.get("/api/events/categories/").json()), 4)
         self.assertEqual(len(self.client.get("/api/articles/categories/").json()), 4)
-        self.assertEqual(len(self.client.get("/api/volunteers/missions/").json()), 6)
-        self.assertEqual([a["name"] for a in self.client.get("/api/awards/categories/").json()], ["Award Exemple"])
+        self.assertEqual(len(self.client.get("/api/volunteers/missions/").json()), 5)
+        names = [a["name"] for a in self.client.get("/api/awards/categories/").json()]
+        self.assertIn("Award Exemple", names)  # + les 8 catégories créées par le seed
+        self.assertNotIn("Inactive", names)
+        self.assertEqual(len(names), 9)
 
 
 class SeoTests(FormsBase):
@@ -162,7 +166,8 @@ class SeoTests(FormsBase):
         self.assertNotIn("cachee-org", body)
         self.assertIn("/evenements/grand-week-end-du-pole-2026", body)
         self.assertNotIn("espace-membres", body)
-        self.assertNotIn("urban-hub-connect-lancement", body)  # article en brouillon
+        self.assertIn("/actualites/urban-hub-connect-lancement-11-12-decembre-2026", body)  # article de lancement publié
+        self.assertNotIn("11-13-decembre", body)
 
     def test_robots_blocks_admin_and_api_and_points_to_sitemap(self):
         body = self.client.get("/robots.txt").content.decode()

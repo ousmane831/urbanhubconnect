@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 
 from apps.core.validators import coordinate_errors, validate_image_extension, validate_upload_size
 from apps.memberships import accounts
+from apps.memberships.network import directory_queryset
 from apps.organizations.api import OrganizationDetailSerializer, OrganizationFilter, OrganizationListSerializer
 from apps.organizations.models import Organization
 from apps.users.models import User
@@ -175,13 +176,6 @@ def listing(request):
 
 
 # ---------- annuaire complet ----------
-def directory_queryset():
-    """Seules les organisations membres à jour de leur cotisation, dont la fiche est publiée."""
-    return (Organization.objects.public()
-            .filter(membership__status="active", membership__valid_until__gte=timezone.localdate())
-            .select_related().prefetch_related("commissions"))
-
-
 class MemberOrganizationDetailSerializer(OrganizationDetailSerializer):
     class Meta(OrganizationDetailSerializer.Meta):
         fields = OrganizationDetailSerializer.Meta.fields + ("offers", "needs")  # réservés aux membres connectés

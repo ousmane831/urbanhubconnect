@@ -19,7 +19,7 @@ export function Button(props: ButtonProps | LinkProps) {
   const cls = `${base} ${styles[variant]} ${className}`;
   if ("to" in rest && rest.to) {
     const { to, ...a } = rest as LinkProps;
-    return to.startsWith("http") ? <a href={to} className={cls} {...a} /> : <Link to={to} className={cls} {...a} />;
+    return /^(https?:|#)/.test(to) ? <a href={to} className={cls} {...a} /> : <Link to={to} className={cls} {...a} />;
   }
   return <button type="button" className={cls} {...(rest as ButtonHTMLAttributes<HTMLButtonElement>)} />;
 }

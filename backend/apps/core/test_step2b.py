@@ -65,7 +65,10 @@ class ContentTests(Step2bBase):
         Article.objects.create(title="Publié", category=cat, is_published=True, published_at=now - timedelta(days=1))
         Article.objects.create(title="Brouillon", category=cat, is_published=False)
         Article.objects.create(title="Programmé", category=cat, is_published=True, published_at=now + timedelta(days=1))
-        self.assertEqual([a.title for a in Article.objects.public()], ["Publié"])
+        titles = [a.title for a in Article.objects.public()]
+        self.assertIn("Publié", titles)
+        self.assertNotIn("Brouillon", titles)
+        self.assertNotIn("Programmé", titles)
 
     def test_article_slug_and_published_at_autofilled(self):
         a = Article.objects.create(title="Mon article", category=ArticleCategory.objects.first(), is_published=True)
@@ -119,14 +122,14 @@ class AdminWorkflowTests(Step2bBase):
 
 
 class SeedContentTests(Step2bBase):
-    def test_launch_event_and_draft_article(self):
+    def test_launch_event_and_published_article(self):
         ev = Event.objects.get(slug="grand-week-end-du-pole-2026")
         start = ev.start_date.astimezone(ZoneInfo("Africa/Dakar"))
         self.assertEqual((start.year, start.month, start.day), (2026, 12, 11))
         self.assertTrue(ev.is_published)
-        art = Article.objects.get(slug="urban-hub-connect-lancement-11-13-decembre-2026")
-        self.assertFalse(art.is_published)
-        self.assertEqual(Article.objects.public().count(), 0)
+        art = Article.objects.get(slug="urban-hub-connect-lancement-11-12-decembre-2026")
+        self.assertTrue(art.is_published)  # seed_article : article de lancement créé publié
+        self.assertEqual(Article.objects.public().count(), 1)
 
     def test_seed_is_idempotent_for_content(self):
         call_command("seed_initial_data", stdout=StringIO())

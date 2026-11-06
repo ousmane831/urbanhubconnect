@@ -2,7 +2,10 @@ import { Section, SectionHeading } from "../components/ui/Container";
 import { Button } from "../components/ui/Button";
 import { HexPattern } from "../components/ui/HexPattern";
 import { useSeo } from "../hooks/useSeo";
-import { Network, Users, HandHeart, Target, Award, Globe, Building2, FileText, Briefcase, GraduationCap, Users2, Sparkles, TrendingUp } from "lucide-react";
+import { useAsync } from "../hooks/useAsync";
+import { getDocuments, getPage } from "../services/api";
+import { RichText } from "../components/ui/RichText";
+import { Network, Users, HandHeart, Target, Award, Building2, FileText, Briefcase, GraduationCap, Users2, TrendingUp, DoorOpen, ShieldCheck, Leaf, Download, Eye, Compass } from "lucide-react";
 
 const MISSIONS = [
   { title: "Connecter", description: "Faciliter les rencontres et les échanges entre tous les acteurs du territoire", icon: Network, color: "bg-green" },
@@ -10,11 +13,16 @@ const MISSIONS = [
   { title: "Agir", description: "Transformer les idées en projets concrets pour le développement du territoire", icon: Target, color: "bg-gold" },
 ];
 
+// Textes déjà publiés sur le site (accroche de la page et article de lancement).
+const VISION = "Fédérer les acteurs des pôles urbains de Diamniadio et du Lac Rose autour d'une vision commune : construire ensemble un territoire dynamique et inclusif.";
+const AMBITION = "Créer un cadre permanent où les acteurs des deux pôles se connaissent, partagent l'information et construisent ensemble des coopérations utiles au territoire.";
+
 const VALEURS = [
-  { title: "Inclusion", description: "Ouvert à tous les acteurs, sans distinction de taille ou de secteur", icon: Users, color: "bg-green" },
-  { title: "Excellence", description: "Recherche de la qualité et de l'impact dans chaque initiative", icon: Award, color: "bg-purple" },
-  { title: "Innovation", description: "Encourager les nouvelles idées et les approches créatives", icon: Sparkles, color: "bg-gold" },
-  { title: "Transparence", description: "Gestion claire et ouverte des ressources et des décisions", icon: Globe, color: "bg-green" },
+  { title: "Ouverture", description: "Le réseau accueille tous les acteurs des deux pôles, quels que soient leur taille, leur secteur ou leur statut.", icon: DoorOpen, color: "bg-green" },
+  { title: "Confiance", description: "Les échanges reposent sur la transparence, le respect de la parole donnée et la discrétion due aux membres.", icon: ShieldCheck, color: "bg-purple" },
+  { title: "Utilité", description: "Une rencontre n'a de sens que si elle produit un bénéfice concret pour les membres et pour le territoire.", icon: Target, color: "bg-gold" },
+  { title: "Exigence", description: "Nous tenons à la qualité des contenus, de l'organisation et de l'accueil réservé à chacun.", icon: Award, color: "bg-green" },
+  { title: "Responsabilité", description: "Nos actions servent un développement durable des pôles, attentif aux habitants comme aux générations futures.", icon: Leaf, color: "bg-purple" },
 ];
 
 const CHIFFRES = [
@@ -34,7 +42,10 @@ const PROFILS = [
 ];
 
 export default function NetworkPage() {
-  useSeo("Le réseau", "Découvrez Urban Hub Connect : missions, valeurs et acteurs des pôles de Diamniadio et du Lac Rose.");
+  useSeo("Le réseau", "Découvrez Urban Hub Connect : vision, mission, ambition, valeurs et acteurs des pôles de Diamniadio et du Lac Rose.");
+  // « Notre trajectoire » : bloc modifiable dans l'admin (Contenus de page, slug reseau-trajectoire), masqué tant qu'il est vide.
+  const trajectoire = useAsync(() => getPage("reseau-trajectoire"));
+  const plaquette = useAsync(() => getDocuments("brochure"));
 
   return (
     <>
@@ -53,7 +64,21 @@ export default function NetworkPage() {
       </section>
 
       <Section>
-        <SectionHeading title="Notre mission" intro="Trois piliers guident chaque action du réseau." />
+        <SectionHeading title="Vision, mission, ambition et valeurs" />
+        <div className="mb-12 grid gap-6 md:grid-cols-2">
+          <div className="rounded-2xl border border-navy/10 bg-white p-8 shadow-soft">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-navy text-white"><Eye className="h-6 w-6" aria-hidden /></div>
+            <h3 className="mt-4 text-2xl font-bold text-navy">Notre vision</h3>
+            <p className="mt-3 text-lg text-navy/80">{VISION}</p>
+          </div>
+          <div className="rounded-2xl border border-navy/10 bg-white p-8 shadow-soft">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-gold text-white"><Compass className="h-6 w-6" aria-hidden /></div>
+            <h3 className="mt-4 text-2xl font-bold text-navy">Notre ambition</h3>
+            <p className="mt-3 text-lg text-navy/80">{AMBITION}</p>
+          </div>
+        </div>
+        <h3 className="mb-2 text-2xl font-bold text-navy">Notre mission</h3>
+        <p className="mb-6 text-lg text-navy/75">Trois piliers guident chaque action du réseau.</p>
         <div className="grid gap-8 md:grid-cols-3">
           {MISSIONS.map((mission) => {
             const Icon = mission.icon;
@@ -72,8 +97,9 @@ export default function NetworkPage() {
       </Section>
 
       <Section tone="offwhite">
-        <SectionHeading title="Nos valeurs" intro="Les principes qui fondent notre démarche collective." />
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <h3 className="mb-2 text-2xl font-bold text-navy">Nos valeurs</h3>
+        <p className="mb-6 text-lg text-navy/75">Cinq valeurs guident la vie du réseau.</p>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {VALEURS.map((valeur) => {
             const Icon = valeur.icon;
             return (
@@ -89,6 +115,17 @@ export default function NetworkPage() {
           })}
         </div>
       </Section>
+
+      {trajectoire.data?.content && (
+        <Section>
+          <SectionHeading title={trajectoire.data.title || "Notre trajectoire"} />
+          <RichText text={trajectoire.data.content} />
+        </Section>)}
+
+      {!!plaquette.data?.length && (
+        <Section tone="offwhite">
+          <a href={plaquette.data[0].file} download className="link inline-flex items-center gap-2 text-lg font-semibold"><Download className="h-5 w-5" aria-hidden />Télécharger la plaquette du réseau<span className="sr-only"> (PDF)</span></a>
+        </Section>)}
 
       <Section>
         <SectionHeading title="Le réseau en chiffres" />

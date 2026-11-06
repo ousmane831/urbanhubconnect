@@ -29,9 +29,12 @@ class SiteSettings(models.Model):
     footer_text = models.CharField(max_length=255, default="Association en cours de constitution · Initiative portée par M'ma Conciergerie")
     legal_information = models.TextField("mentions légales", blank=True, help_text="[à compléter]")
     privacy_policy = models.TextField("confidentialité", blank=True, help_text="[à compléter]")
-
     show_membership_fees = models.BooleanField("afficher les montants de cotisation", default=False,
                                                help_text="À cocher une fois les montants confirmés par l'Assemblée générale.")
+    moderate_opportunities = models.BooleanField("valider les annonces avant publication", default=True,
+                                                 help_text="Décocher pour publier les annonces Urban Opportunities immédiatement.")
+    moderate_opportunities = models.BooleanField("valider les annonces avant publication", default=True,
+                                                 help_text="Décocher pour publier les annonces Urban Opportunities immédiatement.")
     payment_instructions = models.TextField("modalités de paiement de la cotisation", blank=True,
                                             help_text="Texte envoyé avec le bulletin d'adhésion (virement, Wave, Orange Money…).")
 
@@ -96,6 +99,7 @@ class Submission(TimeStampedModel):
     class Meta:
         abstract = True
         ordering = ["-created_at"]
+
 
 class ActionItem(Taxonomy):
     """Programmes, cercles et outils du réseau (page « Nos actions »), modifiables dans l'admin."""

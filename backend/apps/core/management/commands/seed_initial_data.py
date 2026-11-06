@@ -1,5 +1,3 @@
-from datetime import datetime
-from zoneinfo import ZoneInfo
 from apps.core.seed_membership import seed_membership_content
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -7,7 +5,8 @@ from django.utils.text import slugify
 from apps.core.seed_actions import seed_actions
 from apps.core.roles import sync_coordination_group
 from apps.core.seed_article import seed_first_article
-from apps.core.seed_event_content import seed_event_content
+from apps.core.seed_event_content import (EVENT_END, EVENT_LOCATION, EVENT_START, EVENT_TAGLINE, EVENT_TITLE, MISSIONS,
+                                          PARTNERSHIP, seed_event_content)
 from apps.events.models import Event, EventCategory, VolunteerMission
 from apps.map.models import MapCategory
 from apps.memberships.models import MembershipCategory
@@ -31,7 +30,6 @@ MAP_CATEGORIES = [("Institutions et administrations", "landmark"), ("Entreprises
                   ("Grands équipements", "trophy"), ("Services de proximité", "store"), ("Mobilité", "bus"),
                   ("Tourisme et patrimoine", "tree-palm"), ("Initiatives et communautés", "users")]
 EVENT_CATEGORIES = ["After Work Connect", "Commission", "Visite", "Grand Week-End du Pôle"]
-MISSIONS = ["Accueil et accréditations", "Orientation", "Forum et Business Connect", "Portes Ouvertes", "Gala et protocole", "Caravane verte et reboisement"]
 MAP_DESCRIPTIONS = {
     "Institutions et administrations": "Ministères, agences, collectivités, services techniques",
     "Entreprises et zones d'activité": "Sièges, sites de production, parcs et zones d'activité, membres du réseau",
@@ -49,8 +47,6 @@ MEMBERSHIP = [("Grande entreprise, institution, banque, promoteur", 500_000),
               ("TPE, startup, cabinet, structure d'accompagnement", 50_000),
               ("Association, groupement de femmes, organisation de jeunes", 25_000),
               ("Membre individuel", 25_000), ("Étudiant(e), jeune de moins de 26 ans", 10_000)]
-PARTNERSHIP = [("Partenaire Fondateur", 7_500_000), ("Partenaire Officiel", 4_000_000),
-               ("Partenaire Associé", 2_000_000), ("Partenaire Engagé", 1_000_000), ("Pack PME du Pôle", 350_000)]
 
 
 class Command(BaseCommand):
@@ -97,21 +93,19 @@ class Command(BaseCommand):
         self._seed(VolunteerMission, [(n, {}) for n in MISSIONS])
         self._seed(ArticleCategory, [(n, {}) for n in ARTICLE_CATEGORIES])
         self._seed(MembershipCategory, [(n, {"amount_fcfa": a, "public_listing": not n.startswith(("Membre individuel", "Étudiant"))}) for n, a in MEMBERSHIP])
-        self._seed(PartnershipTier, [(n, {"amount_fcfa": a}) for n, a in PARTNERSHIP])
+        self._seed(PartnershipTier, [(n, {"amount_fcfa": a, "description": d, "benefits": b}) for n, a, d, b in PARTNERSHIP])
         self._seed_content()
         group = sync_coordination_group()
         group.user_set.add(*User.objects.filter(role=User.Role.COORDINATION))
         self.stdout.write(self.style.SUCCESS("Données de référence prêtes. Aucun membre, partenaire ni contenu fictif créé."))
 
     def _seed_content(self):
-        dakar = ZoneInfo("Africa/Dakar")
-        # Dates fournies par le cahier des charges ; description/lieu/programme laissés vides (à saisir dans l'admin).
+        # Dates de la note du 5 novembre 2026 : compte à rebours sur le vendredi 9 h 30, fin le samedi à minuit.
         event, ev = Event.objects.get_or_create(
             slug="grand-week-end-du-pole-2026",
-            defaults={"title": "Grand Week-End du Pôle 2026",
+            defaults={"title": EVENT_TITLE, "location": EVENT_LOCATION, "description": EVENT_TAGLINE,
                       "category": EventCategory.objects.get(slug=slugify("Grand Week-End du Pôle")),
-                      "start_date": datetime(2026, 12, 11, 0, 0, tzinfo=dakar),
-                      "end_date": datetime(2026, 12, 13, 23, 59, tzinfo=dakar),
+                      "start_date": EVENT_START, "end_date": EVENT_END,
                       "is_featured": True, "is_published": True})
         art_created, art_updated = seed_first_article()
         self.stdout.write(f"{'contenus événement':<28} +{seed_event_content(event)}")

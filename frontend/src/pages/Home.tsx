@@ -9,7 +9,7 @@ import { useSeo } from "../hooks/useSeo";
 import { getFeaturedEvents, getOrganizationFilters } from "../services/api";
 import { Network, Users, HandHeart, MapPin, Building2, Calendar, FileText, Briefcase, GraduationCap, Users2 } from "lucide-react";
 import heroImage from "../assets/banner.png";
-const fmt = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeZone: "Africa/Dakar" });
+import { fmtDays } from "../utils/format";
 
 const PROFILES = [
   { name: "Entreprises", icon: Building2 },
@@ -25,18 +25,25 @@ const VERBS = [
   { verb: "Agir", text: "Devenir membre du réseau", to: "/adherer", icon: Users, color: "bg-gold" },
 ];
 
+/** Bandeau événement : reste affiché jusqu'à la fin de l'événement (filtre « à venir » côté API) ;
+ *  le compte à rebours vise le début (vendredi 11 décembre 2026, 9 h 30 à Dakar). */
 function EventBand() {
   const { data } = useAsync(getFeaturedEvents);
   const event = data?.[0];
   if (!event) return null;
-  const range = event.end_date ? `Du ${fmt.format(new Date(event.start_date))} au ${fmt.format(new Date(event.end_date))}` : fmt.format(new Date(event.start_date));
+  const name = event.title.replace(/\s+\d{4}$/, "");
+  const line = [name, fmtDays(event.start_date, event.end_date), event.location].filter(Boolean).join(" · ");
   return (
     <section aria-label="Prochain événement" className="bg-green text-white">
       <Container className="flex flex-col gap-6 py-8 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-2xl sm:text-3xl">{event.title}</h2>
-          <p className="mt-1 text-white/85">{range}{event.location && ` · ${event.location}`}</p>
-          <Button to={`/evenements/${event.slug}`} variant="light" className="mt-4">Voir le programme</Button>
+        <div className="max-w-2xl">
+          <h2 className="text-2xl sm:text-3xl">{line}.</h2>
+          {event.description && <p className="mt-2 text-lg text-white/90">{event.description}</p>}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button to={`/evenements/${event.slug}#programme`} variant="light">Découvrir le programme</Button>
+            <Button to="/partenaires" variant="ghost">Devenir partenaire</Button>
+          </div>
+          <p className="mt-4 font-heading text-white/85">Deux pôles, un seul élan.</p>
         </div>
         <Countdown target={event.start_date} />
       </Container>

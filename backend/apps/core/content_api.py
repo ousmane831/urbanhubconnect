@@ -1,5 +1,6 @@
 from django_filters import rest_framework as django_filters
 from django.utils import timezone
+from django.db.models import Q
 from rest_framework import generics, serializers, viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -31,6 +32,7 @@ MembershipSer = ser(MembershipCategory, ["name", "slug", "description", "amount_
                     get_amount_fcfa=lambda self, o: o.amount_fcfa if self.context.get("show_fees") else None)
 TierSer = ser(PartnershipTier, ["name", "slug", "description", "amount_fcfa", "benefits"])
 PartnerSer = ser(Partner, ["name", "logo", "website", "partnership_type"], partnership_type=serializers.StringRelatedField())
+PartnerBandSer = ser(Partner, ["name", "logo", "website", "band_order", "dark_tile"])
 EVENT_FIELDS = ["title", "slug", "category", "category_name", "description", "audience", "start_date", "end_date",
                 "location", "image", "registration_url", "registration_opens_at", "is_featured"]
 EventSer = ser(Event, EVENT_FIELDS, category=cat(), category_name=cat_name())
@@ -71,8 +73,10 @@ class EventFilter(django_filters.FilterSet):
     upcoming = django_filters.BooleanFilter(method="filter_upcoming")
 
     def filter_upcoming(self, qs, name, value):
+        """Un événement en cours reste « à venir » jusqu'à sa fin (bandeau d'accueil visible jusqu'au dernier jour)."""
         now = timezone.now()
-        return qs.filter(start_date__gte=now) if value else qs.filter(start_date__lt=now)
+        running = Q(start_date__gte=now) | Q(end_date__gte=now)
+        return qs.filter(running) if value else qs.exclude(running)
 
     class Meta:
         model = Event
@@ -126,6 +130,12 @@ class PartnerList(generics.ListAPIView):
     """Liste vide tant qu'aucun partenaire n'est confirmé : le front masque alors le bloc."""
     permission_classes, serializer_class, pagination_class = [AllowAny], PartnerSer, None
     queryset = Partner.objects.confirmed()
+
+
+class PartnerBandList(generics.ListAPIView):
+    """Bandeau « En partenariat avec » (DGPU, The Ground, M'ma Conciergerie) : logos placés dans l'admin."""
+    permission_classes, serializer_class, pagination_class = [AllowAny], PartnerBandSer, None
+    queryset = Partner.objects.filter(band_order__isnull=False).order_by("band_order", "name")
 
 
 TaxonomySer = lambda m: ser(m, ["name", "slug", "description"])

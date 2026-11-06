@@ -134,20 +134,38 @@ class EventSection(models.Model):
 
 
 class EventRequest(Submission):
-    """Demandes liées aux événements : accueillir un After Work, réserver une visite, ouvrir ses portes, Caravane verte, Défis."""
+    """Demandes liées aux événements : inscription au Grand Week-End, accueillir un After Work, reboisement, Défis.
+    Les types « visite » et « portes ouvertes » (édition à trois jours) ne sont plus proposés : conservés pour l'historique."""
     class Kind(models.TextChoices):
+        REGISTRATION = "registration", "Inscription au Grand Week-End du Pôle"
         HOST_AFTERWORK = "host_afterwork", "Accueillir un After Work Connect"
-        BOOK_VISIT = "book_visit", "Réserver une visite (Portes Ouvertes)"
-        OPEN_DOORS = "open_doors", "Ouvrir les portes de son organisation"
-        CARAVAN = "caravan", "S'inscrire à la Caravane verte"
+        CARAVAN = "caravan", "Grand reboisement du Lac Rose"
         CHALLENGE = "challenge", "Défis Partenaires : proposer une solution"
+        BOOK_VISIT = "book_visit", "Réserver une visite (ancien programme)"
+        OPEN_DOORS = "open_doors", "Ouvrir ses portes (ancien programme)"
+
+    OPEN_KINDS = (Kind.REGISTRATION, Kind.HOST_AFTERWORK, Kind.CARAVAN, Kind.CHALLENGE)
+    # Choix du formulaire d'inscription (note de la Coordination du 5 novembre 2026).
+    REGISTRATION_OPTIONS = {
+        "vendredi-matin": "Vendredi matin : ouverture officielle et Forum du Pôle, panel 1",
+        "business-connect-vendredi": "Business Connect, vendredi",
+        "business-connect-samedi": "Business Connect, samedi",
+        "reboisement": "Vendredi après-midi : grand reboisement du Lac Rose, avec place dans le convoi de navettes",
+        "samedi-forum": "Samedi : Forum du Pôle, panels 2, 3 et 4",
+        "samedi-awards": "Samedi : cérémonie des Awards du Pôle",
+        "navette-vendredi": "Navette depuis Dakar, vendredi",
+        "navette-samedi": "Navette depuis Dakar, samedi",
+    }
 
     kind = models.CharField(max_length=20, choices=Kind.choices, db_index=True)
     name = models.CharField(max_length=150)
     organization = models.CharField(max_length=200, blank=True)
     email = models.EmailField()
     phone = models.CharField(max_length=30, blank=True)
-    circuit = models.CharField(max_length=1, blank=True, choices=[("A", "Circuit A « Cap sur le Lac Rose »"), ("B", "Circuit B « Cap sur Diamniadio »")])
+    circuit = models.CharField(max_length=1, blank=True, choices=[("A", "Circuit A (ancien programme)"), ("B", "Circuit B (ancien programme)")])
+    options = models.JSONField("choix d'inscription", default=list, blank=True)
+    what_offers = models.TextField("ce que je propose", blank=True)
+    what_needs = models.TextField("ce que je recherche", blank=True)
     message = models.TextField(blank=True)
     accept_waiver = models.BooleanField("décharge de responsabilité acceptée", default=False)
     accept_privacy = models.BooleanField(default=False)
@@ -158,12 +176,20 @@ class EventRequest(Submission):
     def __str__(self):
         return f"{self.name} — {self.get_kind_display()}"
 
+    def options_display(self):
+        return [self.REGISTRATION_OPTIONS.get(o, o) for o in self.options or []]
+
     def clean(self):
         super().clean()
         errors = {}
-        if self.kind == self.Kind.BOOK_VISIT and not self.circuit:
-            errors["circuit"] = "Choisissez un circuit."
-        if self.kind == self.Kind.CARAVAN and not self.accept_waiver:
-            errors["accept_waiver"] = "La décharge de responsabilité doit être acceptée."
+        if self.kind == self.Kind.REGISTRATION:
+            opts = self.options or []
+            if not isinstance(opts, list) or not opts:
+                errors["options"] = "Cochez au moins un temps du programme."
+            elif any(o not in self.REGISTRATION_OPTIONS for o in opts):
+                errors["options"] = "Choix inconnu."
+        wants_planting = self.kind == self.Kind.CARAVAN or "reboisement" in (self.options or [])
+        if wants_planting and not self.accept_waiver:
+            errors["accept_waiver"] = "La décharge de responsabilité doit être acceptée pour le reboisement."
         if errors:
             raise ValidationError(errors)

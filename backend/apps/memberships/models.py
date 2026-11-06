@@ -154,3 +154,67 @@ class ContactReveal(TimeStampedModel):
     class Meta:
         ordering = ["-created_at"]
         verbose_name, verbose_name_plural = "affichage de coordonnées", "affichages de coordonnées"
+
+
+class OpportunityType(Taxonomy):
+    class Meta(Taxonomy.Meta):
+        verbose_name, verbose_name_plural = "type d'annonce", "types d'annonce"
+
+
+class OpportunityQuerySet(models.QuerySet):
+    def open(self):
+        """Annonces publiées et dont la date limite n'est pas dépassée."""
+        return self.filter(status="published").filter(models.Q(deadline__isnull=True) | models.Q(deadline__gte=timezone.localdate()))
+
+
+class Opportunity(TimeStampedModel):
+    """Annonce Urban Opportunities : partenariat, appel d'offres, sous-traitance, emploi, stage… (réservée aux membres)."""
+    class Status(models.TextChoices):
+        PENDING = "pending", "En attente de validation"
+        PUBLISHED = "published", "Publiée"
+        CLOSED = "closed", "Clôturée"
+        REJECTED = "rejected", "Refusée"
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="opportunities")
+    published_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    type = models.ForeignKey(OpportunityType, on_delete=models.PROTECT, related_name="opportunities", verbose_name="type")
+    title = models.CharField("titre", max_length=150)
+    description = models.TextField()
+    deadline = models.DateField("date limite", null=True, blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING, db_index=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    objects = OpportunityQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name, verbose_name_plural = "annonce", "annonces"
+
+    def __str__(self):
+        return f"{self.title} ({self.organization})"
+
+
+class ConnectionRequest(TimeStampedModel):
+    """Demande de mise en relation entre membres : relayée par la Coordination, ou transmise directement pour une réponse à annonce."""
+    class Status(models.TextChoices):
+        PENDING = "pending", "À transmettre"
+        FORWARDED = "forwarded", "Transmise"
+        DECLINED = "declined", "Refusée"
+
+    sender = models.ForeignKey(Membership, on_delete=models.CASCADE, related_name="sent_requests")
+    recipient = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="received_requests")
+    opportunity = models.ForeignKey(Opportunity, null=True, blank=True, on_delete=models.SET_NULL, related_name="responses")
+    message = models.TextField()
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING, db_index=True)
+    handled_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    handled_at = models.DateTimeField(null=True, blank=True)
+    forwarded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name, verbose_name_plural = "demande de mise en relation", "demandes de mise en relation"
+
+    def __str__(self):
+        return f"{self.sender.name} → {self.recipient.name}"

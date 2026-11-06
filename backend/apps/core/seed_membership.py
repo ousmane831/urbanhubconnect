@@ -5,6 +5,8 @@ from apps.memberships.models import MembershipCategory
 from apps.memberships.services import backfill_dossiers
 from apps.organizations.models import Sector
 
+OPPORTUNITY_TYPES = ["Partenariat", "Appel d'offres", "Sous-traitance", "Recherche de fournisseurs", "Emploi", "Stage", "Formation", "Investissement"]
+
 RENAMES = [
     (Sector, "construction-et-immobilier", "Construction et immobilier", "BTP et immobilier"),
     (Sector, "education-et-formation", "Éducation et formation", "Enseignement et formation"),
@@ -42,6 +44,11 @@ def seed_membership_content():
     changed = 0
     for model, slug, old, new in RENAMES:  # n'agit que si le libellé n'a pas déjà été modifié
         changed += model.objects.filter(slug=slug, name=old).update(name=new)
+    from django.utils.text import slugify
+    from apps.memberships.models import OpportunityType
+    for order, name in enumerate(OPPORTUNITY_TYPES, start=1):
+        _, new = OpportunityType.objects.get_or_create(slug=slugify(name), defaults={"name": name, "display_order": order})
+        changed += new
     for slug, title, content in PAGES:
         _, new = PageContent.objects.get_or_create(slug=slug, defaults={"title": title, "content": content, "is_published": True})
         changed += new

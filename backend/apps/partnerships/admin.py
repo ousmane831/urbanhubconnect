@@ -20,7 +20,7 @@ class PartnershipApplicationAdmin(SubmissionAdminMixin, admin.ModelAdmin):
 
 @admin.register(Partner)
 class PartnerAdmin(admin.ModelAdmin):
-    list_display = ("name", "partnership_type", "is_confirmed", "display_order")
-    list_editable = ("is_confirmed", "display_order")
+    list_display = ("name", "partnership_type", "is_confirmed", "display_order", "band_order", "dark_tile")
+    list_editable = ("is_confirmed", "display_order", "band_order", "dark_tile")
     list_filter = ("is_confirmed", "partnership_type")
     search_fields = ("name",)

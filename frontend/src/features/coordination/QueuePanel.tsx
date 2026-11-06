@@ -9,10 +9,12 @@ import { ActionButtons, ActionForm, confirmAction } from "./ui";
 export function QueuePanel({ kinds, kind, onKind, version, onChanged }: {
   kinds: { kind: string; label: string; count: number }[]; kind: string; onKind: (k: string) => void; version: number; onChanged: () => void;
 }) {
-  const state = useAsync(() => coordApi.queue(kind), [kind, version]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [open, setOpen] = useState<{ id: number; action: ActionDef } | null>(null);
+  const [searchText, setSearchText] = useState("");
+  const [search, setSearch] = useState("");
+  const state = useAsync(() => coordApi.queue(kind, kind === "members" ? search : undefined), [kind, version, search]);
 
   const run = async (item: QueueItem, a: ActionDef, data?: Record<string, string>) => {
     setBusy(true); setNotice(null);
@@ -33,14 +35,25 @@ export function QueuePanel({ kinds, kind, onKind, version, onChanged }: {
             {k.label} <span className="ml-1 rounded-full bg-gold px-2 text-sm text-navy">{k.count}</span></button>))}
       </div>
       <p role="status" aria-live="polite" className={`mb-4 min-h-[1.5rem] font-semibold ${notice?.ok ? "text-green" : "text-red-800"}`}>{notice?.text}</p>
-      <Async state={state} isEmpty={(d) => !d.items.length} empty="Rien à traiter ici pour le moment.">
+      {kind === "members" && (
+        <form className="mb-5 flex flex-wrap items-end gap-3" onSubmit={(e) => { e.preventDefault(); setSearch(searchText.trim()); }}>
+          <div className="min-w-60 flex-1">
+            <label htmlFor="member-search" className="mb-1 block font-semibold">Rechercher un membre (nom, représentant, e-mail ou référence)</label>
+            <input id="member-search" className="field" value={searchText} onChange={(e) => setSearchText(e.target.value)} />
+          </div>
+          <button className="min-h-[48px] rounded-md bg-navy px-5 font-semibold text-white hover:bg-navy/90">Rechercher</button>
+          {search && <button type="button" className="min-h-[48px] rounded-md border border-navy/30 px-5 font-semibold hover:bg-offwhite"
+            onClick={() => { setSearchText(""); setSearch(""); }}>Effacer</button>}
+        </form>
+      )}
+      <Async state={state} isEmpty={(d) => !d.items.length} empty={kind === "members" && search ? "Aucun membre ne correspond à cette recherche." : "Rien à traiter ici pour le moment."}>
         {(d) => (
           <ul className="space-y-5">
             {d.items.map((it) => (
               <li key={it.id} className="rounded-md border border-navy/15 bg-white p-5 shadow-soft">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <h3 className="text-xl">{it.title}</h3>
-                  <span className="text-sm text-navy/65">reçu le {fmtDate(it.created_at)}</span>
+                  <span className="text-sm text-navy/65">{kind === "members" ? "dossier ouvert le" : "reçu le"} {fmtDate(it.created_at)}</span>
                 </div>
                 <p className="mt-1 text-navy/80">{it.subtitle}{it.state && <span className="ml-2 rounded bg-offwhite px-2 py-0.5 text-sm font-semibold">{it.state}</span>}</p>
                 <dl className="mt-4 grid gap-x-8 gap-y-2 sm:grid-cols-2">

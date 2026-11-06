@@ -1,4 +1,4 @@
-import { createBrowserRouter, type RouteObject } from "react-router-dom";
+import { createBrowserRouter, Navigate, type RouteObject } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
 import { Forbidden, NotFound, ServerError } from "./pages/ErrorPage";
 import { MaintenanceGuard } from "./components/MaintenanceGuard";
@@ -38,6 +38,8 @@ export const router = createBrowserRouter([
       { path: "adherer", ...lazyPage(() => import("./pages/Membership")) },
       { path: "partenaires", ...lazyPage(() => import("./pages/Partners")) },
       { path: "actualites", ...lazyPage(() => import("./pages/News")) },
+      // Ancienne adresse de l'article de lancement (avant la note du 5 novembre 2026).
+      { path: "actualites/urban-hub-connect-lancement-11-13-decembre-2026", element: <Navigate to="/actualites/urban-hub-connect-lancement-11-12-decembre-2026" replace /> },
       { path: "actualites/:slug", ...lazyPage(() => import("./pages/NewsDetail")) },
       { path: "presse", ...lazyPage(() => import("./pages/Press")) },
       { path: "contact", ...lazyPage(() => import("./pages/Contact")) },

@@ -21,8 +21,9 @@ from apps.events.models import (AwardApplication, BusinessConnectRegistration, E
 from apps.contact.models import ContactMessage
 from apps.map.models import MapPlace, PlaceSuggestion
 from apps.memberships import accounts as acc
+from apps.memberships import network as net
 from apps.memberships import services as ms
-from apps.memberships.models import Membership, MembershipCategory, ProfileChange
+from apps.memberships.models import ConnectionRequest, Membership, MembershipCategory, Opportunity, ProfileChange
 from apps.news.models import Article
 from apps.newsletter.models import NewsletterSubscriber
 from apps.organizations.models import Organization, ValidationStatus as VS
@@ -127,6 +128,13 @@ KINDS = {
         qs=lambda: Membership.objects.filter(status__in=[Membership.Status.RECEIVED, Membership.Status.REVIEWING, Membership.Status.ACCEPTED]).select_related("category", "organization"),
         title=lambda o: o.name, subtitle=lambda o: _membership_subtitle(o), state=lambda o: o.get_status_display(),
         actions=lambda o: _membership_actions(o), details=lambda o: _membership_details(o)),
+    "members": dict(
+        label="Membres à jour", model=Membership,
+        qs=lambda: Membership.objects.filter(status=Membership.Status.ACTIVE, valid_until__gte=timezone.localdate()).select_related("category", "organization"),
+        search=lambda qs, value: qs.filter(Q(name__icontains=value) | Q(representative__icontains=value) |
+                                           Q(email__icontains=value) | Q(reference__icontains=value)),
+        title=lambda o: o.name, subtitle=lambda o: _membership_subtitle(o), state=lambda o: o.get_status_display(),
+        actions=lambda o: _membership_actions(o), details=lambda o: _membership_details(o)),
     "renewals": dict(
         label="Cotisations à renouveler", model=Membership,
         qs=lambda: Membership.objects.filter(Q(status=Membership.Status.EXPIRED) | Q(status=Membership.Status.ACTIVE, valid_until__lt=timezone.localdate() + timedelta(days=30))).select_related("category", "organization"),
@@ -139,6 +147,21 @@ KINDS = {
         title=lambda o: o.organization.name, subtitle=lambda o: "Modification de la fiche demandée par le membre",
         actions=lambda o: [{"id": "accept", "label": "Approuver et publier", "tone": "primary"}, {"id": "reject", "label": "Refuser", "tone": "danger"}],
         details=lambda o: _change_details(o)),
+    "connections": dict(
+        label="Mises en relation", model=ConnectionRequest,
+        qs=lambda: ConnectionRequest.objects.filter(status=ConnectionRequest.Status.PENDING).select_related("sender", "recipient", "opportunity"),
+        title=lambda o: f"{o.sender.name} → {o.recipient.name}",
+        subtitle=lambda o: f"Réponse à l'annonce « {o.opportunity.title} »" if o.opportunity else "Demande de mise en relation",
+        actions=lambda o: [{"id": "accept", "label": "Transmettre à l'organisation", "tone": "primary"}, {"id": "reject", "label": "Refuser", "tone": "danger"}],
+        details=lambda o: rows(("Message", o.message), ("Demandeur", o.sender.representative or o.sender.name), ("Téléphone du demandeur", o.sender.phone),
+                               ("E-mail du demandeur", o.sender.email), ("Destinataire", o.recipient.name),
+                               ("E-mail de contact du destinataire", o.recipient.representative_email or o.recipient.email))),
+    "opportunities": dict(
+        label="Annonces Urban Opportunities", model=Opportunity,
+        qs=lambda: Opportunity.objects.filter(status=Opportunity.Status.PENDING).select_related("organization", "type"),
+        title=lambda o: o.title, subtitle=lambda o: f"{o.type.name} · {o.organization.name}",
+        actions=lambda o: [{"id": "accept", "label": "Publier l'annonce", "tone": "primary"}, {"id": "reject", "label": "Refuser", "tone": "danger"}],
+        details=lambda o: rows(("Description", o.description), ("Date limite", f"{o.deadline:%d/%m/%Y}" if o.deadline else ""))),
     "partnerships": dict(
         label="Demandes de partenariat", model=PartnershipApplication, qs=lambda: PartnershipApplication.objects.filter(status__in=OPEN).select_related(),
         title=lambda o: get(o, "company"), subtitle=lambda o: label(o, "tier") or "Formule non précisée", actions=_status_actions,
@@ -165,6 +188,8 @@ KINDS = {
         title=lambda o: get(o, "name"), subtitle=lambda o: " · ".join(x for x in (label(o, "kind"), get(o, "organization")) if x),
         actions=_status_actions,
         details=lambda o: rows(("E-mail", get(o, "email")), ("Téléphone", get(o, "phone")), ("Circuit", label(o, "circuit")),
+                               ("Choix", " ; ".join(o.options_display())), ("Propose", get(o, "what_offers")),
+                               ("Recherche", get(o, "what_needs")),
                                ("Décharge acceptée", "oui" if get(o, "accept_waiver", False) else ""), ("Message", get(o, "message")))),
     "volunteers": dict(
         label="Candidatures de bénévoles", model=VolunteerApplication, qs=lambda: VolunteerApplication.objects.filter(status__in=OPEN),
@@ -194,6 +219,8 @@ def _membership_subtitle(m):
 
 def _membership_actions(m):
     acts = []
+    if m.status == MS.ACTIVE:
+        acts.append({"id": "resend_invitation", "label": "Renvoyer le lien d'accès", "tone": "neutral"})
     if m.status in (MS.RECEIVED, MS.REVIEWING, MS.ACCEPTED) and not m.category:
         acts.append({"id": "set_category", "label": "Choisir la catégorie", "tone": "primary", "form": "category",
                      "options": [{"value": c.slug, "label": f"{c.name} · {c.amount_fcfa} FCFA"} for c in MembershipCategory.objects.filter(is_active=True)]})
@@ -226,6 +253,11 @@ def _membership_details(m):
 def _apply_membership(obj, action, user, data):
     data = data or {}
     try:
+        if action == "resend_invitation":
+            account, _ = acc.ensure_account(obj)
+            if not acc.send_invitation(obj, account):
+                raise ValidationError("Le lien d'accès n'a pas pu être envoyé. Vérifiez l'adresse e-mail et la configuration d'envoi.")
+            return "Lien d'accès envoyé par e-mail au membre."
         if action == "review":
             ms.review(obj)
             return "Dossier marqué « en cours d'examen »."
@@ -260,6 +292,8 @@ def _apply_membership(obj, action, user, data):
                                      paid_on=paid_on, user=user)[1]
     except ms.DossierError as e:
         raise ValidationError(str(e))
+    except acc.AccountError as e:
+        raise ValidationError(str(e))
     raise ValidationError("Action inconnue.")
 
 
@@ -286,6 +320,27 @@ def _apply_profile_change(obj, action, user):
     raise ValidationError("Action inconnue.")
 
 
+def _apply_network(kind, obj, action, user):
+    try:
+        if kind == "connections":
+            if action == "accept":
+                net.forward(obj, user)
+                return "Demande transmise par e-mail à l'organisation."
+            if action == "reject":
+                net.decline(obj, user)
+                return "Demande refusée : le demandeur en est informé."
+        else:
+            if action == "accept":
+                net.approve_opportunity(obj, user)
+                return "Annonce publiée : l'auteur en est informé."
+            if action == "reject":
+                net.reject_opportunity(obj, user)
+                return "Annonce refusée : l'auteur en est informé."
+    except net.NetworkError as e:
+        raise ValidationError(str(e))
+    raise ValidationError("Action inconnue.")
+
+
 def _item(kind, o):
     k = KINDS[kind]
     return {"id": o.pk, "title": k["title"](o), "subtitle": k["subtitle"](o), "created_at": o.created_at.isoformat(),
@@ -294,10 +349,12 @@ def _item(kind, o):
 
 def _apply(kind, obj, action, user, data=None):
     """Applique l'action ; retourne le message de confirmation. Lève ValidationError si interdit."""
-    if kind in ("memberships", "renewals"):
+    if kind in ("memberships", "members", "renewals"):
         return _apply_membership(obj, action, user, data)
     if kind == "profile-changes":
         return _apply_profile_change(obj, action, user)
+    if kind in ("connections", "opportunities"):
+        return _apply_network(kind, obj, action, user)
     if kind == "messages":
         if action != "handle":
             raise ValidationError("Action inconnue.")
@@ -395,14 +452,18 @@ def summary(request):
         {"label": "Articles publiés", "value": safe(lambda: Article.objects.public().count(), 0, "articles")},
         {"label": "Articles en brouillon", "value": safe(lambda: Article.objects.filter(is_published=False).count(), 0, "drafts")},
     ]
-    return Response({"queues": queues, "stats": stats, "to_handle": sum(q["count"] for q in queues)})
+    return Response({"queues": queues, "stats": stats, "to_handle": sum(q["count"] for q in queues if q["kind"] != "members")})
 
 
 @staff_api(["GET"])
 def queue(request, kind):
     if kind not in KINDS:
         return Response({"detail": "Introuvable."}, status=404)
-    return Response({"label": KINDS[kind]["label"], "items": [_item(kind, o) for o in KINDS[kind]["qs"]().order_by("created_at")[:50]]})
+    queryset = KINDS[kind]["qs"]()
+    search = request.query_params.get("search", "").strip()
+    if search and "search" in KINDS[kind]:
+        queryset = KINDS[kind]["search"](queryset, search)
+    return Response({"label": KINDS[kind]["label"], "items": [_item(kind, o) for o in queryset.order_by("created_at")[:50]]})
 
 
 @staff_api(["POST"])

@@ -1,13 +1,10 @@
 import {
   ArrowRight,
   Award,
-  BriefcaseBusiness,
   CalendarCheck2,
   CheckCircle2,
   Clock3,
   FileLock2,
-  FolderLock,
-  LayoutDashboard,
   LogOut,
   ShieldCheck,
   UserRound,
@@ -20,19 +17,12 @@ import type { MemberMe } from "../../services/members";
 import { fmtDate } from "../../utils/format";
 import { FullDirectory } from "./FullDirectory";
 import { ProfileEditor } from "./ProfileEditor";
-
-type Tab = "home" | "profile" | "directory" | "opportunities" | "documents";
-const TABS = [
-  { id: "home", label: "Accueil", icon: LayoutDashboard },
-  { id: "profile", label: "Mon profil", icon: UserRound },
-  { id: "directory", label: "Annuaire complet", icon: UsersRound },
-  { id: "opportunities", label: "Urban Opportunities", icon: BriefcaseBusiness },
-  { id: "documents", label: "Documents réservés", icon: FolderLock },
-] satisfies { id: Tab; label: string; icon: typeof LayoutDashboard }[];
-const SOON: Record<"opportunities" | "documents", { title: string; text: string }> = {
-  opportunities: { title: "Urban Opportunities", text: "Publier et consulter partenariats, appels d'offres, sous-traitance, emplois, stages." },
-  documents: { title: "Documents réservés", text: "Comptes rendus des commissions, Urban Notes, résultats du Baromètre, documents de l'Assemblée générale." },
-};
+import { ConnectionsPanel } from "./ConnectionsPanel";
+import { DocumentsPanel } from "./DocumentsPanel";
+import { OpportunitiesPanel } from "./OpportunitiesPanel";
+type Tab = "home" | "profile" | "directory" | "connections" | "opportunities" | "documents";
+const TABS: [Tab, string][] = [["home", "Accueil"], ["profile", "Mon profil"], ["directory", "Annuaire complet"], ["connections", "Mises en relation"],
+  ["opportunities", "Urban Opportunities"], ["documents", "Documents réservés"]];
 
 export function MemberWorkspace({ me, onLogout }: { me: MemberMe; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>("home");
@@ -74,10 +64,10 @@ export function MemberWorkspace({ me, onLogout }: { me: MemberMe; onLogout: () =
       <div className="border-b border-navy/10 bg-white shadow-sm">
         <Container>
           <nav aria-label="Sections de l'Espace membres" className="-mb-px flex gap-1 overflow-x-auto">
-            {TABS.map(({ id, label, icon: Icon }) => (
+            {TABS.map(([id, label]) => (
               <button key={id} aria-current={tab === id ? "page" : undefined} onClick={() => setTab(id)}
                 className={`inline-flex min-h-[56px] shrink-0 items-center gap-2 border-b-[3px] px-4 text-sm font-semibold transition-colors sm:text-base ${tab === id ? "border-green text-green" : "border-transparent text-navy/70 hover:border-navy/20 hover:text-navy"}`}>
-                <Icon className="h-4 w-4" aria-hidden="true" />{label}
+                {label}
               </button>))}
           </nav>
         </Container>
@@ -142,11 +132,11 @@ export function MemberWorkspace({ me, onLogout }: { me: MemberMe; onLogout: () =
                 <p className="mt-1 text-navy/70">Accédez aux outils et informations réservés aux membres.</p>
               </div>
               <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {TABS.filter(({ id }) => id !== "home").map(({ id, label, icon: Icon }, index) => (
+                {TABS.filter(([id]) => id !== "home").map(([id, label], index) => (
                   <li key={id}>
                     <button onClick={() => setTab(id)} className="group flex h-full min-h-40 w-full flex-col rounded-2xl border border-navy/10 bg-white p-5 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:border-green/30 hover:shadow-lg">
                       <span className={`flex h-10 w-10 items-center justify-center rounded-xl text-white ${index % 3 === 0 ? "bg-purple" : index % 3 === 1 ? "bg-green" : index % 3 === 2 ? "bg-gold" : "bg-navy"}`}>
-                        <Icon className="h-5 w-5" aria-hidden="true" />
+                        <span className="font-heading text-lg font-bold" aria-hidden="true">{index + 1}</span>
                       </span>
                       <span className="mt-4 flex flex-1 items-center justify-between gap-2 font-semibold text-navy">
                         {label}<ArrowRight className="h-4 w-4 shrink-0 text-green transition-transform group-hover:translate-x-1" aria-hidden="true" />
@@ -159,21 +149,9 @@ export function MemberWorkspace({ me, onLogout }: { me: MemberMe; onLogout: () =
           </div>)}
         {tab === "profile" && <ProfileEditor />}
         {tab === "directory" && <FullDirectory />}
-        {(tab === "opportunities" || tab === "documents") && (
-          <section className="relative max-w-3xl overflow-hidden rounded-2xl border border-navy/10 bg-white p-6 shadow-soft sm:p-9">
-            <div className={`absolute -right-10 -top-10 h-40 w-40 rounded-full opacity-[0.08] ${tab === "opportunities" ? "bg-purple" : "bg-gold"}`} />
-            <div className="relative">
-              <span className={`flex h-12 w-12 items-center justify-center rounded-xl text-white ${tab === "opportunities" ? "bg-purple" : "bg-gold"}`}>
-                {tab === "opportunities" ? <BriefcaseBusiness className="h-6 w-6" aria-hidden="true" /> : <FolderLock className="h-6 w-6" aria-hidden="true" />}
-              </span>
-              <span className="mt-5 inline-flex rounded-full bg-gold/15 px-3 py-1 text-sm font-semibold text-navy">Bientôt disponible</span>
-              <h2 className="mt-3 text-2xl sm:text-3xl">{SOON[tab].title}</h2>
-              <p className="mt-3 text-lg leading-relaxed text-navy/75">{SOON[tab].text}</p>
-              <p className="mt-6 rounded-xl border border-navy/10 bg-offwhite p-4 text-sm text-navy/75">
-                Ce service est en préparation et sera accessible prochainement depuis votre espace membre.
-              </p>
-            </div>
-          </section>)}
+        {tab === "connections" && <ConnectionsPanel />}
+        {tab === "opportunities" && <OpportunitiesPanel />}
+        {tab === "documents" && <DocumentsPanel />}
       </Container>
     </div>
   );

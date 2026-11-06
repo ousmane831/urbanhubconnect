@@ -39,6 +39,7 @@ export interface RefItem { name: string; slug: string; description: string }
 export interface MembershipCategoryItem extends RefItem { amount_fcfa: number | null; public_listing: boolean }
 export interface Priced extends RefItem { amount_fcfa: number; benefits?: string }
 export interface Partner { name: string; logo: string; website: string; partnership_type: string | null }
+export interface BandPartner { name: string; logo: string; website: string; band_order: number; dark_tile: boolean }
 export interface PressRelease { title: string; slug: string; summary: string; document: string | null; published_at: string }
 export interface DocumentItem { title: string; file: string; category: string; description: string }
 

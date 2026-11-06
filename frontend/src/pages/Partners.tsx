@@ -4,17 +4,19 @@ import { ConfigForm, type FieldDef } from "../components/forms/ConfigForm";
 import { HexPattern } from "../components/ui/HexPattern";
 import { useAsync } from "../hooks/useAsync";
 import { useSeo } from "../hooks/useSeo";
-import { getPartners, getTiers } from "../services/api";
+import { getDocuments, getPartners, getTiers } from "../services/api";
 import { fmtFcfa } from "../utils/format";
-import { Handshake, Award, Phone, CheckCircle } from "lucide-react";
+import { PartnerBand } from "../features/events/PartnerBand";
+import { Handshake, Award, Phone, CheckCircle, Download } from "lucide-react";
 
 export default function Partners() {
   useSeo("Partenaires", "Formules de partenariat avec Urban Hub Connect et demande de rappel.");
   const tiers = useAsync(getTiers);
   const partners = useAsync(getPartners);
+  const dossier = useAsync(() => getDocuments("partnership"));
   const fields: FieldDef[] = [
     { name: "company", label: "Entreprise ou institution", type: "text", required: true },
-    { name: "tier", label: "Formule envisagée", type: "select", options: tiers.data?.map((t) => ({ value: t.slug, label: `${t.name} · ${fmtFcfa(t.amount_fcfa)}` })) },
+    { name: "tier", label: "Formule envisagée", type: "select", options: tiers.data?.map((t) => ({ value: t.slug, label: `${t.name} · ${fmtFcfa(t.amount_fcfa)} HT` })) },
     { name: "contact_name", label: "Nom du contact", type: "text", required: true }, { name: "role", label: "Fonction", type: "text" },
     { name: "phone", label: "Téléphone", type: "tel", required: true }, { name: "email", label: "E-mail", type: "email", required: true },
     { name: "message", label: "Message", type: "textarea" },
@@ -39,7 +41,7 @@ export default function Partners() {
       </section>
 
       <Section>
-        <SectionHeading title="Formules de partenariat" intro="Choisissez la formule adaptée à votre engagement." />
+        <SectionHeading title="Formules 2026" intro="Choisissez la formule adaptée à votre engagement pour le Grand Week-End du Pôle et le réseau." />
         <Async state={tiers} empty="Les formules de partenariat seront publiées prochainement.">
           {(list) => (
             <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -53,13 +55,14 @@ export default function Partners() {
                   } text-white`}>
                     <Award className="h-7 w-7" />
                   </div>
-                  <h2 className="mt-4 text-xl font-bold text-navy">{t.name}</h2>
-                  <p className="mt-2 text-3xl font-extrabold text-green">{fmtFcfa(t.amount_fcfa)}</p>
-                  <p className="text-sm text-navy/60">/ an</p>
+                  <h2 className="mt-4 text-xl font-bold text-navy">{t.name}{t.description && <span className="ml-2 text-base font-semibold text-navy/65">({t.description})</span>}</h2>
+                  <p className="mt-2 text-3xl font-extrabold text-green">{fmtFcfa(t.amount_fcfa)} <span className="text-base font-semibold text-navy/65">HT</span></p>
                   {t.benefits && <p className="mt-4 whitespace-pre-line text-navy/75">{t.benefits}</p>}
                 </li>))}
             </ul>)}
         </Async>
+        <p className="mt-8 max-w-3xl text-lg text-navy/80">Montants hors taxes, payables en plusieurs fois et combinables avec un apport en nature ou un parrainage thématique. Chaque partenaire reçoit un bilan chiffré et illustré après l'événement. Engagements pour l'édition 2026 jusqu'au 25 novembre 2026 ; les logos des partenaires sont intégrés aux supports dès la signature, au plus tard le 27 novembre.</p>
+        {dossier.data?.[0] && <a href={dossier.data[0].file} download className="link mt-6 inline-flex items-center gap-2 text-lg font-semibold"><Download className="h-5 w-5" aria-hidden />Télécharger le dossier de l'événement et de partenariat<span className="sr-only"> (PDF)</span></a>}
       </Section>
 
       {!!partners.data?.length && (
@@ -100,10 +103,10 @@ export default function Partners() {
           <h2 className="text-2xl sm:text-3xl font-bold text-center">Pourquoi devenir partenaire ?</h2>
           <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { title: "Visibilité", description: "Gagnez en visibilité auprès des acteurs du territoire" },
-              { title: "Réseau", description: "Accédez à un réseau d'entreprises et d'institutions" },
-              { title: "Impact", description: "Contribuez au développement économique local" },
-              { title: "Innovation", description: "Participez aux initiatives innovantes du réseau" },
+              { title: "Gagner en visibilité", description: "Logo sur les supports de l'événement et du réseau, prise de parole et présence au Village du Pôle." },
+              { title: "Développer ses affaires", description: "Business Connect, rencontre Achetons Local et Mur des opportunités." },
+              { title: "Fédérer ses équipes", description: "Reboisement du Lac Rose et rendez-vous d'affaires." },
+              { title: "Agir pour le territoire", description: "Un bosquet dans la Forêt Urban Hub Connect et un engagement aux côtés des acteurs des deux pôles." },
             ].map((item, index) => (
               <div key={index} className="flex items-start gap-3">
                 <CheckCircle className="h-6 w-6 flex-shrink-0 text-green mt-0.5" />
@@ -116,6 +119,7 @@ export default function Partners() {
           </div>
         </div>
       </section>
+      <PartnerBand />
     </>
   );
 }

@@ -12,7 +12,8 @@ const meta = (key: "name" | "property", name: string, content: string) =>
   upsert(`meta[${key}="${name}"]`, () => { const m = document.createElement("meta"); m.setAttribute(key, name); return m; }, "content", content);
 
 /** Title, description, canonical, Open Graph et Twitter Card pour chaque page. */
-export function useSeo(title: string, description: string = DEFAULT_DESC, path?: string, exact = false) {
+/** `image` : image de partage (idéalement 1200 × 630) ; sans image, la balise og:image est retirée. */
+export function useSeo(title: string, description: string = DEFAULT_DESC, path?: string, exact = false, image?: string | null) {
   useEffect(() => {
     const full = exact || title === "Urban Hub Connect" ? title : `${title} · Urban Hub Connect`;
     const url = SITE + (path ?? window.location.pathname);
@@ -23,5 +24,11 @@ export function useSeo(title: string, description: string = DEFAULT_DESC, path?:
     meta("property", "og:url", url); meta("property", "og:type", "website"); meta("property", "og:locale", "fr_FR");
     meta("name", "twitter:card", "summary_large_image"); meta("name", "twitter:title", full);
     meta("name", "twitter:description", description);
-  }, [title, description, path, exact]);
+    if (image) {
+      const abs = new URL(image, SITE).href;
+      meta("property", "og:image", abs); meta("property", "og:image:width", "1200"); meta("property", "og:image:height", "630");
+      meta("name", "twitter:image", abs);
+    }
+    return () => { if (image) document.head.querySelectorAll('meta[property^="og:image"], meta[name="twitter:image"]').forEach((m) => m.remove()); };
+  }, [title, description, path, exact, image]);
 }

@@ -41,6 +41,11 @@ class Partner(TimeStampedModel):
     website = models.URLField(blank=True)
     is_confirmed = models.BooleanField("confirmé (affiché publiquement)", default=False)
     display_order = models.PositiveIntegerField(default=0)
+    band_order = models.PositiveIntegerField(
+        "position dans le bandeau « En partenariat avec »", null=True, blank=True,
+        help_text="Laisser vide pour ne pas afficher ce logo dans le bandeau. 1 = premier logo (DGPU), affiché plus grand.")
+    dark_tile = models.BooleanField("logo sur tuile noire", default=False,
+                                    help_text="Affiche le logo sur une tuile noire aux angles arrondis (M'ma Conciergerie).")
 
     objects = PartnerQuerySet.as_manager()
 

@@ -68,4 +68,8 @@ class EventRequestAdmin(SubmissionAdminMixin, admin.ModelAdmin):
     list_display = ("name", "kind", "organization", "email", "status_badge", "created_at")
     list_filter = ("status", "kind")
     search_fields = ("name", "organization", "email")
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = ("created_at", "updated_at", "choix")
+
+    @admin.display(description="choix d'inscription")
+    def choix(self, obj):
+        return " ; ".join(obj.options_display()) or "—"

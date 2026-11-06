@@ -15,6 +15,8 @@ from apps.core.forms_urls import urlpatterns as form_urls
 from apps.map.api import MapCategoryListView, MapPlaceViewSet
 from apps.organizations.api import OrganizationViewSet
 from apps.core import coordination_api as co
+
+from apps.core import members_network_api as mn
 admin.site.site_header = "Urban Hub Connect · Coordination"
 admin.site.site_title = "Urban Hub Connect"
 admin.site.index_title = "Tableau de bord de la Coordination"
@@ -47,6 +49,7 @@ urlpatterns = [
     path("api/memberships/categories/", c.MembershipCategoryList.as_view(), name="membership-categories"),
     path("api/partnerships/tiers/", c.TierList.as_view(), name="partnership-tiers"),
     path("api/partnerships/partners/", c.PartnerList.as_view(), name="partners"),
+    path("api/partnerships/band/", c.PartnerBandList.as_view(), name="partner-band"),
     path("api/events/categories/", c.EventCategoryList, name="event-categories"),
     path("api/articles/categories/", c.ArticleCategoryList, name="article-categories"),
     path("api/awards/categories/", c.AwardCategoryList, name="award-categories"),
@@ -60,6 +63,14 @@ urlpatterns = [
     path("api/members/set-password/", mb.SetPasswordView.as_view(), name="member-set-password"),
     path("api/members/profile/", mb.profile, name="member-profile"),
     path("api/members/listing/", mb.listing, name="member-listing"),
+    path("api/members/connections/", mn.connections, name="member-connections"),
+    path("api/members/opportunities/", mn.OpportunitiesView.as_view(), name="member-opportunities"),
+    path("api/members/opportunities/types/", mn.OpportunityTypesView.as_view(), name="member-opportunity-types"),
+    path("api/members/opportunities/<int:pk>/", mn.opportunity_update, name="member-opportunity-update"),
+    path("api/members/opportunities/<int:pk>/close/", mn.opportunity_close, name="member-opportunity-close"),
+    path("api/members/opportunities/<int:pk>/respond/", mn.opportunity_respond, name="member-opportunity-respond"),
+    path("api/members/documents/", mn.documents, name="member-documents"),
+    path("api/members/documents/<int:pk>/download/", mn.document_download, name="member-document-download"),
     path("api/members/directory/", mb.MemberDirectoryList.as_view(), name="member-directory"),
     path("api/members/directory/<slug:slug>/", mb.MemberDirectoryDetail.as_view(), name="member-directory-detail"),
     path("api/members/directory/<slug:slug>/contact/", mb.reveal_contact, name="member-reveal"),

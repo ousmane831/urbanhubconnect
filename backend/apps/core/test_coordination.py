@@ -1,12 +1,15 @@
+from datetime import timedelta
 from io import StringIO
 
 from django.contrib.admin.models import LogEntry
+from django.core import mail
 from django.core.management import call_command
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from apps.contact.models import ContactMessage
 from apps.core.testing import make_org
-from apps.memberships.models import MembershipApplication, MembershipCategory
+from apps.memberships.models import Membership, MembershipApplication, MembershipCategory
 from apps.memberships.services import open_dossier
 from apps.news.models import Article, ArticleCategory
 from apps.organizations.models import Organization, ValidationStatus as VS
@@ -80,6 +83,31 @@ class CoordinationTests(APITestCase):
         self.assertEqual((app.status, dossier.status, msg.is_handled), ("rejected", "rejected", True))
         self.assertEqual(self.client.post(f"/api/coordination/queue/memberships/{dossier.pk}/reject/").status_code, 404)  # déjà traité
         self.assertEqual(self.client.post(f"/api/coordination/queue/memberships/{dossier.pk}/delete/").status_code, 404)
+
+    def test_coordination_can_resend_access_link_to_active_member(self):
+        member_user = User.objects.create_user("active@example.com", "active@example.com", "Mot-de-passe-123", role=User.Role.MEMBER)
+        member = Membership.objects.create(
+            name="Membre actif",
+            representative="Seydina",
+            email="active@example.com",
+            category=MembershipCategory.objects.first(),
+            status=Membership.Status.ACTIVE,
+            valid_until=timezone.localdate() + timedelta(days=100),
+            user=member_user,
+        )
+        self.login()
+
+        queue = self.client.get("/api/coordination/queue/members/?search=Seydina").json()["items"]
+        self.assertEqual(len(queue), 1)
+        self.assertIn("resend_invitation", {action["id"] for action in queue[0]["actions"]})
+        mail.outbox.clear()
+
+        response = self.client.post(f"/api/coordination/queue/members/{member.pk}/resend_invitation/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mail.outbox[0].to, ["active@example.com"])
+        self.assertIn("/espace-membres/mot-de-passe?uid=", mail.outbox[0].body)
+        self.assertEqual(response.json()["detail"], "Lien d'accès envoyé par e-mail au membre.")
 
     def test_unknown_action_is_refused(self):
         org = make_org("X", status=VS.PENDING, published=False)

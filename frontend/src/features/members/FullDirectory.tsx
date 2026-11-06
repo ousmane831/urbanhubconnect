@@ -10,7 +10,7 @@ import { getOrganizationFilters } from "../../services/api";
 import { memberApi, type ContactInfo } from "../../services/members";
 import { apiErrorMessage } from "../../utils/errors";
 import { POLE_LABELS } from "../../utils/constants";
-
+import { ConnectionForm } from "./ConnectionForm";
 const label = (x: unknown) => (typeof x === "string" ? x : (x as { name?: string } | null)?.name ?? "");
 const taxonomyLabel = (value: unknown, options: { slug: string; name: string }[] | undefined) => {
   if (typeof value !== "string") return label(value);
@@ -75,6 +75,11 @@ function OrganizationPanel({ slug, onClose, sectors }: { slug: string; onClose: 
               ) : <Button onClick={reveal} disabled={busy} className="mt-4">{busy ? "Chargement…" : "Afficher les coordonnées"}</Button>}
               {error && <p role="alert" className="mt-3 font-semibold text-red-800">{error}</p>}
               <p className="mt-4 text-sm text-navy/75">Chaque affichage est enregistré. Les coordonnées des membres ne peuvent pas être utilisées à des fins de prospection massive ; toute utilisation abusive entraîne la suspension de l'accès.</p>
+            </div>
+              <div className="rounded-md border border-navy/15 p-5">
+              <h4 className="text-lg">Demander une mise en relation</h4>
+              <p className="mb-4 mt-1 text-navy/80">La Coordination transmet votre demande à l'organisation, avec vos coordonnées de membre.</p>
+              <ConnectionForm id={`cf-${slug}`} onSend={(m) => memberApi.requestConnection(slug, m)} />
             </div>
           </div>)}
       </Async>

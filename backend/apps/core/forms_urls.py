@@ -128,8 +128,14 @@ urlpatterns = [
                                       "what_needs", "preferred_meetings", "accept_privacy"],
         slugs={"event": (Event.objects.public(), True)}, extra=CONSENT("accept_privacy")), name="BusinessConnect")),
     path("event-requests/", submission_view(build_serializer(
-        EventRequest, ["kind", "name", "organization", "email", "phone", "circuit", "message", "accept_waiver", "accept_privacy"],
-        extra=CONSENT("accept_privacy")), "Merci. Votre demande a bien été transmise. La Coordination vous recontactera rapidement.", "EventRequestCreate")),
+        EventRequest, ["kind", "name", "organization", "email", "phone", "options", "what_offers", "what_needs", "message",
+                       "accept_waiver", "accept_privacy"],
+        extra={**CONSENT("accept_privacy"),
+               # Les anciens types (visite, portes ouvertes) restent en base pour l'historique mais ne sont plus acceptés.
+               "kind": serializers.ChoiceField(choices=[(k.value, k.label) for k in EventRequest.OPEN_KINDS]),
+               "options": serializers.ListField(child=serializers.ChoiceField(choices=list(EventRequest.REGISTRATION_OPTIONS)),
+                                                required=False)}),
+        "Merci. Votre demande a bien été transmise. La Coordination vous recontactera rapidement.", "EventRequestCreate")),
     path("volunteers/", submission_view(build_serializer(
         VolunteerApplication, ["name", "email", "phone", "organization", "missions", "availability", "message"],
         many_slugs={"missions": (active(VolunteerMission), False)}), name="VolunteerApply")),

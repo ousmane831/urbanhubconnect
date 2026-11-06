@@ -4,7 +4,7 @@ import type { OrganizationDetail, OrganizationListItem, Paginated } from "../typ
 // Session côté serveur (cookie HttpOnly) + protection CSRF : aucun jeton n'est stocké dans le navigateur.
 const api = axios.create({
   baseURL: `${import.meta.env.VITE_API_URL ?? "/api"}/members`,
-  withCredentials: true, xsrfCookieName: "csrftoken", xsrfHeaderName: "X-CSRFToken", timeout: 20000,
+  withCredentials: true, withXSRFToken: true, xsrfCookieName: "csrftoken", xsrfHeaderName: "X-CSRFToken", timeout: 20000,
 });
 api.interceptors.response.use((r) => r, (e) => {
   const url: string = e.config?.url ?? "";
@@ -26,6 +26,16 @@ export interface ProfileData {
   listing: { published: boolean; hidden_by_member: boolean; public_listing: boolean; validated: boolean };
 }
 export interface MemberOrganizationDetail extends OrganizationDetail { offers: string; needs: string }
+export interface ConnectionItem {
+  id: number; organization: { name: string; slug: string }; opportunity: string | null; message: string; status: string; status_label: string;
+  created_at: string; forwarded_at: string | null;
+}
+export interface OpportunityItem {
+  id: number; title: string; type: string; type_name: string; description: string; deadline: string | null; status: string; status_label: string;
+  published_at: string | null; created_at: string; organization: { name: string; slug: string }; mine: boolean;
+}
+export interface OpportunityInput { type: string; title: string; description: string; deadline: string | null }
+export interface MemberDocumentItem { id: number; title: string; category: string; category_label: string; description: string; published_on: string; download_url: string }
 export interface ContactInfo { name: string; role: string; phone: string; email: string }
 
 const clean = (o: Record<string, string | number | boolean | undefined>) =>
@@ -44,5 +54,15 @@ export const memberApi = {
   directory: (params: Record<string, string | number | boolean | undefined>) =>
     api.get<Paginated<OrganizationListItem>>("/directory/", { params: clean(params) }).then((r) => r.data),
   directoryDetail: (slug: string) => api.get<MemberOrganizationDetail>(`/directory/${slug}/`).then((r) => r.data),
+  connections: () => api.get<ConnectionItem[]>("/connections/").then((r) => r.data),
+  requestConnection: (organization: string, message: string) => api.post<{ detail: string }>("/connections/", { organization, message }).then((r) => r.data.detail),
+  opportunities: (params: Record<string, string | number | boolean | undefined>) =>
+    api.get<Paginated<OpportunityItem>>("/opportunities/", { params: clean(params) }).then((r) => r.data),
+  opportunityTypes: () => api.get<{ name: string; slug: string }[]>("/opportunities/types/").then((r) => r.data),
+  publishOpportunity: (input: OpportunityInput) => api.post<{ detail: string }>("/opportunities/", input).then((r) => r.data.detail),
+  updateOpportunity: (id: number, input: OpportunityInput) => api.post<{ detail: string }>(`/opportunities/${id}/`, input).then((r) => r.data.detail),
+  closeOpportunity: (id: number) => api.post<{ detail: string }>(`/opportunities/${id}/close/`).then((r) => r.data.detail),
+  respond: (id: number, message: string) => api.post<{ detail: string }>(`/opportunities/${id}/respond/`, { message }).then((r) => r.data.detail),
+  documents: () => api.get<MemberDocumentItem[]>("/documents/").then((r) => r.data),
   reveal: (slug: string) => api.post<ContactInfo>(`/directory/${slug}/contact/`).then((r) => r.data),
 };

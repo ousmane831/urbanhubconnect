@@ -1,5 +1,5 @@
 import { http } from "./http";
-import type {ActionsData, EventDetail, PageContent, Article, DocumentItem, EventItem, Partner, PressRelease, Priced, RefItem, MapCategory, MapPlace, OrganizationDetail, OrganizationFilters, OrganizationListItem, Paginated, SiteSettings, MembershipCategoryItem } from "../types/api";
+import type {ActionsData, BandPartner, EventDetail, PageContent, Article, DocumentItem, EventItem, Partner, PressRelease, Priced, RefItem, MapCategory, MapPlace, OrganizationDetail, OrganizationFilters, OrganizationListItem, Paginated, SiteSettings, MembershipCategoryItem } from "../types/api";
 
 export const getSiteSettings = () => http.get<SiteSettings>("/site-settings/").then((r) => r.data);
 export const getFeaturedEvents = () =>
@@ -35,6 +35,7 @@ export const getArticleCategories = () => get<RefItem[]>("/articles/categories/"
 export const getMembershipCategories = () => get<MembershipCategoryItem[]>("/memberships/categories/");
 export const getTiers = () => get<Priced[]>("/partnerships/tiers/");
 export const getPartners = () => get<Partner[]>("/partnerships/partners/");
+export const getPartnerBand = () => get<BandPartner[]>("/partnerships/band/");
 export const getPressReleases = () => get<PressRelease[]>("/press/");
 export const getDocuments = (category?: string) => get<DocumentItem[]>("/documents/", { category });
 export const getAwardCategories = () => get<RefItem[]>("/awards/categories/");

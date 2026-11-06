@@ -3,7 +3,8 @@ from django.contrib import admin, messages
 from apps.core.admin import GOLD, GREEN, GREY, PURPLE, RED, SubmissionAdminMixin, TaxonomyAdmin, badge
 from . import services
 from . import accounts
-from .models import ContactReveal, Membership, MembershipApplication, MembershipCategory, Payment, ProfileChange
+from . import network
+from .models import ConnectionRequest, ContactReveal, Membership, Opportunity, OpportunityType, MembershipApplication, MembershipCategory, Payment, ProfileChange
 
 S = Membership.Status
 COLORS = {S.RECEIVED: GOLD, S.REVIEWING: PURPLE, S.ACCEPTED: GOLD, S.ACTIVE: GREEN, S.EXPIRED: RED, S.SUSPENDED: GREY, S.REJECTED: RED}
@@ -162,3 +163,70 @@ class ContactRevealAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(OpportunityType)
+class OpportunityTypeAdmin(TaxonomyAdmin):
+    pass
+
+
+@admin.register(Opportunity)
+class OpportunityAdmin(admin.ModelAdmin):
+    list_display = ("title", "organization", "type", "status", "deadline", "published_at")
+    list_filter = ("status", "type")
+    search_fields = ("title", "description", "organization__name")
+    date_hierarchy = "created_at"
+    readonly_fields = ("organization", "published_by", "published_at", "reviewed_by", "reviewed_at", "created_at", "updated_at")
+    actions = ["approve", "reject", "close"]
+
+    def has_add_permission(self, request):
+        return False  # les annonces sont publiées par les membres
+
+    def _each(self, request, queryset, fn, ok, with_user=True):
+        for o in queryset:
+            try:
+                fn(o, request.user) if with_user else fn(o)
+                self.message_user(request, f"« {o.title} » : {ok}.")
+            except network.NetworkError as e:
+                self.message_user(request, f"« {o.title} » : {e}", messages.WARNING)
+
+    @admin.action(description="Valider et publier")
+    def approve(self, request, queryset):
+        self._each(request, queryset, network.approve_opportunity, "publiée")
+
+    @admin.action(description="Refuser")
+    def reject(self, request, queryset):
+        self._each(request, queryset, network.reject_opportunity, "refusée")
+
+    @admin.action(description="Clôturer")
+    def close(self, request, queryset):
+        self._each(request, queryset, network.close_opportunity, "clôturée", with_user=False)
+
+
+@admin.register(ConnectionRequest)
+class ConnectionRequestAdmin(admin.ModelAdmin):
+    list_display = ("sender", "recipient", "opportunity", "status", "created_at", "forwarded_at")
+    list_filter = ("status",)
+    search_fields = ("sender__name", "recipient__name", "message")
+    date_hierarchy = "created_at"
+    readonly_fields = ("sender", "recipient", "opportunity", "message", "status", "handled_by", "handled_at", "forwarded_at", "created_at", "updated_at")
+    actions = ["do_forward", "do_decline"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def _each(self, request, queryset, fn, ok):
+        for r in queryset:
+            try:
+                fn(r, request.user)
+                self.message_user(request, f"{r} : {ok}.")
+            except network.NetworkError as e:
+                self.message_user(request, f"{r} : {e}", messages.WARNING)
+
+    @admin.action(description="Transmettre à l'organisation")
+    def do_forward(self, request, queryset):
+        self._each(request, queryset, network.forward, "transmise")
+
+    @admin.action(description="Refuser")
+    def do_decline(self, request, queryset):
+        self._each(request, queryset, network.decline, "refusée")

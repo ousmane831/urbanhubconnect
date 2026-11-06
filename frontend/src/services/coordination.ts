@@ -3,7 +3,7 @@ import axios from "axios";
 // Session côté serveur (cookie HttpOnly) + protection CSRF : aucun jeton n'est stocké dans le navigateur.
 const api = axios.create({
   baseURL: `${import.meta.env.VITE_API_URL ?? "/api"}/coordination`,
-  withCredentials: true, xsrfCookieName: "csrftoken", xsrfHeaderName: "X-CSRFToken", timeout: 15000,
+  withCredentials: true, withXSRFToken: true, xsrfCookieName: "csrftoken", xsrfHeaderName: "X-CSRFToken", timeout: 15000,
 });
 api.interceptors.response.use((r) => r, (e) => {
   const url: string = e.config?.url ?? "";
@@ -26,7 +26,8 @@ export const coordApi = {
   logout: () => api.post("/logout/"),
   me: () => api.get<Me>("/me/").then((r) => r.data),
   summary: () => api.get<Summary>("/summary/").then((r) => r.data),
-  queue: (kind: string) => api.get<{ label: string; items: QueueItem[] }>(`/queue/${kind}/`).then((r) => r.data),
+  queue: (kind: string, search?: string) =>
+    api.get<{ label: string; items: QueueItem[] }>(`/queue/${kind}/`, { params: search ? { search } : undefined }).then((r) => r.data),
   act: (kind: string, id: number, action: string, data: Record<string, string> = {}) => api.post<{ detail: string }>(`/queue/${kind}/${id}/${action}/`, data).then((r) => r.data.detail),
   content: () => api.get<{ articles: ContentItem[]; events: ContentItem[] }>("/content/").then((r) => r.data),
   contentAct: (kind: string, id: number, action: string) => api.post<{ detail: string }>(`/content/${kind}/${id}/${action}/`).then((r) => r.data.detail),
