@@ -302,3 +302,44 @@ class SecurityTests(Base):
         form = MembershipForm(data=data, instance=m)
         self.assertFalse(form.is_valid())
         self.assertIn("email", form.errors)
+
+
+class ListingFromApplicationTests(Base):
+    def test_accepting_an_application_creates_the_listing_published_at_payment(self):
+        from apps.organizations.models import College, Commission
+        self.application(organization_or_name="Yonnu Digital", pole="BOTH", college=College.objects.first().slug,
+                         commissions=[Commission.objects.first().slug], offers="Sites web", needs="Locaux")
+        m = Membership.objects.get()
+        self.assertIsNone(m.organization)
+        ms.accept(m)
+        m.refresh_from_db()
+        org = m.organization
+        self.assertEqual((org.name, org.pole, org.validation_status, org.is_published), ("Yonnu Digital", "BOTH", VS.ACCEPTED, False))
+        self.assertEqual((org.offers, org.representative_email, org.commissions.count()), ("Sites web", "a@x.org", 1))
+        ms.record_payment(m, amount=150000, method="wave")
+        org.refresh_from_db()
+        self.assertTrue(org.is_published)
+        self.assertIn("fiche est publiée", mail.outbox[-1].body)
+
+    def test_individual_categories_get_no_listing(self):
+        self.application(category=self.indiv.slug)
+        m = Membership.objects.get()
+        ms.accept(m)
+        m.refresh_from_db()
+        self.assertIsNone(m.organization)
+
+    def test_paid_dossier_without_listing_can_get_one_from_the_coordination_screen(self):
+        self.application(organization_or_name="Yonnu Digital")
+        m = Membership.objects.get()
+        Membership.objects.filter(pk=m.pk).update(status=S.ACTIVE, valid_until=today() + timedelta(days=300), activated_at=today())
+        c = self.boss()
+        acts = [a["id"] for a in self.items(c, "members")[m.pk]["actions"]]
+        self.assertIn("create_listing", acts)
+        r = c.post(f"/api/coordination/queue/members/{m.pk}/create_listing/", format="json")
+        self.assertIn("publiée", r.json()["detail"])
+        self.assertTrue(Organization.objects.public().filter(name="Yonnu Digital").exists())
+
+    def test_account_state_explains_a_coordination_email(self):
+        User.objects.create_user("admin2", "a@x.org", PW, role=User.Role.COORDINATION)
+        m = self.active()
+        self.assertIn("compte de la Coordination", accounts.account_state(m))

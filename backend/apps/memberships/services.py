@@ -240,6 +240,30 @@ def set_category(m, category):
     return m.charter_sent_at is not None
 
 
+def ensure_listing(m):
+    """Crée la fiche Annuaire à partir de la demande « Adhérer » quand le dossier n'en a pas (catégories avec fiche publique).
+    Les informations viennent du formulaire ; la fiche est validée avec le dossier et publiée au paiement. Retourne la fiche créée ou None."""
+    from apps.organizations.models import College, Pole
+    if m.organization_id or not (m.category and m.category.public_listing):
+        return None
+    app = m.application
+    college = (app.college if app and app.college_id else None) or College.objects.filter(is_active=True).first()
+    if college is None:
+        return None
+    org = Organization.objects.create(
+        name=(app.organization_or_name if app else m.name), college=college,
+        sector=app.sector.name if app and app.sector_id else "", pole=(app.pole if app and app.pole else Pole.BOTH),
+        offers=app.offers if app else "", needs=app.needs if app else "",
+        representative_name=m.representative, representative_role=m.role, representative_phone=m.phone, representative_email=m.email,
+        validation_status=VS.ACCEPTED if m.status != S.RECEIVED and m.status != S.REVIEWING else VS.PENDING, reviewed_at=timezone.now())
+    if app:
+        org.commissions.set(app.commissions.all())
+    m.organization = org
+    _add_note(m, f"Fiche « {org.name} » créée à partir de la demande d'adhésion : le membre peut la compléter (présentation, logo, site web) depuis l'Espace membres.")
+    m.save(update_fields=["organization", "notes", "updated_at"])
+    return org
+
+
 def accept(m):
     _require(m, (S.RECEIVED, S.REVIEWING))
     if not m.category:
@@ -247,6 +271,7 @@ def accept(m):
     with transaction.atomic():
         m.status = S.ACCEPTED
         m.save()
+        ensure_listing(m)  # demande « Adhérer » sans fiche : la fiche est créée avec les informations du formulaire
         if m.organization:  # le contenu de la fiche est validé ; la publication suivra le paiement
             m.organization.validation_status = VS.ACCEPTED
             m.organization.reviewed_at = timezone.now()
@@ -346,6 +371,7 @@ def settle(m):
         m.activated_at = paid_on
         m.is_founder = application_date(m) < founder_deadline()
     m.save()
+    ensure_listing(m)  # dossier accepté avant cette règle : la fiche est créée au paiement
     _sync_application(m, "accepted")
     sync_organization(m)
     from . import accounts

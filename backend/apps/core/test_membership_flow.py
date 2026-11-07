@@ -218,7 +218,7 @@ class CoordinationScreenTests(Base):
     def test_actions_depend_on_the_stage(self):
         received, accepted = self.dossier(status=S.RECEIVED), self.dossier(status=S.ACCEPTED)
         self.assertEqual(set(self.actions("memberships", received.pk)), {"set_category", "review", "accept", "reject"})
-        self.assertEqual(set(self.actions("memberships", accepted.pk)), {"set_category", "send_bulletin", "charter_received", "payment", "reject"})
+        self.assertEqual(set(self.actions("memberships", accepted.pk)), {"set_category", "send_bulletin", "charter_received", "create_listing", "payment", "reject"})
 
     def test_payment_errors_are_reported_not_crashed(self):
         m = self.dossier()

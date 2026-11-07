@@ -60,6 +60,24 @@ def access_problem(user):
 
 
 # ---------- compte, invitation, mot de passe ----------
+def account_state(m):
+    """État du compte membre, en clair, pour le détail du dossier dans l'Espace Coordination."""
+    if m.user_id:
+        if m.user.has_usable_password():
+            return f"actif (identifiant : {m.user.email})"
+        return f"créé, mot de passe pas encore choisi (identifiant : {m.user.email}) : « Renvoyer le lien d'accès » si besoin"
+    email = (m.email or "").strip()
+    if not email:
+        return "non créé : le dossier n'a pas d'adresse e-mail"
+    other = User.objects.filter(email__iexact=email).first()
+    if other and other.role != User.Role.MEMBER:
+        return ("non créé : cette adresse est celle d'un compte de la Coordination. "
+                "Changez l'e-mail du dossier (admin) puis « Renvoyer le lien d'accès »")
+    if other:
+        return "non créé : cette adresse est déjà utilisée par un autre membre"
+    return "non créé : utilisez « Renvoyer le lien d'accès » pour le créer et envoyer le lien"
+
+
 def ensure_account(m):
     """Crée le compte membre (sans mot de passe) si nécessaire. Retourne (utilisateur, créé)."""
     if m.user_id:

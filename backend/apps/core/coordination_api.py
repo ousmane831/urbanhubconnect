@@ -245,6 +245,8 @@ def _membership_actions(m):
     if m.status in (MS.ACCEPTED, MS.ACTIVE, MS.EXPIRED) and m.category:
         acts.append({"id": "payment", "label": "Enregistrer le renouvellement" if m.activated_at else "Enregistrer le paiement", "tone": "primary",
                      "form": "payment", "amount": m.category.amount_fcfa})
+    if m.status in (MS.ACCEPTED, MS.ACTIVE, MS.EXPIRED) and not m.organization_id and m.category and m.category.public_listing:
+        acts.append({"id": "create_listing", "label": "Créer la fiche à partir de la demande", "tone": "primary"})
     if m.status == MS.SUSPENDED:
         acts.append({"id": "reinstate", "label": "Réactiver l'adhésion", "tone": "primary"})
     if m.status in (MS.ACCEPTED, MS.ACTIVE, MS.EXPIRED, MS.SUSPENDED) and ms.last_payment(m):
@@ -275,7 +277,8 @@ def _membership_details(m):
                 ("Bulletin et Charte envoyés le", f"{m.charter_sent_at:%d/%m/%Y}" if m.charter_sent_at else ""),
                 ("Charte signée", f"reçue le {m.charter_signed_on:%d/%m/%Y}" if m.charter_signed_on else ("non reçue" if m.status != MS.RECEIVED else "")),
                 ("Paiements", pays), ("Valable jusqu'au", f"{m.valid_until:%d/%m/%Y}" if m.valid_until else ""),
-                ("Membre fondateur", "oui" if m.is_founder else ""), ("Notes", m.notes))
+                ("Membre fondateur", "oui" if m.is_founder else ""),
+                ("Compte membre", acc.account_state(m) if m.status in (MS.ACTIVE, MS.EXPIRED, MS.SUSPENDED) else ""), ("Notes", m.notes))
 
 
 def _apply_membership(obj, action, user, data):
@@ -306,6 +309,14 @@ def _apply_membership(obj, action, user, data):
         if action == "charter_received":
             ms.record_charter(obj)
             return "Charte signée enregistrée."
+        if action == "create_listing":
+            org = ms.ensure_listing(obj)
+            if org is None:
+                raise ValidationError("Aucune fiche n'a été créée : ce dossier en a déjà une, ou sa catégorie ne comporte pas de fiche publique.")
+            ms.sync_organization(obj)
+            org.refresh_from_db()
+            return (f"Fiche « {org.name} » créée" + (" et publiée dans l'Annuaire." if org.is_published else " : elle sera publiée au paiement.")
+                    + " Le membre peut la compléter depuis l'Espace membres.")
         if action == "suspend":
             ms.suspend(obj)
             return "Adhésion suspendue : la fiche est retirée de l'Annuaire."
