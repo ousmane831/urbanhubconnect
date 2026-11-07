@@ -6,7 +6,7 @@ class User(AbstractUser):
     class Role(models.TextChoices):
         ADMIN = "ADMIN", "Administrateur"
         COORDINATION = "COORDINATION", "Coordination"
-        MEMBER = "MEMBER", "Membre (2027)"
+        MEMBER = "MEMBER", "Membre"
 
     email = models.EmailField("email", unique=True)
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.MEMBER)

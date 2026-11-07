@@ -106,7 +106,8 @@ def _status_actions(obj):
 
 def _org_actions(o):
     if o.validation_status == VS.ACCEPTED:
-        return [{"id": "publish", "label": "Publier sur le site", "tone": "primary"}, {"id": "reject", "label": "Refuser", "tone": "danger"}]
+        acts = [] if ms.publication_blocker(o) else [{"id": "publish", "label": "Publier sur le site", "tone": "primary"}]
+        return acts + [{"id": "reject", "label": "Refuser", "tone": "danger"}]
     acts = [{"id": "accept", "label": "Accepter", "tone": "primary"}, {"id": "reject", "label": "Refuser", "tone": "danger"}]
     if o.validation_status != VS.REVIEWING:
         acts.append({"id": "review", "label": "Marquer « en cours d'examen »", "tone": "neutral"})
@@ -116,13 +117,16 @@ def _org_actions(o):
 KINDS = {
     "organizations": dict(
         label="Fiches de l'annuaire", model=Organization,
-        qs=lambda: Organization.objects.filter(Q(validation_status__in=OPEN) | Q(validation_status=VS.ACCEPTED, is_published=False)).select_related(),
+        # fiches à valider, et fiches acceptées hors adhésion à publier (celles d'un dossier se publient au paiement)
+        qs=lambda: Organization.objects.filter(Q(validation_status__in=OPEN) | Q(validation_status=VS.ACCEPTED, is_published=False,
+                                                                                hidden_by_member=False, membership__isnull=True)).select_related(),
         title=lambda o: get(o, "name"), subtitle=lambda o: " · ".join(x for x in (label(o, "pole"), label(o, "college"), label(o, "sector")) if x),
         actions=_org_actions,
         state=lambda o: "Acceptée, pas encore publiée" if o.validation_status == VS.ACCEPTED else o.get_validation_status_display(),
         details=lambda o: rows(("Représentant", get(o, "representative_name")), ("Fonction", get(o, "representative_role")),
                                ("Téléphone", get(o, "representative_phone")), ("E-mail", get(o, "representative_email")),
-                               ("Quartier", get(o, "neighborhood")), ("Présentation", str(get(o, "description"))[:400]))),
+                               ("Quartier", get(o, "neighborhood")), ("Présentation", str(get(o, "description"))[:400]),
+                               ("Dossier d'adhésion", _org_dossier(o)))),
     "memberships": dict(
         label="Adhésions", model=Membership,
         qs=lambda: Membership.objects.filter(status__in=[Membership.Status.RECEIVED, Membership.Status.REVIEWING, Membership.Status.ACCEPTED]).select_related("category", "organization"),
@@ -140,6 +144,11 @@ KINDS = {
         qs=lambda: Membership.objects.filter(Q(status=Membership.Status.EXPIRED) | Q(status=Membership.Status.ACTIVE, valid_until__lt=timezone.localdate() + timedelta(days=30))).select_related("category", "organization"),
         title=lambda o: o.name, subtitle=lambda o: _membership_subtitle(o),
         state=lambda o: "Cotisation échue" if o.status == Membership.Status.EXPIRED else f"Échéance le {o.valid_until:%d/%m/%Y}",
+        actions=lambda o: _membership_actions(o), details=lambda o: _membership_details(o)),
+    "suspended": dict(
+        label="Adhésions suspendues", model=Membership,
+        qs=lambda: Membership.objects.filter(status=Membership.Status.SUSPENDED).select_related("category", "organization"),
+        title=lambda o: o.name, subtitle=lambda o: _membership_subtitle(o), state=lambda o: o.get_status_display(),
         actions=lambda o: _membership_actions(o), details=lambda o: _membership_details(o)),
     "profile-changes": dict(
         label="Modifications de fiches", model=ProfileChange,
@@ -221,8 +230,9 @@ def _membership_actions(m):
     acts = []
     if m.status == MS.ACTIVE:
         acts.append({"id": "resend_invitation", "label": "Renvoyer le lien d'accès", "tone": "neutral"})
-    if m.status in (MS.RECEIVED, MS.REVIEWING, MS.ACCEPTED) and not m.category:
-        acts.append({"id": "set_category", "label": "Choisir la catégorie", "tone": "primary", "form": "category",
+    if m.status in (MS.RECEIVED, MS.REVIEWING, MS.ACCEPTED):
+        acts.append({"id": "set_category", "label": "Changer la catégorie" if m.category else "Choisir la catégorie",
+                     "tone": "neutral" if m.category else "primary", "form": "category",
                      "options": [{"value": c.slug, "label": f"{c.name} · {c.amount_fcfa} FCFA"} for c in MembershipCategory.objects.filter(is_active=True)]})
     if m.status == MS.RECEIVED:
         acts += [{"id": "review", "label": "Marquer « en cours d'examen »", "tone": "neutral"}, {"id": "accept", "label": "Accepter la demande", "tone": "primary"}]
@@ -230,9 +240,15 @@ def _membership_actions(m):
         acts.append({"id": "accept", "label": "Accepter la demande", "tone": "primary"})
     elif m.status == MS.ACCEPTED:
         acts.append({"id": "send_bulletin", "label": "Renvoyer le bulletin et la Charte" if m.charter_sent_at else "Envoyer le bulletin et la Charte", "tone": "neutral"})
+    if m.status in (MS.ACCEPTED, MS.ACTIVE, MS.EXPIRED) and not m.charter_signed_on:
+        acts.append({"id": "charter_received", "label": "Charte signée reçue", "tone": "neutral"})
     if m.status in (MS.ACCEPTED, MS.ACTIVE, MS.EXPIRED) and m.category:
         acts.append({"id": "payment", "label": "Enregistrer le renouvellement" if m.activated_at else "Enregistrer le paiement", "tone": "primary",
                      "form": "payment", "amount": m.category.amount_fcfa})
+    if m.status == MS.SUSPENDED:
+        acts.append({"id": "reinstate", "label": "Réactiver l'adhésion", "tone": "primary"})
+    if m.status in (MS.ACCEPTED, MS.ACTIVE, MS.EXPIRED, MS.SUSPENDED) and ms.last_payment(m):
+        acts.append({"id": "cancel_payment", "label": "Annuler le dernier paiement (erreur de saisie)", "tone": "danger"})
     if m.status in (MS.RECEIVED, MS.REVIEWING, MS.ACCEPTED):
         acts.append({"id": "reject", "label": "Refuser", "tone": "danger"})
     if m.status in (MS.ACTIVE, MS.EXPIRED):
@@ -240,14 +256,26 @@ def _membership_actions(m):
     return acts
 
 
+def _org_dossier(o):
+    m = ms.membership_of(o)
+    return f"{m.reference} · {m.get_status_display()}" if m else "Aucun (fiche hors adhésion)"
+
+
 def _membership_details(m):
     org = m.organization
     pays = "\n".join(f"{p.paid_on:%d/%m/%Y} · {p.amount_fcfa} FCFA · {p.get_method_display()}" + (f" · {p.reference}" if p.reference else "")
-                     for p in m.payments.all()[:5])
+                     + (" · ANNULÉ" if p.cancelled else "") for p in m.payments.all()[:8])
+    listing = "Aucune fiche liée"
+    if org:
+        listing = f"{org.name} ({'publiée' if org.is_published else 'retirée par le membre' if org.hidden_by_member else 'non publiée'})"
+        if not (m.category and m.category.public_listing):
+            listing += " · catégorie sans fiche publique"
     return rows(("Référence", m.reference), ("Représentant", m.representative), ("Fonction", m.role), ("Téléphone", m.phone), ("E-mail", m.email),
-                ("Fiche Annuaire", f"{org.name} ({'publiée' if org.is_published else 'non publiée'})" if org else "Aucune fiche liée"),
-                ("Bulletin et Charte envoyés le", f"{m.charter_sent_at:%d/%m/%Y}" if m.charter_sent_at else ""), ("Paiements", pays),
-                ("Valable jusqu'au", f"{m.valid_until:%d/%m/%Y}" if m.valid_until else ""), ("Membre fondateur", "oui" if m.is_founder else ""))
+                ("Fiche Annuaire", listing),
+                ("Bulletin et Charte envoyés le", f"{m.charter_sent_at:%d/%m/%Y}" if m.charter_sent_at else ""),
+                ("Charte signée", f"reçue le {m.charter_signed_on:%d/%m/%Y}" if m.charter_signed_on else ("non reçue" if m.status != MS.RECEIVED else "")),
+                ("Paiements", pays), ("Valable jusqu'au", f"{m.valid_until:%d/%m/%Y}" if m.valid_until else ""),
+                ("Membre fondateur", "oui" if m.is_founder else ""), ("Notes", m.notes))
 
 
 def _apply_membership(obj, action, user, data):
@@ -255,7 +283,7 @@ def _apply_membership(obj, action, user, data):
     try:
         if action == "resend_invitation":
             account, _ = acc.ensure_account(obj)
-            if not acc.send_invitation(obj, account):
+            if not acc.send_invitation(obj, account, resend=True):
                 raise ValidationError("Le lien d'accès n'a pas pu être envoyé. Vérifiez l'adresse e-mail et la configuration d'envoi.")
             return "Lien d'accès envoyé par e-mail au membre."
         if action == "review":
@@ -265,20 +293,33 @@ def _apply_membership(obj, action, user, data):
             ms.accept(obj)
             return "Demande acceptée. Envoyez maintenant le bulletin et la Charte."
         if action == "reject":
-            ms.reject(obj)
-            return "Demande refusée."
+            return "Demande refusée." + ms.reject(obj)
+        if action == "reinstate":
+            ms.reinstate(obj)
+            return ("Adhésion réactivée : la fiche revient dans l'Annuaire et l'accès membre est rétabli." if obj.status == MS.ACTIVE
+                    else "Adhésion réactivée, mais la cotisation est échue : enregistrez le renouvellement pour rétablir l'accès.")
+        if action == "cancel_payment":
+            payment = ms.last_payment(obj)
+            if payment is None:
+                raise ValidationError("Aucun paiement à annuler.")
+            return ms.cancel_payment(payment, user)
+        if action == "charter_received":
+            ms.record_charter(obj)
+            return "Charte signée enregistrée."
         if action == "suspend":
             ms.suspend(obj)
             return "Adhésion suspendue : la fiche est retirée de l'Annuaire."
         if action == "send_bulletin":
-            return ("Bulletin et Charte envoyés par e-mail." if ms.send_bulletin(obj)
-                    else "Enregistré, mais l'e-mail n'a pas pu être envoyé : contactez le demandeur directement.")
+            warn = "" if ms.charter_available() else (" Attention : aucune Charte n'est déposée sur le site (Documents, catégorie « Charte », "
+                                                       "téléchargeable publiquement) : l'e-mail ne contient pas de lien vers la Charte.")
+            sent = ms.send_bulletin(obj)
+            return ("Bulletin et Charte envoyés par e-mail." if sent else "Enregistré, mais l'e-mail n'a pas pu être envoyé." + ms.mail_note(obj, False)) + warn
         if action == "set_category":
             cat = MembershipCategory.objects.filter(slug=str(data.get("category", "")), is_active=True).first()
             if not cat:
                 raise ValidationError("Catégorie inconnue.")
-            ms.set_category(obj, cat)
-            return "Catégorie enregistrée."
+            already_sent = ms.set_category(obj, cat)
+            return "Catégorie enregistrée." + (" Le bulletin envoyé indiquait l'ancien montant : renvoyez-le." if already_sent else "")
         if action == "payment":
             try:
                 amount = int(str(data.get("amount", "")).replace(" ", ""))
@@ -349,7 +390,7 @@ def _item(kind, o):
 
 def _apply(kind, obj, action, user, data=None):
     """Applique l'action ; retourne le message de confirmation. Lève ValidationError si interdit."""
-    if kind in ("memberships", "members", "renewals"):
+    if kind in ("memberships", "members", "renewals", "suspended"):
         return _apply_membership(obj, action, user, data)
     if kind == "profile-changes":
         return _apply_profile_change(obj, action, user)
@@ -363,8 +404,9 @@ def _apply(kind, obj, action, user, data=None):
         return "Message marqué comme traité."
     if kind == "organizations":
         if action == "publish":
-            if obj.validation_status != VS.ACCEPTED:
-                raise ValidationError("Acceptez d'abord la fiche avant de la publier.")
+            blocker = ms.publication_blocker(obj)
+            if blocker:
+                raise ValidationError(blocker)
             obj.is_published = True
             msg = "Fiche publiée sur le site."
         else:
@@ -374,6 +416,13 @@ def _apply(kind, obj, action, user, data=None):
             obj.validation_status, obj.reviewed_at, obj.reviewed_by = status, timezone.now(), user
             msg = {"accept": "Fiche acceptée (pas encore publiée).", "reject": "Fiche refusée.", "review": "Fiche marquée « en cours d'examen »."}[action]
         obj.save()
+        m = ms.membership_of(obj)
+        if m is not None:  # la fiche d'un adhérent à jour se publie dès qu'elle est acceptée
+            ms.sync_organization(m)
+            obj.refresh_from_db()
+            if action == "accept":
+                msg = ("Fiche acceptée et publiée : l'adhésion est à jour." if obj.is_published
+                       else "Fiche acceptée : elle sera publiée quand la cotisation sera à jour.")
         return msg
     status = {"accept": "accepted", "reject": "rejected", "review": "reviewing"}.get(action)
     if not status:
@@ -445,14 +494,14 @@ def summary(request):
     now = timezone.now()
     queues = [{"kind": k, "label": v["label"], "count": safe(lambda v=v: v["qs"]().count(), 0, k)} for k, v in KINDS.items()]
     stats = [
-        {"label": "Membres à jour", "value": safe(lambda: Membership.objects.filter(status=Membership.Status.ACTIVE).count(), 0, "membres")},
+        {"label": "Membres à jour", "value": safe(lambda: Membership.objects.filter(status=Membership.Status.ACTIVE, valid_until__gte=timezone.localdate()).count(), 0, "membres")},
         {"label": "Fiches publiées dans l'annuaire", "value": safe(lambda: Organization.objects.public().count(), 0, "orgs")},
         {"label": "Abonnés à la newsletter", "value": safe(lambda: NewsletterSubscriber.objects.filter(is_active=True).count(), 0, "newsletter")},
         {"label": "Événements à venir", "value": safe(lambda: Event.objects.public().filter(start_date__gte=now).count(), 0, "events")},
         {"label": "Articles publiés", "value": safe(lambda: Article.objects.public().count(), 0, "articles")},
         {"label": "Articles en brouillon", "value": safe(lambda: Article.objects.filter(is_published=False).count(), 0, "drafts")},
     ]
-    return Response({"queues": queues, "stats": stats, "to_handle": sum(q["count"] for q in queues if q["kind"] != "members")})
+    return Response({"queues": queues, "stats": stats, "to_handle": sum(q["count"] for q in queues if q["kind"] not in ("members", "suspended"))})
 
 
 @staff_api(["GET"])

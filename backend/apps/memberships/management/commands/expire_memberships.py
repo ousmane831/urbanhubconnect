@@ -1,10 +1,12 @@
 from django.core.management.base import BaseCommand
 
-from apps.memberships.services import expire_overdue
+from apps.memberships.services import daily_maintenance
 
 
 class Command(BaseCommand):
-    help = "Passe en « échue » les cotisations dépassées et retire leurs fiches de l'Annuaire (à planifier chaque jour)."
+    help = ("Tâche quotidienne : passe en « échue » les cotisations dépassées (fiche retirée de l'Annuaire) "
+            "et envoie les rappels d'échéance à J-30 et J-7. À planifier chaque jour (voir deploy/).")
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.SUCCESS(f"{expire_overdue()} cotisation(s) échue(s)."))
+        r = daily_maintenance()
+        self.stdout.write(self.style.SUCCESS(f"{r['expired']} cotisation(s) échue(s), {r['reminders']} rappel(s) d'échéance envoyé(s)."))

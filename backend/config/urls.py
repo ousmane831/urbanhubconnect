@@ -6,7 +6,8 @@ from django.http import HttpResponse
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.permissions import IsAdminUser
 
 from apps.core import members_api as mb
 from apps.core import content_api as c
@@ -38,10 +39,10 @@ urlpatterns = [
     path("sitemap.xml", sitemap, {"sitemaps": SITEMAPS}, name="sitemap"),
     path("admin/", admin.site.urls),
     path("api/map/categories/", MapCategoryListView.as_view(), name="map-categories"),
-    path("api/auth/token/", TokenObtainPairView.as_view(), name="token"),
-    path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
-    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
-    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
+    # Documentation de l'API : réservée au personnel connecté à l'administration.
+    path("api/schema/", SpectacularAPIView.as_view(authentication_classes=[SessionAuthentication], permission_classes=[IsAdminUser]), name="schema"),
+    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema", authentication_classes=[SessionAuthentication],
+                                                     permission_classes=[IsAdminUser]), name="docs"),
     path("api/site-settings/", c.SiteSettingsView.as_view(), name="site-settings"),
     path("api/actions/", c.ActionsView.as_view(), name="actions"),
     path("api/documents/", c.DocumentList.as_view(), name="documents"),

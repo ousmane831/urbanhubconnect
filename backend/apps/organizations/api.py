@@ -63,6 +63,8 @@ class OrganizationViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ["name", "created_at"]
 
     def get_queryset(self):
+        from apps.memberships.services import run_daily_if_needed
+        run_daily_if_needed()  # une fiche dont la cotisation est échue ne doit pas rester affichée
         return (Organization.objects.public()
                 .select_related("college").prefetch_related("commissions"))
 

@@ -60,9 +60,8 @@ CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", default="", cast=Csv())
 
 
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-    ],
+    # Les espaces Membres et Coordination déclarent leur propre authentification (session) ; le reste de l'API est public en lecture.
+    "DEFAULT_AUTHENTICATION_CLASSES": [],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ],
@@ -88,8 +87,6 @@ REST_FRAMEWORK = {
     },
     "COERCE_DECIMAL_TO_STRING": False,
 }
-SIMPLE_JWT = {"ACCESS_TOKEN_LIFETIME": timedelta(minutes=config("JWT_ACCESS_MINUTES", default=15, cast=int)),
-              "REFRESH_TOKEN_LIFETIME": timedelta(days=7), "ROTATE_REFRESH_TOKENS": True}
 SPECTACULAR_SETTINGS = {"TITLE": "Urban Hub Connect API", "VERSION": "1.0.0"}
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"

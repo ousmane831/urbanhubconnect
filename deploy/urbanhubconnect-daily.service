@@ -1,0 +1,12 @@
+# Tâche quotidienne d'Urban Hub Connect : constate les cotisations échues (fiche retirée de l'Annuaire)
+# et envoie les rappels d'échéance à J-30 et J-7. Installation : voir deploy/README.md.
+[Unit]
+Description=Urban Hub Connect - echeances et rappels de cotisation
+After=network-online.target postgresql.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/var/www/urbanhubconnect/backend
+Environment="DJANGO_SETTINGS_MODULE=config.settings.prod"
+ExecStart=/var/www/urbanhubconnect/backend/env/bin/python manage.py expire_memberships

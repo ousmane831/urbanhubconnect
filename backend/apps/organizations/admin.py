@@ -34,7 +34,8 @@ class OrganizationAdmin(admin.ModelAdmin):
     date_hierarchy = "created_at"
     list_select_related = ("college",)
     filter_horizontal = ("commissions",)
-    readonly_fields = ("logo_preview", "osm_link", "reviewed_at", "reviewed_by", "created_at", "updated_at")
+    # statut d'adhésion et membre fondateur découlent du dossier d'adhésion : ils ne se modifient pas à la main
+    readonly_fields = ("logo_preview", "osm_link", "member_founder", "membership_status", "reviewed_at", "reviewed_by", "created_at", "updated_at")
     actions = ["mark_reviewing", "accept", "reject", "publish", "unpublish"]
     prepopulated_fields = {"slug": ("name",)}
     fieldsets = (
@@ -69,9 +70,15 @@ class OrganizationAdmin(admin.ModelAdmin):
                            obj.latitude, obj.longitude)
 
     def save_model(self, request, obj, form, change):
+        from apps.memberships import services as ms
         if "validation_status" in form.changed_data:
             obj.reviewed_at, obj.reviewed_by = timezone.now(), request.user
+        if obj.is_published and "is_published" in form.changed_data and (blocker := ms.publication_blocker(obj)):
+            obj.is_published = False
+            self.message_user(request, f"Fiche non publiée : {blocker}", messages.WARNING)
         super().save_model(request, obj, form, change)
+        if (m := ms.membership_of(obj)) is not None:  # la fiche d'un adhérent suit son dossier
+            ms.sync_organization(m)
 
     def _review(self, request, queryset, status, label):
         fields = {"validation_status": status, "reviewed_at": timezone.now(),
@@ -79,13 +86,16 @@ class OrganizationAdmin(admin.ModelAdmin):
         if status != VS.ACCEPTED:
             fields["is_published"] = False
         n = queryset.update(**fields)
+        from apps.memberships import services as ms
+        for org in queryset.filter(membership__isnull=False):
+            ms.sync_organization(ms.membership_of(org))  # fiche d'un adhérent à jour : publiée dès qu'elle est acceptée
         self.message_user(request, f"{n} fiche(s) {label}.")
 
     @admin.action(description="Passer en « en cours d'examen »")
     def mark_reviewing(self, request, queryset):
         self._review(request, queryset, VS.REVIEWING, "en cours d'examen")
 
-    @admin.action(description="Accepter (sans publier)")
+    @admin.action(description="Accepter (publiée seulement si l'adhésion est à jour)")
     def accept(self, request, queryset):
         self._review(request, queryset, VS.ACCEPTED, "acceptée(s) — non publiée(s) tant que vous ne les publiez pas")
 
@@ -93,14 +103,19 @@ class OrganizationAdmin(admin.ModelAdmin):
     def reject(self, request, queryset):
         self._review(request, queryset, VS.REJECTED, "refusée(s) et masquée(s)")
 
-    @admin.action(description="Publier (fiches acceptées uniquement)")
+    @admin.action(description="Publier (fiches acceptées, hors adhésion en attente de paiement)")
     def publish(self, request, queryset):
-        ok = queryset.filter(validation_status=VS.ACCEPTED)
-        skipped = queryset.count() - ok.count()
-        n = ok.update(is_published=True, updated_at=timezone.now())
+        from apps.memberships import services as ms
+        n = 0
+        for org in queryset:
+            blocker = ms.publication_blocker(org)
+            if blocker:
+                self.message_user(request, f"{org.name} : {blocker}", messages.WARNING)
+                continue
+            org.is_published = True
+            org.save(update_fields=["is_published", "updated_at"])
+            n += 1
         self.message_user(request, f"{n} fiche(s) publiée(s).")
-        if skipped:
-            self.message_user(request, f"{skipped} fiche(s) ignorée(s) : elles doivent d'abord être acceptées.", messages.WARNING)
 
     @admin.action(description="Dépublier (masquer)")
     def unpublish(self, request, queryset):

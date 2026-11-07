@@ -19,6 +19,7 @@ Chaque fiche a **deux statuts distincts** :
 - **Publication** : Publiée ou Masquée.
 
 Une fiche acceptée n'est **pas** publiée automatiquement. Une fiche non acceptée ne peut jamais être publiée.
+Une fiche liée à un dossier d'adhésion est publiée automatiquement au paiement de la cotisation (voir « Adhésions »).
 
 Pour valider une demande de référencement reçue par le formulaire :
 1. Organisations → filtrer « Validation : En attente », ouvrir la fiche.
@@ -56,6 +57,29 @@ officiel, puis publiez.
 - **Partenaires** → Ajouter : nom, logo, formule. Cocher **Confirmé** pour l'afficher. Tant qu'aucun partenaire
   n'est confirmé, le bloc « Nos partenaires » reste masqué.
 
+## Adhésions : du visiteur au membre
+
+Tout se pilote depuis l'**Espace Coordination** (`/coordination`) ; l'admin propose les mêmes actions.
+
+1. **Demande** : le formulaire « Adhérer » ou « Référencer mon organisation » ouvre un dossier (référence `UHC-AAAA-NNNN`)
+   et envoie un e-mail de confirmation. Une fiche non publiée du même demandeur (même e-mail, ou même nom : à vérifier)
+   y est rattachée ; la note du dossier l'indique. Une fiche **déjà publiée n'est jamais rattachée automatiquement**.
+   Une demande renvoyée (même e-mail, même nom) complète le dossier existant au lieu d'en ouvrir un second.
+2. **Examen** : choisir (ou changer) la catégorie, « en cours d'examen », puis **Accepter** ou **Refuser**.
+   Accepter valide la fiche mais ne la publie pas.
+3. **Bulletin** : « Envoyer le bulletin et la Charte ». La Charte doit être déposée dans Documents (catégorie « Charte »,
+   téléchargeable publiquement), sinon l'Espace Coordination vous prévient. À réception : « Charte signée reçue ».
+4. **Paiement** : « Enregistrer le paiement ». Un montant inférieur à la cotisation est un paiement partiel.
+   Dès que la cotisation est atteinte : membre à jour 12 mois, fiche publiée, compte membre créé, lien d'accès envoyé.
+   **Erreur de saisie** : « Annuler le dernier paiement » (le paiement reste visible, barré, et la cotisation est recalculée).
+   Une même référence de paiement ne peut pas être saisie deux fois.
+5. **Échéances** : rappels automatiques par e-mail à J-30 et J-7 ; à la date, l'accès est coupé et la fiche retirée.
+   Renouveler = enregistrer un nouveau paiement. **Suspendre / Réactiver** : file « Adhésions suspendues ».
+
+Le statut d'un dossier ne se modifie jamais à la main dans l'admin : utilisez les actions, qui mettent aussi la fiche à jour.
+Une fiche liée à un dossier ne peut pas être publiée tant que la cotisation n'est pas à jour, ni si l'organisation l'a
+elle-même retirée de l'Annuaire.
+
 ## Demandes reçues
 
 Adhésions, partenariats, accréditations presse, candidatures Awards, inscriptions Business Connect, bénévoles,
@@ -76,12 +100,12 @@ mention de pied de page, **mentions légales** et **politique de confidentialit�
 
 ## Sauvegardes
 
-- Base de données : `docker compose exec postgres pg_dump -U urbanhub urbanhub > sauvegarde.sql`
-  (à planifier chaque jour ; conserver les copies hors du serveur).
-- Fichiers téléversés : sauvegarder le volume Docker `media`.
-- Restauration : `cat sauvegarde.sql | docker compose exec -T postgres psql -U urbanhub urbanhub`.
+- Serveur sans Docker (VPS actuel) : script `deploy/backup.sh`, à planifier chaque jour (voir `deploy/README.md`).
+  Il sauvegarde la base, les fichiers publics (`media`) et les documents réservés aux membres (`private_media`).
+- Avec Docker : `docker compose exec postgres pg_dump -U urbanhub urbanhub > sauvegarde.sql`, et les volumes `media` et `private_media`.
+- Conserver les copies **hors du serveur**.
 
 ## Déploiement et mises à jour
 
-Voir `README.md` (section Production). Mise à jour : récupérer la nouvelle version, puis
-`docker compose up -d --build`. Les migrations s'appliquent au démarrage.
+Voir `deploy/README.md` : mise à jour du code, tâche quotidienne (échéances et rappels), sauvegardes, réglages e-mail.
+Avec Docker : `docker compose up -d --build` (les migrations s'appliquent au démarrage).

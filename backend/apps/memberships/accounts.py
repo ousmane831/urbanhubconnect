@@ -17,7 +17,7 @@ from apps.map.models import MapPlace
 from apps.organizations.models import ValidationStatus as VS
 from apps.users.models import User
 from .models import ContactReveal, Membership, ProfileChange
-from .services import fmt_date, notify
+from .services import fmt_date, listing_sentence, notify, send_to
 
 logger = logging.getLogger(__name__)
 S = Membership.Status
@@ -45,6 +45,18 @@ def current_membership(user):
         return None
     m = Membership.objects.filter(user=user).select_related("organization", "category").first()
     return m if m and m.is_current else None
+
+
+def access_problem(user):
+    """Explique pourquoi un membre (mot de passe correct) n'a pas accès : affiché seulement après authentification."""
+    m = Membership.objects.filter(user=user).first()
+    if m is None:
+        return "Aucune adhésion n'est liée à ce compte. Contactez la Coordination."
+    if m.status == S.SUSPENDED:
+        return "Votre adhésion est suspendue. Contactez la Coordination."
+    if m.status == S.REJECTED:
+        return "Votre adhésion n'est pas active. Contactez la Coordination."
+    return "Votre cotisation n'est pas à jour : votre accès est suspendu jusqu'au renouvellement. Contactez la Coordination."
 
 
 # ---------- compte, invitation, mot de passe ----------
@@ -75,14 +87,35 @@ def password_link(user):
     return f"{frontend_url()}/espace-membres/mot-de-passe?uid={uid}&token={default_token_generator.make_token(user)}"
 
 
-def send_invitation(m, user=None):
+def send_invitation(m, user=None, resend=False):
+    """Lien pour choisir le mot de passe, envoyé à l'adresse de connexion du compte."""
     user = user or m.user
-    ok = notify(m, "Votre cotisation est enregistrée : créez votre accès à l'Espace membres",
-                f"Bonjour {m.representative},\n\nVotre cotisation est enregistrée : vous êtes membre à jour jusqu'au "
-                f"{fmt_date(m.valid_until)}. Votre fiche est publiée dans l'Annuaire.\n\n"
-                f"Pour accéder à l'Espace membres, choisissez votre mot de passe (lien valable 3 jours) :\n{password_link(user)}\n\n"
-                f"Votre identifiant de connexion est votre adresse e-mail : {user.email}\n\nUrban Hub Connect")
-    return ok
+    if resend:
+        subject = "Votre lien d'accès à l'Espace membres Urban Hub Connect"
+        intro = "Voici un nouveau lien pour accéder à l'Espace membres."
+    else:
+        subject = "Votre cotisation est enregistrée : créez votre accès à l'Espace membres"
+        intro = f"Votre cotisation est enregistrée : vous êtes membre à jour jusqu'au {fmt_date(m.valid_until)}."
+        if sentence := listing_sentence(m):
+            intro += f" {sentence}"
+    return send_to(user.email, subject,
+                   f"Bonjour {m.representative},\n\n{intro}\n\n"
+                   "Pour accéder à l'Espace membres, choisissez votre mot de passe (lien valable 3 jours, utilisable une seule fois) :\n"
+                   f"{password_link(user)}\n\nVotre identifiant de connexion est votre adresse e-mail : {user.email}\n\nUrban Hub Connect",
+                   m.reference)
+
+
+def sync_user_email(m):
+    """L'adresse du dossier a changé : l'identifiant de connexion suit, sauf si elle est déjà prise par un autre compte."""
+    if not m.user_id:
+        return
+    email = (m.email or "").strip().lower()
+    if not email or email == m.user.email.lower():
+        return
+    if User.objects.filter(email__iexact=email).exclude(pk=m.user_id).exists():
+        raise AccountError("Cette adresse est déjà utilisée par un autre compte : l'identifiant de connexion n'a pas été modifié.")
+    m.user.email = m.user.username = email
+    m.user.save(update_fields=["email", "username"])
 
 
 def user_from_uid(uid):
@@ -116,10 +149,10 @@ def request_password_reset(email):
     """Envoie un lien si l'adresse correspond à un compte membre ; ne révèle jamais si elle existe."""
     user = User.objects.filter(email__iexact=(email or "").strip(), is_active=True, role=User.Role.MEMBER).first()
     m = Membership.objects.filter(user=user).first() if user else None
-    if user and m:
-        notify(m, "Urban Hub Connect : choisir un nouveau mot de passe",
-               f"Bonjour {m.representative},\n\nPour choisir un nouveau mot de passe (lien valable 3 jours) :\n{password_link(user)}\n\n"
-               "Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.\n\nUrban Hub Connect")
+    if user and m:  # envoyé à l'adresse de connexion, celle que la personne vient de saisir
+        send_to(user.email, "Urban Hub Connect : choisir un nouveau mot de passe",
+                f"Bonjour {m.representative},\n\nPour choisir un nouveau mot de passe (lien valable 3 jours) :\n{password_link(user)}\n\n"
+                "Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.\n\nUrban Hub Connect", m.reference)
 
 
 # ---------- profil ----------

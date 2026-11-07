@@ -54,7 +54,7 @@ class LoginView(APIView):
         if user is None or user.role != User.Role.MEMBER or user.is_superuser:  # même message : aucun indice sur les comptes
             return Response({"detail": "Identifiant ou mot de passe incorrect."}, status=400)
         if accounts.current_membership(user) is None:
-            return Response({"detail": "Votre accès est suspendu : votre cotisation n'est pas à jour. Contactez la Coordination."}, status=400)
+            return Response({"detail": accounts.access_problem(user)}, status=400)
         login(request._request, user)
         return Response(_me(user))
 

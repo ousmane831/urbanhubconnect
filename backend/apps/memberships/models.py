@@ -78,6 +78,9 @@ class Membership(TimeStampedModel):
     notes = models.TextField("notes internes", blank=True)
     user = models.OneToOneField(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="membership",
                                 verbose_name="compte membre")
+    # Rappels d'échéance déjà envoyés : on garde la date de fin concernée, pour n'envoyer chaque rappel qu'une fois par période.
+    reminder_30_for = models.DateField("rappel J-30 envoyé pour l'échéance du", null=True, blank=True, editable=False)
+    reminder_7_for = models.DateField("rappel J-7 envoyé pour l'échéance du", null=True, blank=True, editable=False)
 
     class Meta:
         ordering = ["-created_at"]
@@ -113,13 +116,18 @@ class Payment(TimeStampedModel):
     recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     notes = models.CharField(max_length=255, blank=True)
     applied = models.BooleanField("appliqué à la cotisation", default=False, editable=False)
+    cancelled = models.BooleanField("annulé", default=False, editable=False,
+                                    help_text="Paiement saisi par erreur : il ne compte plus dans la cotisation.")
+    cancelled_at = models.DateTimeField("annulé le", null=True, blank=True, editable=False)
+    cancelled_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+                                     editable=False, verbose_name="annulé par")
 
     class Meta:
         ordering = ["-paid_on", "-id"]
         verbose_name, verbose_name_plural = "paiement", "paiements"
 
     def __str__(self):
-        return f"{self.amount_fcfa} FCFA · {self.get_method_display()} · {self.paid_on}"
+        return f"{self.amount_fcfa} FCFA · {self.get_method_display()} · {self.paid_on:%d/%m/%Y}" + (" (annulé)" if self.cancelled else "")
 
 
 class ProfileChange(TimeStampedModel):
@@ -163,8 +171,10 @@ class OpportunityType(Taxonomy):
 
 class OpportunityQuerySet(models.QuerySet):
     def open(self):
-        """Annonces publiées et dont la date limite n'est pas dépassée."""
-        return self.filter(status="published").filter(models.Q(deadline__isnull=True) | models.Q(deadline__gte=timezone.localdate()))
+        """Annonces publiées, non échues, d'une organisation dont l'adhésion est à jour (on peut donc lui répondre)."""
+        today = timezone.localdate()
+        return (self.filter(status="published", organization__membership__status="active", organization__membership__valid_until__gte=today)
+                .filter(models.Q(deadline__isnull=True) | models.Q(deadline__gte=today)))
 
 
 class Opportunity(TimeStampedModel):
