@@ -36,6 +36,14 @@ export const getMembershipCategories = () => get<MembershipCategoryItem[]>("/mem
 export const getTiers = () => get<Priced[]>("/partnerships/tiers/");
 export const getPartners = () => get<Partner[]>("/partnerships/partners/");
 export const getPartnerBand = () => get<BandPartner[]>("/partnerships/band/");
+export interface PlantingSeats { seats: number | null; remaining: number | null }
+export const getPlantingSeats = () => get<PlantingSeats>("/events-planting-seats/");
+export interface BadgeInfo {
+  name: string; organization: string; kind: string; options: string[]; planting: boolean; valid: boolean;
+  checkins: { day: string; at: string }[]; event: { title: string; dates: string; location: string };
+}
+export const getBadge = (token: string) => get<BadgeInfo>(`/badges/${encodeURIComponent(token)}/`);
+export const badgeQrUrl = (token: string) => `${import.meta.env.VITE_API_URL ?? "/api"}/badges/${encodeURIComponent(token)}/qr.png`;
 export const getPressReleases = () => get<PressRelease[]>("/press/");
 export const getDocuments = (category?: string) => get<DocumentItem[]>("/documents/", { category });
 export const getAwardCategories = () => get<RefItem[]>("/awards/categories/");

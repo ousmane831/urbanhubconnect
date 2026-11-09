@@ -18,6 +18,7 @@ from apps.organizations.api import OrganizationViewSet
 from apps.core import coordination_api as co
 
 from apps.core import members_network_api as mn
+from apps.events import badge_api as bd
 admin.site.site_header = "Urban Hub Connect · Coordination"
 admin.site.site_title = "Urban Hub Connect"
 admin.site.index_title = "Tableau de bord de la Coordination"
@@ -80,6 +81,14 @@ urlpatterns = [
     path("api/", include(router.urls)),
 
     # b) dans urlpatterns, AVANT le path("api/", include(...)) général
+    # Badges du Grand Week-End : page « Mon badge » (publique, code secret) et accueil le jour J (Coordination)
+    path("api/badges/<str:token>/", bd.badge_detail, name="badge-detail"),
+    path("api/badges/<str:token>/qr.png", bd.badge_qr, name="badge-qr"),
+    path("api/events-planting-seats/", bd.planting_seats, name="planting-seats"),
+    path("api/coordination/checkin/", bd.checkin, name="coord-checkin"),
+    path("api/coordination/checkin/search/", bd.checkin_search, name="coord-checkin-search"),
+    path("api/coordination/checkin/resend/", bd.checkin_resend, name="coord-checkin-resend"),
+    path("api/coordination/checkin/stats/", bd.checkin_stats, name="coord-checkin-stats"),
     path("api/coordination/csrf/", co.csrf, name="coord-csrf"),
     path("api/coordination/login/", co.LoginView.as_view(), name="coord-login"),
     path("api/coordination/logout/", co.logout_view, name="coord-logout"),

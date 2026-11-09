@@ -169,6 +169,11 @@ class EventRequest(Submission):
     message = models.TextField(blank=True)
     accept_waiver = models.BooleanField("décharge de responsabilité acceptée", default=False)
     accept_privacy = models.BooleanField(default=False)
+    # Badge du Grand Week-End : code secret porté par le QR code (aucune donnée personnelle dedans).
+    badge_token = models.CharField("code du badge", max_length=32, unique=True, null=True, blank=True, editable=False)
+    badge_sent_at = models.DateTimeField("badge envoyé le", null=True, blank=True, editable=False)
+
+    BADGE_KINDS = (Kind.REGISTRATION, Kind.CARAVAN)
 
     class Meta(Submission.Meta):
         verbose_name, verbose_name_plural = "demande liée à un événement", "demandes liées aux événements"
@@ -179,6 +184,22 @@ class EventRequest(Submission):
     def options_display(self):
         return [self.REGISTRATION_OPTIONS.get(o, o) for o in self.options or []]
 
+    @property
+    def wants_planting(self):
+        return self.kind == self.Kind.CARAVAN or "reboisement" in (self.options or [])
+
+    @classmethod
+    def planting_taken(cls):
+        """Places du convoi du reboisement déjà attribuées (inscriptions non annulées)."""
+        qs = cls.objects.filter(kind__in=cls.BADGE_KINDS).exclude(status="rejected").only("kind", "options")
+        return sum(1 for r in qs if r.wants_planting)
+
+    @classmethod
+    def planting_remaining(cls):
+        from apps.core.models import SiteSettings
+        seats = SiteSettings.load().planting_seats
+        return None if seats is None else max(0, seats - cls.planting_taken())
+
     def clean(self):
         super().clean()
         errors = {}
@@ -188,8 +209,27 @@ class EventRequest(Submission):
                 errors["options"] = "Cochez au moins un temps du programme."
             elif any(o not in self.REGISTRATION_OPTIONS for o in opts):
                 errors["options"] = "Choix inconnu."
-        wants_planting = self.kind == self.Kind.CARAVAN or "reboisement" in (self.options or [])
-        if wants_planting and not self.accept_waiver:
+        if self.wants_planting and not self.accept_waiver:
             errors["accept_waiver"] = "La décharge de responsabilité doit être acceptée pour le reboisement."
+        if self.wants_planting and self.pk is None and self.planting_remaining() == 0:
+            full = ("Le convoi du reboisement est complet. Décochez le reboisement pour vous inscrire aux autres temps du programme, "
+                    "ou contactez la Coordination pour être sur la liste d'attente.")
+            errors["options" if self.kind == self.Kind.REGISTRATION else "detail"] = full
         if errors:
             raise ValidationError(errors)
+
+
+class CheckIn(models.Model):
+    """Arrivée d'un participant, enregistrée au scan de son badge : une par jour au plus."""
+    registration = models.ForeignKey(EventRequest, on_delete=models.CASCADE, related_name="checkins", verbose_name="inscription")
+    day = models.DateField("jour")
+    at = models.DateTimeField("heure d'arrivée", auto_now_add=True)
+    by = models.ForeignKey("users.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="scanné par")
+
+    class Meta:
+        ordering = ["-at"]
+        unique_together = [("registration", "day")]
+        verbose_name, verbose_name_plural = "arrivée", "arrivées"
+
+    def __str__(self):
+        return f"{self.registration.name} · {self.day:%d/%m/%Y}"

@@ -99,6 +99,31 @@ class NewsletterView(SubmissionCreateView):
             return sub
 
 
+class EventRequestCreate(SubmissionCreateView):
+    """Demandes liées aux événements. Une inscription au Grand Week-End (ou au reboisement) est confirmée d'office
+    et le badge (QR code) part aussitôt par e-mail."""
+    success_message = "Merci. Votre demande a bien été transmise. La Coordination vous recontactera rapidement."
+    serializer_class = build_serializer(
+        EventRequest, ["kind", "name", "organization", "email", "phone", "options", "what_offers", "what_needs", "message",
+                       "accept_waiver", "accept_privacy"],
+        extra={**CONSENT("accept_privacy"),
+               # Les anciens types (visite, portes ouvertes) restent en base pour l'historique mais ne sont plus acceptés.
+               "kind": serializers.ChoiceField(choices=[(k.value, k.label) for k in EventRequest.OPEN_KINDS]),
+               "options": serializers.ListField(child=serializers.ChoiceField(choices=list(EventRequest.REGISTRATION_OPTIONS)),
+                                                required=False)})
+
+    def after_create(self, obj):
+        if obj.kind not in EventRequest.BADGE_KINDS:
+            return
+        from apps.events import badges
+        if badges.issue(obj):
+            self.success_message = (f"Merci, votre inscription est confirmée. Votre badge (QR code) vient d'être envoyé à {obj.email} : "
+                                    "présentez-le à l'accueil, sur votre téléphone ou imprimé. Pensez à vérifier vos courriers indésirables.")
+        else:
+            self.success_message = ("Merci, votre inscription est enregistrée. Votre badge n'a pas pu être envoyé par e-mail pour le moment : "
+                                    "la Coordination vous le fera parvenir.")
+
+
 urlpatterns = [
     path("memberships/", submission_view(membership, name="MembershipCreate", after=open_dossier)),  
     path("organizations/submit/", submission_view(
@@ -127,15 +152,7 @@ urlpatterns = [
         BusinessConnectRegistration, ["event", "participant_name", "organization", "email", "phone", "what_offers",
                                       "what_needs", "preferred_meetings", "accept_privacy"],
         slugs={"event": (Event.objects.public(), True)}, extra=CONSENT("accept_privacy")), name="BusinessConnect")),
-    path("event-requests/", submission_view(build_serializer(
-        EventRequest, ["kind", "name", "organization", "email", "phone", "options", "what_offers", "what_needs", "message",
-                       "accept_waiver", "accept_privacy"],
-        extra={**CONSENT("accept_privacy"),
-               # Les anciens types (visite, portes ouvertes) restent en base pour l'historique mais ne sont plus acceptés.
-               "kind": serializers.ChoiceField(choices=[(k.value, k.label) for k in EventRequest.OPEN_KINDS]),
-               "options": serializers.ListField(child=serializers.ChoiceField(choices=list(EventRequest.REGISTRATION_OPTIONS)),
-                                                required=False)}),
-        "Merci. Votre demande a bien été transmise. La Coordination vous recontactera rapidement.", "EventRequestCreate")),
+    path("event-requests/", EventRequestCreate.as_view()),
     path("volunteers/", submission_view(build_serializer(
         VolunteerApplication, ["name", "email", "phone", "organization", "missions", "availability", "message"],
         many_slugs={"missions": (active(VolunteerMission), False)}), name="VolunteerApply")),

@@ -35,6 +35,8 @@ class SiteSettings(models.Model):
                                                  help_text="Décocher pour publier les annonces Urban Opportunities immédiatement.")
     moderate_opportunities = models.BooleanField("valider les annonces avant publication", default=True,
                                                  help_text="Décocher pour publier les annonces Urban Opportunities immédiatement.")
+    planting_seats = models.PositiveIntegerField("places dans le convoi du reboisement", null=True, blank=True,
+                                                 help_text="Grand Week-End du Pôle : nombre maximal d'inscrits au reboisement. Vide = pas de limite.")
     payment_instructions = models.TextField("modalités de paiement de la cotisation", blank=True,
                                             help_text="Texte envoyé avec le bulletin d'adhésion (virement, Wave, Orange Money…).")
 

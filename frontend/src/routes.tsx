@@ -24,6 +24,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, ...lazyPage(() => import("./pages/Home")) },
       { path: "espace-membres", ...lazyPage(() => import("./pages/MembersArea")) },
+      { path: "badge/:token", ...lazyPage(() => import("./pages/Badge")) },
       { path: "espace-membres/mot-de-passe", ...lazyPage(() => import("./pages/SetPassword")) },
       { path: "espace-membres/mot-de-passe-oublie", ...lazyPage(() => import("./pages/ForgotPassword")) },
       { path: "le-reseau", ...lazyPage(() => import("./pages/Network")) },

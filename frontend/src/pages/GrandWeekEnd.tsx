@@ -16,7 +16,7 @@ import { EventRequestForm } from "../features/events/EventRequestForm";
 import { PartnerBand } from "../features/events/PartnerBand";
 import { useAsync } from "../hooks/useAsync";
 import { useSeo } from "../hooks/useSeo";
-import { getAwardCategories, getDocuments, getEvent, getVolunteerMissions } from "../services/api";
+import { getAwardCategories, getDocuments, getEvent, getPlantingSeats, getVolunteerMissions } from "../services/api";
 import type { EventDetail } from "../types/api";
 import { fmtDate, fmtDays } from "../utils/format";
 import { parseBlocks } from "../utils/richtext";
@@ -253,6 +253,7 @@ export default function GrandWeekEnd() {
   const dossier = useAsync(() => getDocuments("partnership"));
   const rules = useAsync(() => getDocuments("awards_rules"));
   const flyer = useAsync(() => getDocuments("flyer"));
+  const seats = useAsync(getPlantingSeats);
   const heroRef = useRef<HTMLElement>(null);
   useSeo("Le Grand Week-End du Pôle 2026 – 11 et 12 décembre, Diamniadio et Lac Rose",
     "Première édition : ouverture officielle du réseau, Forum du Pôle en quatre panels, Business Connect, grand reboisement du Lac Rose, Awards et Gala du Pôle.",
@@ -371,7 +372,11 @@ export default function GrandWeekEnd() {
             </div>
             <div className="space-y-6 border border-t-0 border-navy/10 bg-white p-6 sm:p-10 lg:border-l-0 lg:border-t">
               <RichText text={reboisement.body} />
-              <Reveal label="M'inscrire au reboisement" block><EventRequestForm kind="caravan" /></Reveal>
+              {seats.data?.remaining != null && (
+                <p className={`inline-flex rounded-full px-4 py-1.5 font-semibold ${seats.data.remaining > 0 ? "bg-green/10 text-green" : "bg-red-50 text-red-800"}`}>
+                  {seats.data.remaining > 0 ? `${seats.data.remaining} place${seats.data.remaining > 1 ? "s" : ""} restante${seats.data.remaining > 1 ? "s" : ""} dans le convoi`
+                    : "Convoi complet : contactez la Coordination pour la liste d'attente"}</p>)}
+              {seats.data?.remaining !== 0 && <Reveal label="M'inscrire au reboisement" block><EventRequestForm kind="caravan" /></Reveal>}
             </div>
           </div>
         </Section>)}
@@ -476,6 +481,8 @@ export default function GrandWeekEnd() {
               <Eyebrow light>{fmtDays(e.start_date, e.end_date)}</Eyebrow>
               <H2 light>S'inscrire au Grand Week-End du Pôle</H2>
               <p className="mt-4 text-lg text-white/85">L'inscription donne droit à un badge nominatif valable pour les deux journées. Le Gala du Pôle ne fait pas l'objet d'une inscription : il est accessible sur invitation et par la billetterie commune avec The Ground.</p>
+              <p className="mt-3 text-white/85">Dès votre inscription, votre badge (QR code) vous est envoyé par e-mail : présentez-le à l'accueil, sur votre téléphone ou imprimé.</p>
+              {seats.data?.remaining === 0 && <p className="mt-3 rounded-xl bg-white/10 p-3 font-semibold">Le convoi du reboisement est complet ; les autres temps du programme restent ouverts.</p>}
             </div>
             <div className="rounded-2xl bg-white p-4 shadow-lg sm:p-8">
               {registrationOpen ? <EventRequestForm kind="registration" /> : <p className="text-navy/75">Les inscriptions ouvriront le {opens && fmtDate(opens.toISOString())}.</p>}
