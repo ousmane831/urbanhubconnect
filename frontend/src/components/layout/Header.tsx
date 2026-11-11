@@ -67,7 +67,9 @@ export function Header() {
       </div>
 
       {open && (
-        <div id="menu-mobile" ref={menu} className="fixed inset-x-0 bottom-0 top-16 overflow-y-auto bg-white xl:hidden">
+        // Pas de « fixed » ici : l'en-tête a un flou (backdrop-blur), qui ferait calculer la position par rapport à l'en-tête
+        // (64 px de haut) et donnerait un menu de hauteur nulle. On le place juste sous l'en-tête, sur toute la hauteur restante.
+        <div id="menu-mobile" ref={menu} className="absolute inset-x-0 top-full h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain border-t border-navy/10 bg-white supports-[height:100dvh]:h-[calc(100dvh-4rem)] xl:hidden">
           <nav aria-label="Navigation mobile" className="mx-auto flex max-w-7xl flex-col px-4 pb-10 pt-2 sm:px-6">
             {NAV_LINKS.map((l) => (
               <NavLink key={l.to} to={l.to} end={l.to === "/"}
