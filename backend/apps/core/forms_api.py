@@ -55,15 +55,21 @@ class SubmissionCreateView(generics.CreateAPIView):
         return Response({"detail": self.success_message}, status=status.HTTP_201_CREATED)
 
     def after_create(self, obj):
-        pass
+        """Accusé de réception par e-mail au demandeur (voir confirmations.py)."""
+        from .confirmations import send_confirmation
+        send_confirmation(obj)
 
 
 def submission_view(serializer, message=None, name="SubmissionView", after=None):
+    """`after` : traitement propre au formulaire ; l'accusé de réception part ensuite (sauf formulaires qui envoient le leur)."""
     attrs = {"serializer_class": serializer}
     if message:
         attrs["success_message"] = message
     if after:
-        attrs["after_create"] = lambda self, obj: after(obj)
+        def after_create(self, obj):
+            after(obj)
+            SubmissionCreateView.after_create(self, obj)
+        attrs["after_create"] = after_create
     return type(name, (SubmissionCreateView,), attrs).as_view()
 
 

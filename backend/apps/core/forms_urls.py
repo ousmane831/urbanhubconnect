@@ -92,11 +92,17 @@ class NewsletterView(SubmissionCreateView):
 
         def create(self, data):
             email = data.pop("email").strip().lower()
-            sub, _ = NewsletterSubscriber.objects.get_or_create(email=email, defaults=data)
+            sub, created = NewsletterSubscriber.objects.get_or_create(email=email, defaults=data)
+            sub.welcome = created  # e-mail de bienvenue seulement pour une nouvelle inscription ou une réinscription
             if not sub.is_active:
                 sub.is_active = True
                 sub.save(update_fields=["is_active", "updated_at"])
+                sub.welcome = True
             return sub
+
+    def after_create(self, sub):
+        if getattr(sub, "welcome", False):
+            super().after_create(sub)
 
 
 class EventRequestCreate(SubmissionCreateView):
@@ -114,6 +120,7 @@ class EventRequestCreate(SubmissionCreateView):
 
     def after_create(self, obj):
         if obj.kind not in EventRequest.BADGE_KINDS:
+            super().after_create(obj)  # accusé de réception (After Work, Défis Partenaires)
             return
         from apps.events import badges
         if badges.issue(obj):
