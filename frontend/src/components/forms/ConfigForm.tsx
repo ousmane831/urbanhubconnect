@@ -46,7 +46,7 @@ export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, s
     catch (e) { if (!applyServerErrors(e, setError as never)) setFailure(apiErrorMessage(e)); }
   };
 
-  if (done) return <p role="status" className="rounded-md border border-green/40 bg-green/5 p-5 text-lg">{done}</p>;
+  if (done) return <p role="status" className="rounded-lg border border-green/40 bg-green/5 p-5 text-lg">{done}</p>;
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="relative grid gap-5 sm:grid-cols-2">
       <Honeypot register={register} />
@@ -78,9 +78,9 @@ export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, s
               : <input type={f.type} className="field" {...fieldProps(id, e)} {...register(f.name)} />}
           </FormField>);
       })}
-      {failure && <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-4 font-semibold text-red-900 sm:col-span-2">{failure}</p>}
+      {failure && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-4 font-semibold text-red-900 sm:col-span-2">{failure}</p>}
       <div className="sm:col-span-2">
-        <button disabled={isSubmitting} className="inline-flex min-h-[48px] items-center rounded-md bg-green px-8 text-lg font-semibold text-white hover:bg-green-2 disabled:opacity-60">
+        <button disabled={isSubmitting} className="inline-flex min-h-[52px] w-full items-center justify-center rounded-lg bg-green px-8 text-lg font-semibold text-white shadow-sm transition-colors hover:bg-green-2 disabled:opacity-60 sm:w-auto">
           {isSubmitting ? "Envoi en cours…" : submitLabel}
         </button>
       </div>

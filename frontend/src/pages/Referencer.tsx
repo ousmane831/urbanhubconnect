@@ -58,7 +58,7 @@ export default function Referencer() {
             <CheckCircle2 className="h-8 w-8" aria-hidden="true" />
           </span>
           <p className="mt-5 text-lg text-navy/80">{done}</p>
-          <Link to="/annuaire" className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-md bg-green px-5 font-semibold text-white transition-colors hover:bg-green-2">
+          <Link to="/annuaire" className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-lg bg-green px-5 font-semibold text-white transition-colors hover:bg-green-2">
             <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Retour à l'annuaire
           </Link>
         </div>
@@ -159,10 +159,10 @@ export default function Referencer() {
               {e(k) && <p id={`${k}-err`} role="alert" className="ml-8 mt-1 text-sm font-semibold text-red-700">{e(k)}</p>}</div>))}
         </div>
 
-        {failure && <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-4 font-semibold text-red-900">{failure}</p>}
+        {failure && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-4 font-semibold text-red-900">{failure}</p>}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-navy/65">Votre demande sera transmise à la Coordination pour examen.</p>
-          <button disabled={isSubmitting} className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-md bg-green px-8 text-lg font-semibold text-white transition-colors hover:bg-green-2 disabled:cursor-not-allowed disabled:opacity-60">
+          <button disabled={isSubmitting} className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg bg-green px-8 text-lg font-semibold text-white transition-colors hover:bg-green-2 disabled:cursor-not-allowed disabled:opacity-60">
             {isSubmitting ? "Envoi en cours…" : "Envoyer ma demande"}
           </button>
         </div>

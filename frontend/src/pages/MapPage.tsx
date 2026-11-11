@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { Button } from "../components/ui/Button";
 import { Section, SectionHeading } from "../components/ui/Container";
 import { EmptyState, ErrorState, Loading } from "../components/ui/States";
-import { HexPattern } from "../components/ui/HexPattern";
+import { PageHero } from "../components/ui/PageHero";
 import ProposePlaceForm from "../features/map/ProposePlaceForm";
 import { useAsync } from "../hooks/useAsync";
 import { useDebounce } from "../hooks/useDebounce";
@@ -80,27 +80,11 @@ export default function MapPage() {
 
   return (
     <>
-      <section className="relative overflow-hidden bg-navy text-white">
-        <HexPattern className="text-white/[0.05]" />
-        <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green text-white">
-              <Map className="h-6 w-6" />
-            </div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold">Cartographie du Hub</h1>
-          </div>
-          <h2 className="mt-4 text-xl sm:text-2xl text-white/90">Les deux pôles sur une seule carte</h2>
-          <p className="mt-4 max-w-3xl text-lg text-white/80">
-            Où se trouvent les institutions, les zones d'activité, les écoles, les services, les équipements et les initiatives des deux pôles ?
-            La Cartographie du Hub rassemble sur une seule carte ce qui fait vivre Diamniadio et le Lac Rose, pour mieux s'orienter,
-            mieux se connaître et repérer les complémentarités du territoire.
-          </p>
-        </div>
-      </section>
+      <PageHero eyebrow="Les deux pôles sur une seule carte" title="Cartographie du Hub"
+        intro="Où se trouvent les institutions, les zones d'activité, les écoles, les services, les équipements et les initiatives des deux pôles ? La Cartographie du Hub rassemble sur une seule carte ce qui fait vivre Diamniadio et le Lac Rose, pour mieux s'orienter, mieux se connaître et repérer les complémentarités du territoire." />
 
       <Section>
-        <div className="relative overflow-hidden rounded-2xl border border-navy/10 bg-white p-6 shadow-soft">
-          <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-green opacity-10" />
+        <div className="card relative p-6">
           <div className="flex items-center gap-2 mb-4">
             <Filter className="h-5 w-5 text-green" />
             <h3 className="text-lg font-bold text-navy">Filtrer la carte</h3>
@@ -157,7 +141,7 @@ export default function MapPage() {
                           <span className="block font-semibold text-navy">{p.name}{p.is_member && <span className="ml-2 text-sm text-purple">Membre</span>}</span>
                           <span className="mt-1 block text-sm text-navy/70">{p.category.name}{user && ` · ${distanceKm(user, [p.latitude, p.longitude]).toFixed(1)} km`}</span>
                         </button>
-                        <button type="button" onClick={() => showRoute(p)} className="mt-2 inline-flex min-h-10 items-center gap-2 rounded-md border border-green/30 px-3 text-sm font-semibold text-green transition-colors hover:bg-green/5">
+                        <button type="button" onClick={() => showRoute(p)} className="mt-2 inline-flex min-h-10 items-center gap-2 rounded-lg border border-green/30 px-3 text-sm font-semibold text-green transition-colors hover:bg-green/5">
                           <Route className="h-4 w-4" aria-hidden="true" />Voir l'itinéraire
                         </button>
                       </div>
@@ -195,7 +179,6 @@ export default function MapPage() {
 
       <Section id="proposer">
         <div className="relative overflow-hidden rounded-2xl border border-navy/10 bg-white p-8 shadow-soft">
-          <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-purple opacity-10" />
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-xl bg-purple text-white">
             <Map className="h-8 w-8" />
           </div>

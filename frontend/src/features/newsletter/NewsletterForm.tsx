@@ -38,7 +38,7 @@ export function NewsletterForm({ onDark = false, variant = "compact" }: { onDark
       <FormField id="nl-email" label="E-mail" required error={errors.email?.message}><input type="email" autoComplete="email" className="field" {...fieldProps("nl-email", errors.email?.message)} {...register("email")} /></FormField>
       <FormField id="nl-org" label="Organisation" error={errors.organization?.message} className="sm:col-span-2"><input autoComplete="organization" className="field" {...fieldProps("nl-org", errors.organization?.message)} {...register("organization")} /></FormField>
       <div className="sm:col-span-2">
-        <button disabled={isSubmitting} className="inline-flex min-h-[48px] items-center rounded-md bg-green px-8 text-lg font-semibold text-white hover:bg-green-2 disabled:opacity-60">
+        <button disabled={isSubmitting} className="inline-flex min-h-[48px] items-center rounded-lg bg-green px-8 text-lg font-semibold text-white hover:bg-green-2 disabled:opacity-60">
           {isSubmitting ? "Envoi…" : "Je m'abonne"}</button>
         {message}
       </div>
@@ -51,7 +51,7 @@ export function NewsletterForm({ onDark = false, variant = "compact" }: { onDark
       <div className="flex flex-col gap-2 sm:flex-row">
         <input id="nl-email" type="email" autoComplete="email" placeholder="votre@email.com" aria-invalid={!!errors.email}
           aria-describedby="nl-msg" className={`field text-navy ${onDark ? "border-white/30" : ""}`} {...register("email")} />
-        <button disabled={isSubmitting} className="min-h-[44px] rounded-md bg-gold px-5 font-semibold text-navy hover:bg-gold-light disabled:opacity-60">
+        <button disabled={isSubmitting} className="min-h-[44px] rounded-lg bg-gold px-5 font-semibold text-navy hover:bg-gold-light disabled:opacity-60">
           {isSubmitting ? "Envoi…" : "S'abonner"}
         </button>
       </div>

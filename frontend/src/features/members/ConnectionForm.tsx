@@ -28,7 +28,7 @@ export function ConnectionForm({ onSend, submitLabel = "Envoyer la demande", lab
         <textarea id={id} rows={4} className="field" value={message} onChange={(e) => setMessage(e.target.value)} />
         <p className="mt-1 text-sm text-navy/65">{message.trim().length} / {MESSAGE_MAX} caractères</p></div>
       {feedback && <p role={feedback.ok ? "status" : "alert"} className={`font-semibold ${feedback.ok ? "text-green" : "text-red-800"}`}>{feedback.text}</p>}
-      <button disabled={busy} className="min-h-[44px] rounded-md bg-green px-6 font-semibold text-white hover:bg-green-2 disabled:opacity-60">{busy ? "Envoi…" : submitLabel}</button>
+      <button disabled={busy} className="min-h-[44px] rounded-lg bg-green px-6 font-semibold text-white hover:bg-green-2 disabled:opacity-60">{busy ? "Envoi…" : submitLabel}</button>
     </form>
   );
 }

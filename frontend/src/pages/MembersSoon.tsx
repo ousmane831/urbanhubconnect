@@ -21,7 +21,6 @@ export default function MembersSoon() {
       <Section tone="offwhite" className="pt-10 sm:pt-14">
         <Container className="max-w-5xl !px-0">
           <div className="relative overflow-hidden rounded-2xl border border-navy/10 bg-white p-6 shadow-soft sm:p-10">
-            <div className="absolute -right-10 -top-10 h-44 w-44 rounded-full bg-gold opacity-[0.09]" />
             <div className="relative grid gap-8 md:grid-cols-[auto_1fr] md:items-center">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-purple text-white shadow-soft md:mx-0">
                 <LockKeyhole className="h-9 w-9" aria-hidden="true" />

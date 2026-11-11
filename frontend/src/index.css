@@ -4,14 +4,24 @@
 @tailwind utilities;
 
 @layer base {
-  html { font-size: 16px; scroll-behavior: smooth; }
-  body { @apply bg-white font-body text-base text-navy antialiased; }
-  h1, h2, h3, h4 { @apply font-heading font-bold tracking-tight; }
+  html { font-size: 16px; scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body { @apply bg-white font-body text-base leading-relaxed text-navy antialiased; }
+  h1, h2, h3, h4 { @apply font-heading font-bold tracking-tight text-balance; }
+  h1 { letter-spacing: -0.02em; }
+  ::selection { @apply bg-mint/60 text-navy; }
   :focus-visible { @apply outline outline-2 outline-offset-2 outline-purple; }
 }
 @layer components {
-  .link { @apply text-green underline decoration-green/40 underline-offset-4 hover:decoration-green; }
-  .field { @apply w-full rounded-md border border-navy/25 bg-white px-3 py-2.5 text-base focus:border-green focus:outline-none focus:ring-2 focus:ring-green/30; }
+  .link { @apply font-medium text-green underline decoration-green/30 underline-offset-4 transition-colors hover:decoration-green; }
+  .field { @apply min-h-[48px] w-full rounded-lg border border-navy/20 bg-white px-3.5 py-2.5 text-base transition-colors placeholder:text-navy/40 hover:border-navy/35 focus:border-green focus:outline-none focus:ring-4 focus:ring-green/15; }
+  /* Surtitre au-dessus des titres de section */
+  .eyebrow { @apply inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-green; }
+  .eyebrow::before { content: ""; @apply h-px w-6 bg-current; }
+  /* Carte standard du site : bord fin, coins arrondis, légère élévation au survol si interactive */
+  .card { @apply rounded-2xl border border-navy/10 bg-white shadow-soft; }
+  .card-hover { @apply transition-all duration-200 hover:-translate-y-0.5 hover:border-navy/20 hover:shadow-lift; }
+  /* Pastille d'icône uniforme */
+  .icon-tile { @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green/10 text-green; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }

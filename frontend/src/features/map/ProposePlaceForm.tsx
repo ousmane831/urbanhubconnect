@@ -54,7 +54,7 @@ export default function ProposePlaceForm() {
     catch (err) { if (!applyServerErrors(err, setError as never)) setFailure(apiErrorMessage(err)); }
   };
 
-  if (done) return <p role="status" className="rounded-md border border-green/40 bg-green/5 p-5 text-lg">{done}</p>;
+  if (done) return <p role="status" className="rounded-lg border border-green/40 bg-green/5 p-5 text-lg">{done}</p>;
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="relative grid max-w-3xl gap-5 sm:grid-cols-2">
       <Honeypot register={register} />
@@ -80,9 +80,9 @@ export default function ProposePlaceForm() {
         <input type="file" accept={TYPES.join(",")} className="field" {...fieldProps("pl-photo", photoError)} onChange={(ev) => onPhoto(ev.target.files?.[0])} /></FormField>
       <FormField id="pl-sname" label="Votre nom" required error={e("submitter_name")}><input className="field" {...fieldProps("pl-sname", e("submitter_name"))} {...register("submitter_name")} /></FormField>
       <FormField id="pl-smail" label="Votre e-mail" required error={e("submitter_email")}><input type="email" className="field" {...fieldProps("pl-smail", e("submitter_email"))} {...register("submitter_email")} /></FormField>
-      {failure && <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-4 font-semibold text-red-900 sm:col-span-2">{failure}</p>}
+      {failure && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-4 font-semibold text-red-900 sm:col-span-2">{failure}</p>}
       <div className="sm:col-span-2">
-        <button disabled={isSubmitting} className="inline-flex min-h-[48px] items-center rounded-md bg-green px-8 text-lg font-semibold text-white hover:bg-green-2 disabled:opacity-60">
+        <button disabled={isSubmitting} className="inline-flex min-h-[48px] items-center rounded-lg bg-green px-8 text-lg font-semibold text-white hover:bg-green-2 disabled:opacity-60">
           {isSubmitting ? "Envoi en cours…" : "Proposer un lieu"}</button>
       </div>
     </form>

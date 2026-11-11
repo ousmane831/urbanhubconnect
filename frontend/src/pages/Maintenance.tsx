@@ -53,7 +53,6 @@ const Maintenance: React.FC = () => {
         <section className="py-16">
           <Container className="max-w-md">
             <div className="relative overflow-hidden rounded-2xl border border-navy/10 bg-white p-8 shadow-soft">
-              <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-green opacity-10" />
               <div className="relative">
                 <div className="mb-6 flex items-center gap-3">
                   <div className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-green text-white">

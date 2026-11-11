@@ -1,10 +1,10 @@
-import { Section } from "../components/ui/Container";
+import { Clock, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import { ConfigForm, type FieldDef } from "../components/forms/ConfigForm";
-import { HexPattern } from "../components/ui/HexPattern";
-import { useSiteSettings } from "../hooks/useSiteSettings";
-import { useSeo } from "../hooks/useSeo";
 import { Button } from "../components/ui/Button";
-import { MapPin, Phone, Mail, Send, Clock } from "lucide-react";
+import { Section } from "../components/ui/Container";
+import { PageHero } from "../components/ui/PageHero";
+import { useSeo } from "../hooks/useSeo";
+import { useSiteSettings } from "../hooks/useSiteSettings";
 
 const SUBJECTS = [["membership", "Adhésion"], ["partnership", "Partenariat"], ["events", "Événements"], ["press", "Presse"],
   ["volunteer", "Bénévolat"], ["directory", "Annuaire"], ["map", "Cartographie"], ["other", "Autre"]].map(([value, label]) => ({ value, label }));
@@ -19,108 +19,45 @@ const FIELDS: FieldDef[] = [
 export default function Contact() {
   useSeo("Contact", "Contactez la Coordination d'Urban Hub Connect : adhésion, partenariat, événements, presse, bénévolat.");
   const s = useSiteSettings();
+  const tel = s.phone.replace(/\s/g, "");
+  const items = [
+    { icon: MapPin, title: "Adresse", body: <address className="not-italic">{s.address}</address> },
+    { icon: Phone, title: "Téléphone", body: <a className="link" href={`tel:${tel}`}>{s.phone}</a> },
+    { icon: Mail, title: "E-mail", body: <a className="link break-all" href={`mailto:${s.email}`}>{s.email}</a> },
+    { icon: Clock, title: "Horaires", body: "Lundi - Vendredi : 9h - 18h" },
+  ];
   return (
     <>
-      <section className="relative overflow-hidden bg-navy text-white">
-        <HexPattern className="text-white/[0.05]" />
-        <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold">Contact</h1>
-          <p className="mt-5 max-w-2xl text-xl text-white/85">
-            Une question ? Une suggestion ? Contactez la Coordination d'Urban Hub Connect.
-          </p>
-        </div>
-      </section>
+      <PageHero eyebrow="Contact" title="Parlons de votre projet" intro="Une question ? Une suggestion ? Contactez la Coordination d'Urban Hub Connect.">
+        <Button to={`tel:${tel}`} variant="light" size="lg"><Phone className="h-5 w-5" aria-hidden />Appeler la Coordination</Button>
+        {s.whatsapp && <Button to={`https://wa.me/${s.whatsapp}`} variant="ghost" size="lg" target="_blank" rel="noopener noreferrer"><MessageCircle className="h-5 w-5" aria-hidden />WhatsApp</Button>}
+      </PageHero>
 
-      <Section>
-        <div className="grid gap-12 lg:grid-cols-2">
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-navy">Coordination Urban Hub Connect</h2>
-            <p className="mt-4 text-lg text-navy/75">Notre équipe est à votre disposition pour vous accompagner dans vos démarches.</p>
-            
-            <div className="mt-8 space-y-6">
-              <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green text-white">
-                  <MapPin className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-navy">Adresse</h3>
-                  <address className="mt-1 not-italic text-navy/80">
-                    {s.address.split(",").map((l, i) => (
-                      <p key={i}>{l.trim()}</p>
-                    ))}
-                  </address>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple text-white">
-                  <Phone className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-navy">Téléphone</h3>
-                  <p className="mt-1 text-navy/80">
-                    <a className="link" href={`tel:${s.phone.replace(/\s/g, "")}`}>{s.phone}</a>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gold text-white">
-                  <Mail className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-navy">E-mail</h3>
-                  <p className="mt-1 text-navy/80">
-                    <a className="link" href={`mailto:${s.email}`}>{s.email}</a>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green text-white">
-                  <Clock className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-navy">Horaires</h3>
-                  <p className="mt-1 text-navy/80">Lundi - Vendredi : 9h - 18h</p>
-                </div>
-              </div>
+      <Section tone="offwhite">
+        <div className="grid gap-8 lg:grid-cols-[1fr_1.5fr] lg:gap-12">
+          <div className="space-y-4">
+            <div>
+              <p className="eyebrow mb-3">Coordination</p>
+              <h2 className="text-3xl leading-tight">Coordination Urban Hub Connect</h2>
+              <p className="mt-3 text-lg text-navy/70">Notre équipe est à votre disposition pour vous accompagner dans vos démarches.</p>
             </div>
-
-            <div className="mt-10">
-              <Button to="/adherer" variant="primary" className="w-full sm:w-auto">Devenir membre</Button>
-            </div>
+            <ul className="card divide-y divide-navy/10">
+              {items.map((i) => (
+                <li key={i.title} className="flex items-start gap-4 p-5">
+                  <span className="icon-tile"><i.icon className="h-5 w-5" aria-hidden /></span>
+                  <div><h3 className="text-sm font-bold uppercase tracking-wider text-navy/55">{i.title}</h3><div className="mt-1 text-navy/85">{i.body}</div></div>
+                </li>))}
+            </ul>
+            <Button to="/adherer" variant="secondary" className="w-full sm:w-auto">Devenir membre</Button>
           </div>
 
-          <div className="relative overflow-hidden rounded-2xl border border-navy/10 bg-white p-8 shadow-soft">
-            <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-purple opacity-10" />
-            <div className="inline-flex h-16 w-16 items-center justify-center rounded-xl bg-purple text-white">
-              <Send className="h-8 w-8" />
-            </div>
-            <h2 className="mt-6 text-3xl font-bold text-navy">Envoyer un message</h2>
-            <p className="mt-3 text-lg text-navy/75">Remplissez le formulaire ci-dessous et nous vous répondrons dans les plus brefs délais.</p>
-            <div className="mt-8">
-              <ConfigForm endpoint="/contact/" fields={FIELDS} submitLabel="Envoyer le message" successFallback="Merci. Votre message a bien été envoyé." />
-            </div>
+          <div className="card p-6 sm:p-9">
+            <h2 className="text-2xl sm:text-3xl">Envoyer un message</h2>
+            <p className="mb-7 mt-2 text-navy/70">Remplissez le formulaire ci-dessous et nous vous répondrons dans les plus brefs délais.</p>
+            <ConfigForm endpoint="/contact/" fields={FIELDS} submitLabel="Envoyer le message" successFallback="Merci. Votre message a bien été envoyé." />
           </div>
         </div>
       </Section>
-
-      <section className="relative overflow-hidden bg-navy py-16 text-white">
-        <HexPattern className="text-white/[0.05]" />
-        <div className="relative mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
-          <h2 className="text-3xl sm:text-4xl font-bold">Besoin d'une réponse rapide ?</h2>
-          <p className="mt-4 max-w-2xl mx-auto text-lg text-white/85">
-            Pour les demandes urgentes, n'hésitez pas à nous contacter par téléphone.
-          </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-4">
-            <a href={`tel:${s.phone.replace(/\s/g, "")}`} className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-white px-6 py-2.5 text-base font-semibold text-navy transition-colors hover:bg-offwhite">
-              <Phone className="h-5 w-5" />
-              Appeler maintenant
-            </a>
-          </div>
-        </div>
-      </section>
     </>
   );
 }

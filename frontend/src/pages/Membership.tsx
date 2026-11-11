@@ -1,9 +1,10 @@
-import { BadgeCheck, ChevronRight, ClipboardList, UsersRound } from "lucide-react";
-import { Container, Section, SectionHeading } from "../components/ui/Container";
+import { ArrowRight, BadgeCheck, ClipboardList, Sparkles, UsersRound } from "lucide-react";
 import { Async } from "../components/ui/Async";
+import { Button } from "../components/ui/Button";
+import { ConfigForm, type FieldDef } from "../components/forms/ConfigForm";
+import { Section, SectionHeading } from "../components/ui/Container";
 import { PageHero } from "../components/ui/PageHero";
 import { RichText } from "../components/ui/RichText";
-import { ConfigForm, type FieldDef } from "../components/forms/ConfigForm";
 import { useAsync } from "../hooks/useAsync";
 import { useSeo } from "../hooks/useSeo";
 import { getMembershipCategories, getOrganizationFilters, getPages } from "../services/api";
@@ -34,92 +35,57 @@ export default function Membership() {
   ];
   return (
     <>
-      <PageHero title={intro?.title ?? "Rejoignez le réseau"} intro={intro?.content}>
-        <div className="flex flex-wrap gap-3">
-          <a href="#formulaire" className="inline-flex min-h-12 items-center gap-2 rounded-md bg-green px-5 font-semibold text-white transition-colors hover:bg-green-2">
-            Demander mon adhésion <ChevronRight className="h-5 w-5" aria-hidden="true" />
-          </a>
-          <a href="#cotisations" className="inline-flex min-h-12 items-center rounded-md border border-white/35 px-5 font-semibold text-white transition-colors hover:bg-white/10">
-            Découvrir les cotisations
-          </a>
-        </div>
+      <PageHero eyebrow="Adhésion" title={intro?.title ?? "Rejoignez le réseau"} intro={intro?.content}>
+        <Button to="#formulaire" variant="light" size="lg">Demander mon adhésion<ArrowRight className="h-5 w-5" aria-hidden /></Button>
+        <Button to="#cotisations" variant="ghost" size="lg">Découvrir les cotisations</Button>
       </PageHero>
 
       {perks && (
         <Section>
-          <SectionHeading title={perks.title} intro="Les atouts d'une adhésion à Urban Hub Connect." />
-          <div className="relative overflow-hidden rounded-2xl border border-navy/10 bg-white p-6 shadow-soft sm:p-8">
-            <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-gold opacity-[0.08]" />
-            <div className="relative">
+          <div className="grid gap-10 lg:grid-cols-[1fr_1.5fr] lg:gap-16">
+            <SectionHeading eyebrow="Pourquoi adhérer" title={perks.title} intro="Les atouts d'une adhésion à Urban Hub Connect." />
+            <div className="card p-6 sm:p-8">
+              <span className="icon-tile mb-5"><Sparkles className="h-5 w-5" aria-hidden /></span>
               <RichText text={perks.content} />
             </div>
           </div>
-        </Section>
-      )}
+        </Section>)}
 
       <Section tone="offwhite" id="cotisations">
-        <SectionHeading title="Cotisations annuelles" intro="Consultez les catégories d'adhésion et leurs cotisations." />
+        <SectionHeading eyebrow="Cotisations" title="Cotisations annuelles" intro="Consultez les catégories d'adhésion et leurs cotisations." />
         <Async state={cats} empty="Les catégories d'adhésion seront publiées prochainement.">
-          {(list) => feesPublished ? (
-            <ul className="grid gap-4 md:grid-cols-2">
-              {list.map((c) => (
-                <li key={c.slug} className="flex flex-col justify-between gap-3 rounded-2xl border border-navy/10 bg-offwhite p-5 transition-shadow hover:shadow-soft sm:flex-row sm:items-center sm:p-6">
-                  <h3 className="text-lg font-semibold text-navy">{c.name}</h3>
-                  <p className="shrink-0 font-heading text-xl font-bold text-green">
-                    {c.amount_fcfa !== null ? fmtFcfa(c.amount_fcfa) : "À confirmer"}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="rounded-2xl border border-navy/10 bg-white p-6 shadow-soft sm:p-8">
-              <ul className="grid gap-3 sm:grid-cols-2">{list.map((c, index) => (
-                <li key={c.slug} className="flex items-center gap-3 rounded-xl bg-offwhite px-4 py-3 font-semibold text-navy">
-                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white ${index % 3 === 0 ? "bg-green" : index % 3 === 1 ? "bg-purple" : "bg-gold"}`}>
-                    <UsersRound className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                  {c.name}
-                </li>))}</ul>
-              <p className="mt-6 flex items-start gap-2 border-t border-navy/10 pt-5 text-navy/75">
-                <BadgeCheck className="mt-0.5 h-5 w-5 shrink-0 text-gold" aria-hidden="true" />
-                Le montant de la cotisation vous est communiqué par la Coordination.
-              </p>
-            </div>)}
+          {(list) => (
+            <>
+              <ul className="grid gap-3 md:grid-cols-2">
+                {list.map((c) => (
+                  <li key={c.slug} className="card flex items-center justify-between gap-4 p-5">
+                    <span className="flex items-center gap-3 font-semibold leading-snug">
+                      <span className="icon-tile h-10 w-10"><UsersRound className="h-5 w-5" aria-hidden /></span>{c.name}</span>
+                    {feesPublished && <span className="shrink-0 font-heading text-lg font-bold text-green">{c.amount_fcfa !== null ? fmtFcfa(c.amount_fcfa) : "À confirmer"}</span>}
+                  </li>))}
+              </ul>
+              {!feesPublished && (
+                <p className="mt-6 flex items-start gap-2 text-navy/75"><BadgeCheck className="mt-0.5 h-5 w-5 shrink-0 text-gold" aria-hidden />
+                  Le montant de la cotisation vous est communiqué par la Coordination.</p>)}
+            </>)}
         </Async>
       </Section>
 
-      {steps && (
-        <Section>
-          <SectionHeading title={steps.title} intro="Quelques étapes pour rejoindre le réseau." />
-          <div className="rounded-2xl border border-navy/10 bg-white p-6 shadow-soft sm:p-8">
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-purple/10 text-purple">
-              <ClipboardList className="h-6 w-6" aria-hidden="true" />
-            </div>
-            <RichText text={steps.content} />
+      <Section id="formulaire">
+        <div className="grid gap-10 lg:grid-cols-[1fr_1.6fr] lg:gap-14">
+          <div className="lg:sticky lg:top-24 lg:self-start">
+            <SectionHeading eyebrow="Votre demande" title="Votre demande d'adhésion" intro="Complétez les informations ci-dessous pour rejoindre le réseau." />
+            {steps && (
+              <div className="-mt-4 card p-6">
+                <h3 className="mb-3 flex items-center gap-2 text-lg"><ClipboardList className="h-5 w-5 text-green" aria-hidden />{steps.title}</h3>
+                <RichText text={steps.content} />
+              </div>)}
           </div>
-        </Section>
-      )}
-
-      <Section tone="offwhite" id="formulaire">
-        <Container className="max-w-4xl !px-0">
-          <div className="overflow-hidden rounded-2xl border border-navy/10 bg-white shadow-soft">
-            <div className="border-b border-navy/10 bg-white px-6 py-6 sm:px-8">
-              <div className="flex items-center gap-3">
-                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-gold text-white">
-                  <UsersRound className="h-6 w-6" aria-hidden="true" />
-                </span>
-                <div>
-                  <h2 className="text-2xl sm:text-3xl">Votre demande d'adhésion</h2>
-                  <p className="mt-1 text-navy/70">Complétez les informations ci-dessous pour rejoindre le réseau.</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-6 sm:p-8">
-              <ConfigForm key={`${cats.data?.length}-${filters.data ? 1 : 0}`} endpoint="/memberships/" fields={fields} submitLabel="Envoyer ma demande d'adhésion"
-                successFallback="Merci. Votre demande a bien été transmise. La Coordination vous contactera sous 72 heures." />
-            </div>
+          <div className="card p-6 sm:p-8">
+            <ConfigForm key={`${cats.data?.length}-${filters.data ? 1 : 0}`} endpoint="/memberships/" fields={fields} submitLabel="Envoyer ma demande d'adhésion"
+              successFallback="Merci. Votre demande a bien été transmise. La Coordination vous contactera sous 72 heures." />
           </div>
-        </Container>
+        </div>
       </Section>
     </>
   );

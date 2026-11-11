@@ -1,14 +1,21 @@
+import { ArrowRight, Mail, Newspaper } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Async } from "../components/ui/Async";
-import { Section, SectionHeading } from "../components/ui/Container";
-import { HexPattern } from "../components/ui/HexPattern";
+import { Section } from "../components/ui/Container";
+import { PageHero } from "../components/ui/PageHero";
 import { Pagination } from "../components/ui/Pagination";
 import { NewsletterForm } from "../features/newsletter/NewsletterForm";
 import { useAsync } from "../hooks/useAsync";
 import { useSeo } from "../hooks/useSeo";
 import { getArticleCategories, listArticles } from "../services/api";
+import type { Article } from "../types/api";
 import { fmtDate } from "../utils/format";
-import { Newspaper, Filter, Mail } from "lucide-react";
+
+function Cover({ a, className }: { a: Pick<Article, "featured_image">; className: string }) {
+  return a.featured_image
+    ? <img src={a.featured_image} alt="" loading="lazy" className={`${className} object-cover`} />
+    : <div aria-hidden className={`${className} flex items-center justify-center bg-navy`}><Newspaper className="h-10 w-10 text-white/25" /></div>;
+}
 
 export default function News() {
   useSeo("Actualités – Urban Hub Connect", "Les nouvelles du réseau et des pôles de Diamniadio et du Lac Rose, les portraits d'acteurs et La Lettre du Hub.", undefined, true);
@@ -17,67 +24,59 @@ export default function News() {
   const cats = useAsync(getArticleCategories);
   const list = useAsync(() => listArticles({ category__slug: category, page }), [category, page]);
   const go = (k: string, v: string) => { const n = new URLSearchParams(params); v ? n.set(k, v) : n.delete(k); if (k !== "page") n.delete("page"); setParams(n); };
-  const chip = (active: boolean) => `min-h-[44px] rounded-full border px-4 font-semibold ${active ? "border-green bg-green text-white" : "border-navy/25 hover:bg-offwhite"}`;
+  const chip = (active: boolean) => `inline-flex min-h-[40px] shrink-0 items-center whitespace-nowrap rounded-full px-4 text-sm font-semibold transition-colors ${active ? "bg-navy text-white" : "bg-white text-navy/75 ring-1 ring-navy/15 hover:ring-navy/30"}`;
   return (
     <>
-      <section className="relative overflow-hidden bg-navy text-white">
-        <HexPattern className="text-white/[0.05]" />
-        <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green text-white">
-              <Newspaper className="h-6 w-6" />
-            </div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold">Actualités</h1>
-          </div>
-          <p className="mt-4 max-w-2xl text-xl text-white/85">
-            Les nouvelles du réseau et des pôles de Diamniadio et du Lac Rose, les portraits d'acteurs et La Lettre du Hub.
-          </p>
-        </div>
-      </section>
+      <PageHero eyebrow="Actualités" title="Les nouvelles du réseau"
+        intro="Les nouvelles du réseau et des pôles de Diamniadio et du Lac Rose, les portraits d'acteurs et La Lettre du Hub." />
 
-      <Section>
-        <div className="relative overflow-hidden rounded-2xl border border-navy/10 bg-white p-6 shadow-soft">
-          <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-green opacity-10" />
-          <div className="flex items-center gap-2 mb-4">
-            <Filter className="h-5 w-5 text-green" />
-            <h3 className="text-lg font-bold text-navy">Filtrer par catégorie</h3>
-          </div>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Catégories">
-            <button className={chip(!category)} aria-pressed={!category} onClick={() => go("categorie", "")}>Toutes</button>
-            {cats.data?.map((c) => <button key={c.slug} className={chip(category === c.slug)} aria-pressed={category === c.slug} onClick={() => go("categorie", c.slug)}>{c.name}</button>)}
-          </div>
+      <Section tone="offwhite" className="!pt-10 sm:!pt-12">
+        <div role="group" aria-label="Catégories" className="-mx-4 mb-8 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden">
+          <button className={chip(!category)} aria-pressed={!category} onClick={() => go("categorie", "")}>Toutes</button>
+          {cats.data?.map((c) => <button key={c.slug} className={chip(category === c.slug)} aria-pressed={category === c.slug} onClick={() => go("categorie", c.slug)}>{c.name}</button>)}
         </div>
-      </Section>
-
-      <Section>
-        <SectionHeading title="Dernières actualités" intro="Restez informé de l'actualité du réseau." />
         <Async state={list} isEmpty={(d) => !d.results.length} empty="Aucune actualité n'est publiée pour le moment.">
-          {(d) => (<>
-            <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{d.results.map((a) => (
-              <li key={a.slug} className="group relative overflow-hidden rounded-2xl border border-navy/10 bg-white shadow-soft transition-all hover:border-green hover:shadow-lg">
-                {a.featured_image && <img src={a.featured_image} alt="" loading="lazy" className="aspect-video w-full object-cover" />}
-                <div className="p-5">
-                  <p className="text-sm text-navy/70">{a.category_name} · {fmtDate(a.published_at)}</p>
-                  <h2 className="mt-2 text-xl font-bold leading-snug text-navy"><Link to={`/actualites/${a.slug}`} className="hover:text-green transition-colors">{a.title}</Link></h2>
-                  {a.excerpt && <p className="mt-3 text-navy/75 line-clamp-3">{a.excerpt}</p>}
-                </div>
-              </li>))}</ul>
-            <Pagination page={page} pages={Math.ceil(d.count / 12)} onChange={(p) => go("page", String(p))} />
-          </>)}
+          {(d) => {
+            const [first, ...rest] = d.results;
+            const showFeature = page === 1 && !category;
+            const cards = showFeature ? rest : d.results;
+            return (<>
+              {showFeature && first && (
+                <article className="group card card-hover relative mb-6 grid overflow-hidden md:grid-cols-[1.2fr_1fr]">
+                  <Cover a={first} className="aspect-video h-full w-full md:aspect-auto md:min-h-[20rem]" />
+                  <div className="flex flex-col justify-center p-6 sm:p-9">
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-green">{first.category_name} · {fmtDate(first.published_at)}</p>
+                    <h2 className="mt-3 text-2xl leading-tight sm:text-3xl">
+                      <Link to={`/actualites/${first.slug}`} className="after:absolute after:inset-0">{first.title}</Link>
+                    </h2>
+                    {first.excerpt && <p className="mt-3 line-clamp-4 text-navy/70">{first.excerpt}</p>}
+                    <span className="mt-5 inline-flex items-center gap-1.5 font-semibold text-green">Lire l'article<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden /></span>
+                  </div>
+                </article>)}
+              {!!cards.length && (
+                <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{cards.map((a) => (
+                  <li key={a.slug} className="group card card-hover relative flex flex-col overflow-hidden">
+                    <Cover a={a} className="aspect-video w-full" />
+                    <div className="flex flex-1 flex-col p-5 sm:p-6">
+                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-green">{a.category_name} · {fmtDate(a.published_at)}</p>
+                      <h2 className="mt-2 text-lg leading-snug"><Link to={`/actualites/${a.slug}`} className="after:absolute after:inset-0">{a.title}</Link></h2>
+                      {a.excerpt && <p className="mt-2 line-clamp-3 text-navy/70">{a.excerpt}</p>}
+                    </div>
+                  </li>))}</ul>)}
+              <Pagination page={page} pages={Math.ceil(d.count / 12)} onChange={(p) => go("page", String(p))} />
+            </>);
+          }}
         </Async>
       </Section>
 
-      <Section tone="offwhite" id="lettre-du-hub">
-        <div className="relative overflow-hidden rounded-2xl border border-navy/10 bg-white p-8 shadow-soft">
-          <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-purple opacity-10" />
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-xl bg-purple text-white">
-            <Mail className="h-8 w-8" />
+      <Section id="lettre-du-hub">
+        <div className="grid gap-8 rounded-3xl bg-navy p-6 text-white sm:p-12 lg:grid-cols-[1fr_1.2fr] lg:items-center">
+          <div>
+            <span className="icon-tile bg-white/10 text-gold-light"><Mail className="h-5 w-5" aria-hidden /></span>
+            <h2 className="mt-5 text-3xl text-white">La Lettre du Hub</h2>
+            <p className="mt-3 text-lg text-white/75">Chaque mois, l'agenda du réseau, les nouveaux membres, les opportunités et les portraits d'acteurs du territoire.</p>
           </div>
-          <h2 className="mt-6 text-3xl font-bold text-navy">La Lettre du Hub</h2>
-          <p className="mt-3 max-w-3xl text-lg text-navy/75">Chaque mois, l'agenda du réseau, les nouveaux membres, les opportunités et les portraits d'acteurs du territoire.</p>
-          <div className="mt-8">
-            <NewsletterForm variant="full" />
-          </div>
+          <div className="rounded-2xl bg-white p-5 text-navy sm:p-7"><NewsletterForm variant="full" /></div>
         </div>
       </Section>
     </>
