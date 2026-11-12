@@ -16,7 +16,7 @@ CONTENT = """Institutions, entreprises, investisseurs, écoles, associations, co
 
 Le réseau sera officiellement lancé lors de la première édition du Grand Week-End du Pôle, les vendredi 11 et samedi 12 décembre 2026 : ouverture officielle, Forum du Pôle en quatre panels, rendez-vous d'affaires, grand reboisement du Lac Rose, Awards et Gala du Pôle.
 
-Les organisations qui souhaitent devenir membres fondateurs ou partenaires peuvent dès à présent contacter la Coordination au +221 78 309 56 56 ou à infosurbanhubconnect@gmail.com."""
+Les organisations qui souhaitent devenir membres fondateurs ou partenaires peuvent dès à présent contacter la Coordination au +221 78 309 56 56 ou à infos@urbanhubconnect.com."""
 
 
 def seed_first_article():

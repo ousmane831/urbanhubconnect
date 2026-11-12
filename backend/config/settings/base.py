@@ -95,13 +95,15 @@ EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
 EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = True
-CONTACT_RECIPIENT = config("CONTACT_RECIPIENT", default="infosurbanhubconnect@gmail.com")
+# Reçoit la copie des messages du formulaire Contact.
+CONTACT_RECIPIENT = config("CONTACT_RECIPIENT", default="coordination@urbanhubconnect.com")
 
 REST_FRAMEWORK["COERCE_DECIMAL_TO_STRING"] = False
 # Emprise géographique acceptée (Sénégal) : détecte les latitudes/longitudes inversées.
 GEO_BOUNDS = {"lat_min": 12.0, "lat_max": 17.0, "lon_min": -18.0, "lon_max": -11.0}
 
-DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default=EMAIL_HOST_USER or "noreply@urbanhubconnect.com")
+# Expéditeur de tous les e-mails du site (confirmations, badges, invitations, rappels).
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default=EMAIL_HOST_USER or "coordination@urbanhubconnect.com")
 
 SITE_URL = config("SITE_URL", default="https://www.urbanhubconnect.com").rstrip("/")
 

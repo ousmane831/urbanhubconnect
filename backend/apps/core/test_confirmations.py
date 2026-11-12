@@ -87,3 +87,36 @@ class ConfirmationTests(APITestCase):
         from unittest import mock
         with mock.patch("apps.core.confirmations.send_mail", side_effect=OSError("SMTP indisponible")):
             self.post("/api/partnerships/", {"company": "X", "contact_name": "Awa", "phone": "77", "email": "p@x.org", "accept_privacy": True})
+
+
+class ProfessionalAddressTests(APITestCase):
+    def setUp(self):
+        call_command("seed_initial_data", stdout=StringIO())
+        mail.outbox.clear()
+
+    def test_signature_uses_the_site_settings_and_replies_reach_the_coordination(self):
+        from django.conf import settings
+        from apps.core.models import SiteSettings
+        SiteSettings.objects.update_or_create(pk=1, defaults={"email": "infos@urbanhubconnect.com"})
+        self.client.post("/api/press/accreditation/", {"media": "RFM", "name": "Awa", "phone": "77", "email": "j@x.org"}, format="json")
+        msg = [m for m in mail.outbox if m.to == ["j@x.org"]][0]
+        self.assertIn("infos@urbanhubconnect.com", msg.body)
+        self.assertNotIn("gmail", msg.body)
+        self.assertEqual(msg.from_email, settings.DEFAULT_FROM_EMAIL)
+
+    def test_migration_replaces_the_old_address_only(self):
+        from importlib import import_module
+        from django.apps import apps as django_apps
+        from apps.core.models import SiteSettings
+        from apps.news.models import Article
+        old = "infosurbanhubconnect@gmail.com"
+        SiteSettings.objects.update_or_create(pk=1, defaults={"email": old})
+        art = Article.objects.first()
+        Article.objects.filter(pk=art.pk).update(content=f"Écrivez à {old}.")
+        import_module("apps.core.migrations.0006_sitesettings_email_pro").forwards(django_apps, None)
+        self.assertEqual(SiteSettings.load().email, "infos@urbanhubconnect.com")
+        art.refresh_from_db()
+        self.assertEqual(art.content, "Écrivez à infos@urbanhubconnect.com.")
+        SiteSettings.objects.filter(pk=1).update(email="autre@urbanhubconnect.com")  # choix fait dans l'admin : conservé
+        import_module("apps.core.migrations.0006_sitesettings_email_pro").forwards(django_apps, None)
+        self.assertEqual(SiteSettings.load().email, "autre@urbanhubconnect.com")

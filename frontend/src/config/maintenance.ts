@@ -16,5 +16,5 @@ export const MAINTENANCE_CONFIG = {
   MESSAGE: "Nous travaillons activement pour vous offrir une expérience exceptionnelle.",
   
   // Email de contact affiché sur la page de maintenance
-  CONTACT_EMAIL: "contact@urbanhubconnect.com",
+  CONTACT_EMAIL: "infos@urbanhubconnect.com",
 };

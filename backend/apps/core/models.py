@@ -21,7 +21,7 @@ class SiteSettings(models.Model):
     site_name = models.CharField(max_length=120, default="Urban Hub Connect")
     phone = models.CharField(max_length=30, default="+221 78 309 56 56")
     whatsapp = models.CharField(max_length=30, default="221783095656", help_text="Format international sans +")
-    email = models.EmailField(default="infosurbanhubconnect@gmail.com")
+    email = models.EmailField(default="infos@urbanhubconnect.com")
     address = models.CharField(max_length=255, default="SD City, Villa 115, Pôle urbain de Diamniadio")
     linkedin = models.URLField(blank=True)
     facebook = models.URLField(blank=True)

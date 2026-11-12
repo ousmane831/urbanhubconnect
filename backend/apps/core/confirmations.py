@@ -11,8 +11,12 @@ from django.core.mail import send_mail
 
 logger = logging.getLogger(__name__)
 
-SIGNATURE = ("\n\nUrban Hub Connect · Coordination\n+221 78 309 56 56 (appel et WhatsApp) · infosurbanhubconnect@gmail.com\n"
-             "www.urbanhubconnect.com\n\nCet e-mail confirme la réception de votre demande ; inutile d'y répondre.")
+def signature():
+    """Coordonnées lues dans les Paramètres du site : un changement dans l'admin s'applique aussi aux e-mails."""
+    from .models import SiteSettings
+    s = SiteSettings.load()
+    return (f"\n\nUrban Hub Connect · Coordination\n{s.phone} (appel et WhatsApp) · {s.email}\n{settings.SITE_URL.replace('https://', '')}\n\n"
+            "Cet e-mail confirme la réception de votre demande. Pour toute question, répondez simplement à ce message.")
 
 
 def _lines(*pairs):
@@ -104,7 +108,7 @@ def send_confirmation(obj):
         to, subject, body = build(obj)
         if not to:
             return False
-        send_mail(subject, body + SIGNATURE, settings.DEFAULT_FROM_EMAIL, [to], fail_silently=False)
+        send_mail(subject, body + signature(), settings.DEFAULT_FROM_EMAIL, [to], fail_silently=False)
         return True
     except Exception:
         logger.exception("Confirmation non envoyée (%s %s)", type(obj).__name__, getattr(obj, "pk", ""))

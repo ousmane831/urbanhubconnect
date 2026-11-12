@@ -63,7 +63,7 @@ class FormSubmissionTests(FormsBase):
         r = self.post("/api/contact/", {"name": "N", "email": "n@x.org", "subject": "press", "message": "Bonjour", "consent": True})
         self.assertEqual(r.status_code, 201)
         self.assertTrue(ContactMessage.objects.get().email_sent)
-        self.assertEqual(mail.outbox[0].to, ["infosurbanhubconnect@gmail.com"])
+        self.assertEqual(mail.outbox[0].to, ["coordination@urbanhubconnect.com"])
         self.assertEqual(mail.outbox[0].reply_to, ["n@x.org"])
 
     def test_contact_rejects_unknown_subject_and_missing_consent(self):

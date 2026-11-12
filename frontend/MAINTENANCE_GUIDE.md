@@ -21,7 +21,7 @@ Ouvrez le fichier `frontend/src/config/maintenance.ts` et modifiez le mot de pas
 export const MAINTENANCE_CONFIG = {
   PASSWORD: "votre-nouveau-mot-de-passe",
   MESSAGE: "Votre message personnalisé",
-  CONTACT_EMAIL: "contact@urbanhubconnect.com",
+  CONTACT_EMAIL: "infos@urbanhubconnect.com",
 };
 ```
 
