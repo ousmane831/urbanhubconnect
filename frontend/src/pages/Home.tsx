@@ -1,8 +1,14 @@
 import {
   ArrowRight, Briefcase, Building2, CalendarDays, GraduationCap, HandHeart, Landmark, Map, MapPin, Network, Store, Users, UsersRound,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import heroImage from "../assets/banner.png";
+import diamniadioImage from "../assets/diamniadio.png";
+import lacRoseImage from "../assets/lac_rose.jpg";
+import agirImage from "../assets/agir.jpeg";
+import connecterImage from "../assets/connecter.jpeg";
+import cooperImage from "../assets/cooperer.jpeg";
 import { Countdown } from "../components/Countdown";
 import { Button } from "../components/ui/Button";
 import { CtaBand, FeatureCard } from "../components/ui/Card";
@@ -23,10 +29,35 @@ const PROFILES = [
   { name: "Jeunes et communautés", icon: Users },
 ];
 const PILLARS = [
-  { verb: "Connecter", text: "Trouver les acteurs du territoire, leurs activités, leurs offres et leurs besoins.", to: "/annuaire", icon: Network, cta: "Explorer l'Annuaire" },
-  { verb: "Coopérer", text: "Rejoindre une commission thématique et construire des projets avec les autres membres.", to: "/nos-actions", icon: HandHeart, cta: "Découvrir nos actions" },
-  { verb: "Agir", text: "Devenir membre du réseau et prendre part à la vie des deux pôles.", to: "/adherer", icon: UsersRound, cta: "Adhérer au réseau" },
+  { verb: "Connecter", text: "Trouver les acteurs du territoire, leurs activités, leurs offres et leurs besoins.", to: "/annuaire", icon: Network, cta: "Explorer l'Annuaire",
+    image: connecterImage, alt: "Rencontre entre professionnels dans un hall", accent: "bg-green" },
+  { verb: "Coopérer", text: "Rejoindre une commission thématique et construire des projets avec les autres membres.", to: "/nos-actions", icon: HandHeart, cta: "Découvrir nos actions",
+    image: cooperImage, alt: "Groupe de travail autour de plans posés sur une table", accent: "bg-gold" },
+  { verb: "Agir", text: "Devenir membre du réseau et prendre part à la vie des deux pôles.", to: "/adherer", icon: UsersRound, cta: "Adhérer au réseau",
+    image: agirImage, alt: "Plantation d'arbres au bord du Lac Rose", accent: "bg-green" },
 ];
+
+/** Carte photo cliquable : la photo en haut, entièrement visible ; le texte en dessous, sur fond blanc, parfaitement lisible. */
+function PhotoCard({ to, image, alt, accent, icon: Icon, title, cta, compact = false, children }: {
+  to: string; image: string; alt: string; accent: string; icon: LucideIcon; title: string; cta: string; compact?: boolean; children: React.ReactNode;
+}) {
+  return (
+    <Link to={to} className="group card card-hover flex h-full flex-col overflow-hidden focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green/40">
+      <div className={`relative overflow-hidden bg-navy ${compact ? "aspect-[16/9]" : "aspect-[16/9] sm:aspect-[2/1]"}`}>
+        <img src={image} alt={alt} loading="lazy" decoding="async"
+          className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
+        <span aria-hidden className={`absolute bottom-0 left-0 h-1.5 w-full ${accent}`} />
+      </div>
+      <div className={`flex flex-1 flex-col ${compact ? "p-6 sm:p-7" : "p-6 sm:p-8"}`}>
+        <h3 className={`flex items-center gap-2.5 text-navy ${compact ? "text-lg leading-snug sm:text-xl" : "text-2xl sm:text-3xl"}`}>
+          <Icon className={`shrink-0 text-green ${compact ? "h-5 w-5" : "h-6 w-6"}`} aria-hidden />{title}
+        </h3>
+        <p className={`mt-2 flex-1 leading-relaxed text-navy/75 ${compact ? "" : "text-base sm:text-lg"}`}>{children}</p>
+        <span className={`mt-5 inline-flex items-center gap-1.5 font-semibold text-green ${compact ? "text-sm" : ""}`}>{cta}<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden /></span>
+      </div>
+    </Link>
+  );
+}
 
 /** Bandeau événement : reste affiché jusqu'à la fin de l'événement (filtre « à venir » côté API) ;
  *  le compte à rebours vise le début (vendredi 11 décembre 2026, 9 h 30 à Dakar). Texte fixé par la note du 5 novembre 2026. */
@@ -111,7 +142,8 @@ export default function Home() {
       <Section>
         <SectionHeading eyebrow="Notre mission" title="Connecter · Coopérer · Agir" intro="Trois façons de prendre part à la vie des pôles urbains de Diamniadio et du Lac Rose." />
         <div className="grid gap-5 md:grid-cols-3">
-          {PILLARS.map((p) => <FeatureCard key={p.verb} icon={p.icon} title={p.verb} to={p.to} cta={p.cta}>{p.text}</FeatureCard>)}
+          {PILLARS.map((p) => (
+            <PhotoCard key={p.verb} to={p.to} image={p.image} alt={p.alt} accent={p.accent} icon={p.icon} title={p.verb} cta={p.cta} compact>{p.text}</PhotoCard>))}
         </div>
       </Section>
 
@@ -120,16 +152,13 @@ export default function Home() {
         <SectionHeading eyebrow="Le territoire" title="Deux pôles, un même territoire" action={<Button to="/cartographie" variant="secondary"><Map className="h-4 w-4" aria-hidden />Ouvrir la Cartographie</Button>} />
         <div className="grid gap-5 md:grid-cols-2">
           {[
-            { name: "Diamniadio", pole: "DIAMNIADIO", description: "Pôle urbain en plein essor", accent: "bg-green" },
-            { name: "Lac Rose", pole: "LAC_ROSE", description: "Territoire touristique et culturel", accent: "bg-gold" },
+            { name: "Diamniadio", pole: "DIAMNIADIO", description: "Pôle urbain en plein essor", accent: "bg-green", image: diamniadioImage,
+              alt: "Vue aérienne du pôle urbain de Diamniadio au coucher du soleil" },
+            { name: "Lac Rose", pole: "LAC_ROSE", description: "Territoire touristique et culturel", accent: "bg-gold", image: lacRoseImage,
+              alt: "Vue aérienne d'un lac aux eaux roses" },
           ].map((p) => (
-            <Link key={p.pole} to={`/cartographie?pole=${p.pole}`} className="group card card-hover relative flex min-h-[13rem] flex-col justify-end overflow-hidden p-7 sm:p-9">
-              <span aria-hidden className={`absolute left-0 top-0 h-1.5 w-full ${p.accent}`} />
-              <MapPin className="absolute right-7 top-8 h-10 w-10 text-navy/10 transition-colors group-hover:text-green/30" aria-hidden />
-              <h3 className="text-3xl sm:text-4xl">{p.name}</h3>
-              <p className="mt-2 text-lg text-navy/70">{p.description}</p>
-              <span className="mt-6 inline-flex items-center gap-1.5 font-semibold text-green">Voir sur la carte<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden /></span>
-            </Link>))}
+            <PhotoCard key={p.pole} to={`/cartographie?pole=${p.pole}`} image={p.image} alt={p.alt} accent={p.accent} icon={MapPin} title={p.name}
+              cta="Voir sur la carte">{p.description}</PhotoCard>))}
         </div>
       </Section>
 
