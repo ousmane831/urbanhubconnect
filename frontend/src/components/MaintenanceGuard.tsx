@@ -11,7 +11,7 @@ export const MaintenanceGuard: React.FC<MaintenanceGuardProps> = ({ children }) 
 
   // Mode maintenance : désactivé pour l'instant
   // Changez cette variable à true pour activer la page de maintenance
-  const MAINTENANCE_MODE = true;
+  const MAINTENANCE_MODE = false;
 
   if (isLoading) {
     return (
