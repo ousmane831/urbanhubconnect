@@ -6,6 +6,7 @@ import { passwordProblem } from "../features/members/password";
 import { useSeo } from "../hooks/useSeo";
 import { memberApi } from "../services/members";
 import { apiErrorMessage } from "../utils/errors";
+import { ErrorMessage, SuccessMessage } from "../components/forms/FormMessage";
 
 export default function SetPassword() {
   useSeo("Créer votre mot de passe – Urban Hub Connect", "Choisissez le mot de passe de votre accès à l'Espace membres.", undefined, true);
@@ -33,7 +34,7 @@ export default function SetPassword() {
       {!uid || !token ? (
         <p role="alert" className="mt-6 rounded-lg border border-red-300 bg-red-50 p-4 font-semibold text-red-900">Ce lien est incomplet. Utilisez le lien reçu par e-mail ou « Mot de passe oublié ».</p>
       ) : done ? (
-        <div role="status" className="mt-6 space-y-5"><p className="rounded-lg border border-green/40 bg-green/5 p-4 text-lg">{done}</p><Button to="/espace-membres">Me connecter</Button></div>
+        <div className="mt-6 space-y-5"><SuccessMessage>{done}</SuccessMessage><Button to="/espace-membres">Me connecter</Button></div>
       ) : (
         <form onSubmit={submit} className="mt-6 space-y-5">
           <p className="text-navy/80">Au moins 10 caractères, pas uniquement des chiffres.</p>
@@ -41,7 +42,7 @@ export default function SetPassword() {
             <input id="pw1" type="password" className="field" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
           <div><label htmlFor="pw2" className="mb-1.5 block font-semibold">Confirmer le mot de passe</label>
             <input id="pw2" type="password" className="field" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required /></div>
-          {error && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 font-semibold text-red-900">{error}</p>}
+          {error && <ErrorMessage>{error}</ErrorMessage>}
           <button disabled={busy} className="min-h-[48px] rounded-lg bg-green px-8 text-lg font-semibold text-white hover:bg-green-2 disabled:opacity-60">{busy ? "Enregistrement…" : "Enregistrer le mot de passe"}</button>
         </form>)}
     </Container>

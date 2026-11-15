@@ -6,6 +6,7 @@ import { submitForm } from "../../services/api";
 import { apiErrorMessage, applyServerErrors } from "../../utils/errors";
 import { FormField, fieldProps } from "./FormField";
 import { Honeypot } from "./Honeypot";
+import { ErrorMessage, SuccessMessage } from "./FormMessage";
 
 export interface FieldDef {
   name: string; label: string; type: "text" | "email" | "tel" | "textarea" | "select" | "multi" | "consent" | "check";
@@ -46,7 +47,7 @@ export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, s
     catch (e) { if (!applyServerErrors(e, setError as never)) setFailure(apiErrorMessage(e)); }
   };
 
-  if (done) return <p role="status" className="rounded-lg border border-green/40 bg-green/5 p-5 text-lg">{done}</p>;
+  if (done) return <SuccessMessage>{done}</SuccessMessage>;
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="relative grid gap-5 sm:grid-cols-2">
       <Honeypot register={register} />
@@ -78,7 +79,7 @@ export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, s
               : <input type={f.type} className="field" {...fieldProps(id, e)} {...register(f.name)} />}
           </FormField>);
       })}
-      {failure && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-4 font-semibold text-red-900 sm:col-span-2">{failure}</p>}
+      {failure && <ErrorMessage className="sm:col-span-2">{failure}</ErrorMessage>}
       <div className="sm:col-span-2">
         <button disabled={isSubmitting} className="inline-flex min-h-[52px] w-full items-center justify-center rounded-lg bg-green px-8 text-lg font-semibold text-white shadow-sm transition-colors hover:bg-green-2 disabled:opacity-60 sm:w-auto">
           {isSubmitting ? "Envoi en cours…" : submitLabel}
