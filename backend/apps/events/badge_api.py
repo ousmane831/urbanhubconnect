@@ -37,6 +37,18 @@ def badge_qr(request, token):
 @api_view(["GET"])
 @authentication_classes([])
 @permission_classes([AllowAny])
+def badge_image(request, token):
+    """Badge complet (PNG) : le même que dans l'e-mail et à l'impression."""
+    response = HttpResponse(badges.badge_png(_get(token)), content_type="image/png")
+    response["Cache-Control"] = "private, max-age=300"  # court : la fonction ou l'organisation peuvent être corrigées
+    if request.query_params.get("telecharger"):
+        response["Content-Disposition"] = 'attachment; filename="badge-grand-week-end.png"'
+    return response
+
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def planting_seats(request):
     seats = EventRequest.planting_remaining()
     from apps.core.models import SiteSettings

@@ -47,6 +47,8 @@ export interface UnsubscribeState { email: string; unsubscribed: boolean }
 export const getUnsubscribe = (token: string) => get<UnsubscribeState>(`/unsubscribe/${encodeURIComponent(token)}/`);
 export const confirmUnsubscribe = (token: string) =>
   http.post<UnsubscribeState>(`/unsubscribe/${encodeURIComponent(token)}/`).then((r) => r.data);
+export const badgeImageUrl = (token: string, download = false) =>
+  `${import.meta.env.VITE_API_URL ?? "/api"}/badges/${encodeURIComponent(token)}/badge.png${download ? "?telecharger=1" : ""}`;
 export const badgeQrUrl = (token: string) => `${import.meta.env.VITE_API_URL ?? "/api"}/badges/${encodeURIComponent(token)}/qr.png`;
 export const getPressReleases = () => get<PressRelease[]>("/press/");
 export const getDocuments = (category?: string) => get<DocumentItem[]>("/documents/", { category });

@@ -1,10 +1,9 @@
-import { ArrowLeft, CheckCheck, Printer, Trees } from "lucide-react";
+import { ArrowLeft, CheckCheck, Printer } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import logo from "../assets/logo.png";
 import { Loading } from "../components/ui/States";
 import { useSeo } from "../hooks/useSeo";
-import { badgeQrUrl } from "../services/api";
+import { badgeImageUrl } from "../services/api";
 import { coordApi, type BadgePrintList, type PrintBadge } from "../services/coordination";
 import { apiErrorMessage } from "../utils/errors";
 
@@ -20,33 +19,12 @@ const PRINT_CSS = `
 .sheet { width: 210mm; height: 297mm; display: grid; grid-template-columns: 105mm 105mm; grid-template-rows: 148.5mm 148.5mm;
   background: #fff; margin: 0 auto 12mm; box-shadow: 0 2px 12px rgb(14 34 64 / .15); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .cell { border: 0.2mm dashed #c9ced6; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.badge { width: 97mm; height: 140mm; display: flex; flex-direction: column; overflow: hidden; border-radius: 3mm; }
+.badge { width: 97mm; height: 140mm; display: block; }
 `;
 
-function Badge({ b, event }: { b: PrintBadge; event: BadgePrintList["event"] }) {
-  const long = b.name.length > 24;
-  return (
-    <div className="badge border border-navy/15">
-      <div className="flex h-[17mm] items-center justify-center bg-white px-[5mm]">
-        <img src={logo} alt="Urban Hub Connect" className="h-[11mm] w-auto" />
-      </div>
-      <div className="border-b-[1.2mm] border-gold bg-navy px-[5mm] py-[3.5mm] text-center text-white">
-        <p className="font-heading text-[5.2mm] font-extrabold uppercase leading-tight tracking-wide">{event.title.replace(/\s+\d{4}$/, "")}</p>
-        {event.dates && <p className="mt-[1mm] text-[3.4mm] font-semibold text-gold-light">{event.dates}</p>}
-        {event.location && <p className="text-[3mm] text-white/80">{event.location}</p>}
-      </div>
-      <div className="flex flex-1 flex-col items-center px-[5mm] pt-[5mm] text-center text-navy">
-        <p className={`font-heading font-extrabold leading-tight ${long ? "text-[6mm]" : "text-[7mm]"}`}>{b.name}</p>
-        {b.job_title && <p className="mt-[1.5mm] text-[3.8mm] leading-snug">{b.job_title}</p>}
-        {b.organization && <p className="mt-[1.5mm] text-[4.2mm] font-bold leading-snug">{b.organization}</p>}
-        <img src={badgeQrUrl(b.token)} alt="" className="mt-auto h-[38mm] w-[38mm]" />
-        <div className="mb-[3mm] mt-[2mm] flex w-full items-center justify-between text-[2.8mm] text-navy/60">
-          <span>N° {String(b.number).padStart(4, "0")}</span>
-          {b.planting && <span className="inline-flex items-center gap-[1mm] font-semibold text-green"><Trees className="h-[3mm] w-[3mm]" aria-hidden />Reboisement</span>}
-        </div>
-      </div>
-    </div>
-  );
+/** Image du badge générée par le serveur : exactement celle reçue par e-mail par le participant. */
+function Badge({ b }: { b: PrintBadge }) {
+  return <img src={badgeImageUrl(b.token)} alt={`Badge n° ${b.number} : ${b.name}`} className="badge" />;
 }
 
 const chunk = <T,>(items: T[], size: number) => Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, i * size + size));
@@ -106,7 +84,7 @@ export default function BadgePrint() {
       {!data.badges.length
         ? <p className="mx-auto mt-10 max-w-lg text-center text-navy/70">Aucun badge à imprimer{onlyNew ? " : tous les badges ont déjà été imprimés." : "."}</p>
         : <div className="mt-6 overflow-x-auto">{chunk(data.badges, 4).map((page, i) => (
-            <div key={i} className="sheet">{page.map((b) => <div key={b.id} className="cell"><Badge b={b} event={data.event} /></div>)}</div>))}
+            <div key={i} className="sheet">{page.map((b) => <div key={b.id} className="cell"><Badge b={b} /></div>)}</div>))}
           </div>}
     </div>
   );

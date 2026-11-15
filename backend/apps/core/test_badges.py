@@ -169,3 +169,23 @@ class PrintTests(Base):
     def test_staff_only(self):
         self.assertIn(APIClient().get("/api/coordination/badges/print/").status_code, (401, 403))
         self.assertIn(APIClient().get("/api/coordination/badges/qr.zip").status_code, (401, 403))
+
+
+class BadgeImageTests(Base):
+    """Le badge envoyé par e-mail est l'image qui sera imprimée (nom, fonction, organisation, QR code, numéro)."""
+
+    def test_email_carries_the_full_badge_image_and_the_page_serves_the_same(self):
+        from PIL import Image
+        import io as _io
+        self.register("a@x.org", job_title="Directrice générale")
+        reg = EventRequest.objects.get()
+        msg = mail.outbox[-1]
+        attached = next(a for a in msg.attachments if getattr(a, "get_content_type", lambda: "")() == "image/png")
+        png = attached.get_payload(decode=True)
+        self.assertEqual(Image.open(_io.BytesIO(png)).size, (970, 1400))
+        served = self.client.get(f"/api/badges/{reg.badge_token}/badge.png")
+        self.assertEqual(served.status_code, 200)
+        self.assertEqual(served["Content-Type"], "image/png")
+        self.assertEqual(served.content, png)  # identique à l'e-mail
+        z = __import__("zipfile").ZipFile(_io.BytesIO(self.staff().get("/api/coordination/badges/qr.zip").content))
+        self.assertIn("badges/0001-Awa-Ndiaye.png", z.namelist())

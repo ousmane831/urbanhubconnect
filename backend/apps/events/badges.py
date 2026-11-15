@@ -64,6 +64,15 @@ def qr_png(r, scale=10):
     return buf.getvalue()
 
 
+def badge_png(r):
+    """Image complète du badge : identique dans l'e-mail, sur la page « Mon badge » et à l'impression."""
+    from .badge_image import render
+    info = event_info()
+    return render(name=r.name, job_title=r.job_title, organization=r.organization, number=ensure_number(r),
+                  planting=r.wants_planting, event_title=re.sub(r"\s+\d{4}$", "", info["title"]), dates=info["dates"],
+                  location=info["location"], qr_data=badge_url(r))
+
+
 def event_info():
     e = Event.objects.filter(slug=EVENT_SLUG).first()
     if not e:
@@ -85,15 +94,16 @@ def payload(r):
 
 
 def send_badge(r):
-    """Envoie (ou renvoie) le badge par e-mail, avec le QR code dans le message. Retourne True si l'e-mail est parti."""
-    info, url, png = event_info(), badge_url(r), qr_png(r)
+    """Envoie (ou renvoie) le badge par e-mail : l'image du badge (celle qui sera imprimée) dans le message et en pièce jointe.
+    Retourne True si l'e-mail est parti."""
+    info, url, png = event_info(), badge_url(r), badge_png(r)
     choices = payload(r)["options"]
     planting = ("\nVotre place dans le convoi du reboisement (vendredi après-midi) est réservée. Pensez à des chaussures fermées, "
                 "un couvre-chef et de l'eau.\n") if r.wants_planting else ""
     text = (f"Bonjour {r.name},\n\nVotre inscription au {info['title']} est confirmée"
             + (f" ({info['dates']} · {info['location']})" if info["dates"] else "") + ".\n\n"
             "Vos temps du programme :\n" + "\n".join(f"- {c}" for c in choices) + "\n" + planting +
-            f"\nVotre badge (QR code) est joint à ce message. Présentez-le à l'accueil, sur votre téléphone ou imprimé : "
+            f"\nVotre badge est joint à ce message. Présentez-le à l'accueil, sur votre téléphone ou imprimé : "
             f"il est valable pour les deux journées.\nVous pouvez aussi l'afficher à tout moment ici : {url}\n\n"
             "Le Gala du Pôle ne fait pas partie de cette inscription : il est accessible sur invitation et par la billetterie commune avec The Ground.\n\n"
             "Contact : +221 78 309 56 56 (appel et WhatsApp)\n\nUrban Hub Connect")
@@ -103,10 +113,9 @@ def send_badge(r):
 <p>Votre inscription au <strong>{escape(info['title'])}</strong> est confirmée{(' (' + escape(info['dates']) + ' · ' + escape(info['location']) + ')') if info['dates'] else ''}.</p>
 <p style="margin-bottom:4px"><strong>Vos temps du programme :</strong></p><ul style="margin-top:0">{items}</ul>
 {'<p><strong>Votre place dans le convoi du reboisement est réservée.</strong> Pensez à des chaussures fermées, un couvre-chef et de l’eau.</p>' if r.wants_planting else ''}
-<div style="text-align:center;border:2px solid #1E5C3F;border-radius:12px;padding:16px;margin:20px 0">
-<p style="margin:0 0 8px;font-weight:bold">Votre badge · {escape(r.name)}</p>
-<img src="cid:badge" alt="QR code de votre badge" width="240" height="240" style="display:block;margin:0 auto">
-<p style="margin:8px 0 0;font-size:13px">À présenter à l’accueil, sur votre téléphone ou imprimé. Valable pour les deux journées.</p>
+<div style="text-align:center;margin:20px 0">
+<img src="cid:badge" alt="Votre badge pour le {escape(info['title'])}" width="300" height="433" style="display:block;margin:0 auto;max-width:100%;height:auto;border:1px solid #d0d5dd;border-radius:8px">
+<p style="margin:10px 0 0;font-size:13px">À présenter à l’accueil, sur votre téléphone ou imprimé. Valable pour les deux journées.</p>
 </div>
 <p>Vous pouvez aussi afficher votre badge à tout moment : <a href="{url}">{url}</a></p>
 <p style="font-size:13px;color:#555">Le Gala du Pôle ne fait pas partie de cette inscription : il est accessible sur invitation et par la billetterie commune avec The Ground.<br>Contact : +221 78 309 56 56 (appel et WhatsApp)</p>
@@ -116,7 +125,7 @@ def send_badge(r):
     msg.mixed_subtype = "related"
     img = MIMEImage(png, "png")
     img.add_header("Content-ID", "<badge>")
-    img.add_header("Content-Disposition", "inline", filename="badge-grand-week-end.png")
+    img.add_header("Content-Disposition", "inline", filename=f"badge-{r.badge_number or 0:04d}-grand-week-end.png")
     msg.attach(img)
     try:
         msg.send(fail_silently=False)
@@ -194,7 +203,7 @@ def _slug(text):
 
 
 def qr_zip(only_new=False):
-    """Archive ZIP : un QR code par inscrit (« 0007-Awa-Ndiaye.png », triés par numéro) et la liste correspondante (CSV)."""
+    """Archive ZIP : le badge complet (dossier badges/) et le QR code seul (dossier qr/) de chaque inscrit (« 0007-Awa-Ndiaye.png », triés par numéro) et la liste correspondante (CSV)."""
     buf = io.BytesIO()
     rows = list(printable(only_new))
     listing = io.StringIO()
@@ -204,6 +213,7 @@ def qr_zip(only_new=False):
         for r in rows:
             name = f"{r.badge_number:04d}-{_slug(r.name)}.png"
             z.writestr(f"qr/{name}", qr_png(r, scale=12))
+            z.writestr(f"badges/{name}", badge_png(r))
             writer.writerow([r.badge_number, r.name, r.job_title, r.organization, "oui" if r.wants_planting else "", name])
         z.writestr("liste-des-badges.csv", "\ufeff" + listing.getvalue())  # BOM : accents corrects à l'ouverture dans Excel
     return buf.getvalue(), len(rows)

@@ -1,10 +1,10 @@
-import { CalendarDays, CheckCircle2, MapPin, Trees, XCircle } from "lucide-react";
+import { CalendarDays, CheckCircle2, Download, MapPin, Trees, XCircle } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { Container } from "../components/ui/Container";
 import { ErrorState, Loading } from "../components/ui/States";
 import { useAsync } from "../hooks/useAsync";
 import { useSeo } from "../hooks/useSeo";
-import { badgeQrUrl, getBadge } from "../services/api";
+import { badgeImageUrl, getBadge } from "../services/api";
 import { NotFound } from "./ErrorPage";
 
 const fmtDay = (iso: string) => new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: "Africa/Dakar" }).format(new Date(`${iso}T12:00:00Z`));
@@ -30,20 +30,20 @@ export default function Badge() {
           </header>
 
           <div className="px-6 py-6 text-center">
-            <p className="font-heading text-2xl font-bold leading-tight">{d.name}</p>
-            {d.job_title && <p className="mt-1 text-navy/80">{d.job_title}</p>}
-            {d.organization && <p className="mt-1 font-semibold text-navy/70">{d.organization}</p>}
-
             {d.valid ? (
               <>
-                <img src={badgeQrUrl(token)} alt={`QR code du badge de ${d.name}`} width={288} height={288}
-                  className="mx-auto mt-5 aspect-square w-full max-w-[18rem] rounded-xl border border-navy/10 bg-white p-2" />
-                <p className="mt-4 text-sm text-navy/75">Présentez ce QR code à l'accueil. Il est valable pour les deux journées.<br />
-                  Astuce : faites une capture d'écran, il restera disponible sans connexion.</p>
+                {/* Même image que dans l'e-mail et sur le badge imprimé remis à l'accueil */}
+                <img src={badgeImageUrl(token)} alt={`Badge de ${d.name}${d.job_title ? `, ${d.job_title}` : ""}${d.organization ? `, ${d.organization}` : ""}`}
+                  width={970} height={1400} className="mx-auto h-auto w-full max-w-[20rem] rounded-xl border border-navy/10 bg-white shadow-sm" />
+                <a href={badgeImageUrl(token, true)} download
+                  className="mt-4 inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-green px-5 font-semibold text-white hover:bg-green-2">
+                  <Download className="h-4 w-4" aria-hidden />Télécharger mon badge</a>
+                <p className="mt-4 text-sm text-navy/75">Présentez ce badge à l'accueil, sur votre téléphone ou imprimé. Il est valable pour les deux journées.</p>
               </>
             ) : (
+              <><p className="font-heading text-2xl font-bold leading-tight">{d.name}</p>
               <p className="mt-6 flex items-center justify-center gap-2 rounded-xl bg-red-50 p-4 font-semibold text-red-800">
-                <XCircle className="h-5 w-5" aria-hidden />Cette inscription a été annulée : le badge n'est plus valable.</p>
+                <XCircle className="h-5 w-5" aria-hidden />Cette inscription a été annulée : le badge n'est plus valable.</p></>
             )}
           </div>
 

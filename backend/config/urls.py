@@ -85,6 +85,7 @@ urlpatterns = [
     # Badges du Grand Week-End : page « Mon badge » (publique, code secret) et accueil le jour J (Coordination)
     path("api/badges/<str:token>/", bd.badge_detail, name="badge-detail"),
     path("api/badges/<str:token>/qr.png", bd.badge_qr, name="badge-qr"),
+    path("api/badges/<str:token>/badge.png", bd.badge_image, name="badge-image"),
     path("api/events-planting-seats/", bd.planting_seats, name="planting-seats"),
     path("api/coordination/checkin/", bd.checkin, name="coord-checkin"),
     path("api/coordination/checkin/search/", bd.checkin_search, name="coord-checkin-search"),
