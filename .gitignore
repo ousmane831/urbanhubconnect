@@ -168,3 +168,7 @@ credentials.json
 service-account.json
 
 .github
+
+# Fichiers de contacts déposés pour import (données personnelles : jamais dans Git)
+/*.xlsx
+/*.csv

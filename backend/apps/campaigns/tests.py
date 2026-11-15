@@ -65,6 +65,19 @@ class ImportTests(TestCase):
         self.assertEqual(r["created"], 2)
         self.assertEqual((r["sheets"], r["ignored_sheets"]), (["Industriels", "Hôtels"], ["Notes"]))
 
+    def test_cells_with_several_addresses_and_comma_typos(self):
+        data = xlsx([["STRUCTURE", "REPRESENTANT", "CONTACT", "E-mail "],
+                     ["BEM", "C. Roux", "77 000 00 00", "croux@bem.sn/mmbaye@bem.sn"],
+                     ["Djoloff", "", "33 000", "djoloffrelax@gmail,com"],
+                     ["Mahwa", "", "", "'a@gmail.com'; 'b@gmail.com'"],
+                     ["Sotracom", "", "", "cheikhlo.sotracomsa.sn"]])
+        r = import_contacts("c.xlsx", data)
+        self.assertEqual((r["created"], r["split"], r["skipped_count"]), (5, 2, 1))
+        self.assertEqual(sorted(Contact.objects.values_list("email", flat=True)),
+                         ["a@gmail.com", "b@gmail.com", "croux@bem.sn", "djoloffrelax@gmail.com", "mmbaye@bem.sn"])
+        bem = Contact.objects.get(email="croux@bem.sn")
+        self.assertEqual((bem.organization, bem.name, bem.segment), ("BEM", "C. Roux", "Sheet"))  # « Représentant », pas le téléphone
+
     def test_file_without_email_column_is_refused(self):
         from .importer import ImportError_
         with self.assertRaises(ImportError_):

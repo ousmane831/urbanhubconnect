@@ -77,6 +77,11 @@ function ContactsCard({ data, onChanged }: { data: CampaignOverview; onChanged: 
             Import terminé : {result.created} ajouté{result.created > 1 ? "s" : ""}, {result.updated} mis à jour, {result.unchanged} inchangé{result.unchanged > 1 ? "s" : ""}.
           </p>
           {!!result.sheets?.length && <p className="mt-1 text-sm text-navy/70">Feuilles lues : {result.sheets.join(", ")}.</p>}
+          {(!!result.split || !!result.duplicates) && (
+            <p className="mt-1 text-sm text-navy/70">
+              {!!result.split && <>{result.split} case{result.split > 1 ? "s" : ""} contenai{result.split > 1 ? "ent" : "t"} plusieurs adresses : un contact créé par adresse. </>}
+              {!!result.duplicates && <>{result.duplicates} adresse{result.duplicates > 1 ? "s" : ""} en double, comptée{result.duplicates > 1 ? "s" : ""} une seule fois.</>}
+            </p>)}
           {!!result.ignored_sheets?.length && (
             <p className="mt-1 text-sm font-semibold text-red-900">
               Feuilles ignorées (pas de colonne « E-mail » dans leurs premières lignes) : {result.ignored_sheets.join(", ")}.

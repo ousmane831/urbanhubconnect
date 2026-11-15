@@ -5,6 +5,7 @@ Les colonnes sont reconnues par leur titre, quel que soit leur ordre (« E-mail 
 """
 import csv
 import io
+import re
 import unicodedata
 
 from django.core.exceptions import ValidationError
@@ -13,13 +14,18 @@ from django.core.validators import validate_email
 from .models import Contact
 
 MAX_ROWS = 5000
+# Titres reconnus, du plus précis au plus vague : si deux colonnes conviennent, la mieux classée l'emporte
+# (« Représentant » plutôt que « Contact », souvent un téléphone ; « Activité » plutôt que « Secteur »).
 COLUMNS = {
-    "email": ["email", "e-mail", "mail", "adresse e-mail", "adresse email", "adresse mail", "courriel", "e mail"],
-    "organization": ["organisation", "organization", "entreprise", "structure", "societe", "raison sociale", "partenaire", "nom de l'organisation"],
-    "name": ["nom", "name", "contact", "nom du contact", "responsable", "prenom et nom", "nom et prenom", "nom complet", "interlocuteur"],
-    "segment": ["segment", "segments", "categorie", "type", "type de partenaire", "college"],
-    "activity": ["activite", "activites", "secteur", "secteur d'activite", "domaine", "domaine d'activite"],
+    "email": ["e-mail", "email", "e mail", "adresse e-mail", "adresse email", "adresse mail", "courriel", "mail"],
+    "organization": ["organisation", "organization", "entreprise", "structure", "societe", "raison sociale", "nom de l'organisation", "partenaire"],
+    "name": ["nom du contact", "interlocuteur", "representant", "representants", "responsable", "nom complet", "prenom et nom",
+             "nom et prenom", "nom", "name", "contact"],
+    "segment": ["segment", "segments", "type de partenaire", "categorie", "type", "college", "secteur"],
+    "activity": ["activite", "activites", "secteur d'activite", "domaine d'activite", "domaine", "secteur"],
 }
+EMAIL = re.compile(r"[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}")
+COMMA_TLD = re.compile(r"(@[a-z0-9.-]+),(com|net|org|fr|sn|ca|tr|info|biz)\b")  # « gmail,com » saisi pour « gmail.com »
 LIMITS = {"organization": 200, "name": 150, "segment": 100, "activity": 150}
 
 
@@ -66,16 +72,34 @@ def _rows_from_csv(data):
 
 
 def _header_map(row):
-    found = {}
-    for index, cell in enumerate(row):
-        name = _norm(cell)
-        for field, aliases in COLUMNS.items():
-            if field not in found and name in aliases:
+    titles = {index: _norm(cell) for index, cell in enumerate(row)}
+    found, used = {}, set()
+    for field, aliases in COLUMNS.items():
+        for alias in aliases:
+            index = next((i for i, t in titles.items() if t == alias and i not in used), None)
+            if index is not None:
                 found[field] = index
+                used.add(index)
+                break
     return found if "email" in found else None
 
 
-def _read_sheet(rows, sheet, parsed, skipped):
+def emails_in(cell):
+    """Adresses d'une case, même s'il y en a plusieurs (séparées par / ; , ou des espaces) ou une virgule à la place du point."""
+    text = COMMA_TLD.sub(r"\1.\2", _clean(cell).lower())
+    found = []
+    for e in EMAIL.findall(text):
+        e = e.strip(".")
+        try:
+            validate_email(e)
+        except ValidationError:
+            continue
+        if e not in found:
+            found.append(e)
+    return found
+
+
+def _read_sheet(rows, sheet, parsed, skipped, stats):
     """Lit une feuille (titres sur l'une des 10 premières lignes). Retourne les colonnes trouvées, ou None."""
     mapping, line = None, 0
     for row in rows:
@@ -88,13 +112,20 @@ def _read_sheet(rows, sheet, parsed, skipped):
         if not any(_clean(c) for c in row):
             continue
         get = lambda f: _clean(row[mapping[f]]) if f in mapping and mapping[f] < len(row) else ""
-        email = get("email").lower().strip("<>;, ")
-        try:
-            validate_email(email)
-        except ValidationError:
-            skipped.append({"sheet": sheet, "line": line, "value": email, "reason": "adresse e-mail manquante ou invalide"})
+        raw = get("email")
+        emails = emails_in(raw)
+        if not emails:
+            skipped.append({"sheet": sheet, "line": line, "value": raw[:120], "reason": "adresse e-mail manquante ou invalide"})
             continue
-        parsed[email] = {f: get(f)[:LIMITS[f]] for f in LIMITS}  # une adresse en double : la dernière ligne l'emporte
+        values = {f: get(f)[:LIMITS[f]] for f in LIMITS}
+        if "segment" not in mapping and sheet:  # feuille sans colonne segment : son nom sert de segment
+            values["segment"] = sheet[:LIMITS["segment"]]
+        for email in emails:  # plusieurs adresses dans la case : un contact par adresse
+            if email in parsed:
+                stats["duplicates"] += 1
+            parsed[email] = values  # une adresse en double : la dernière ligne l'emporte
+        if len(emails) > 1:
+            stats["split"] += 1
         if len(parsed) > MAX_ROWS:
             raise ImportError_(f"Le fichier dépasse {MAX_ROWS} contacts.")
     return mapping
@@ -111,10 +142,11 @@ def import_contacts(filename, data):
         raise ImportError_("Format non pris en charge : envoyez un fichier Excel (.xlsx) ou CSV.")
 
     parsed, skipped, columns, read, ignored = {}, [], set(), [], []
+    stats = {"duplicates": 0, "split": 0}
     for sheet, rows in sheets:
         if not any(any(_clean(c) for c in r) for r in rows):
             continue  # feuille vide
-        mapping = _read_sheet(rows, sheet, parsed, skipped)
+        mapping = _read_sheet(rows, sheet, parsed, skipped, stats)
         if mapping is None:
             ignored.append(sheet)
         else:
@@ -141,4 +173,4 @@ def import_contacts(filename, data):
     unsubscribed = sum(1 for c in existing.values() if c.unsubscribed_at)
     return {"created": created, "updated": updated, "unchanged": len(parsed) - created - updated, "skipped": skipped[:50],
             "skipped_count": len(skipped), "unsubscribed_kept": unsubscribed,
-            "columns": sorted(columns), "sheets": [x for x in read if x], "ignored_sheets": [x for x in ignored if x]}
+            "columns": sorted(columns), "sheets": [x for x in read if x], "ignored_sheets": [x for x in ignored if x], **stats}
