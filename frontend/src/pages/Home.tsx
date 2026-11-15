@@ -184,9 +184,9 @@ export default function Home() {
         <SectionHeading eyebrow="Pour qui ?" title="Un réseau ouvert à tous les acteurs du territoire" center />
         <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           {PROFILES.map((p) => (
-            <li key={p.name} className="card flex items-center gap-3 p-4 sm:gap-4 sm:p-5">
-              <span className="icon-tile"><p.icon className="h-5 w-5" aria-hidden /></span>
-              <span className="font-semibold leading-snug">{p.name}</span>
+            <li key={p.name} className="card flex min-w-0 flex-col items-center gap-2.5 p-4 text-center sm:flex-row sm:gap-4 sm:p-5 sm:text-left">
+              <span className="icon-tile shrink-0"><p.icon className="h-5 w-5" aria-hidden /></span>
+              <span className="min-w-0 break-words text-[15px] font-semibold leading-snug [hyphens:auto] sm:text-base">{p.name}</span>
             </li>))}
         </ul>
       </Section>
