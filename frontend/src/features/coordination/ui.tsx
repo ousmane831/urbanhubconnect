@@ -1,18 +1,22 @@
-import { useState, type FormEvent } from "react";
+import {
+  Award, BadgeCheck, Briefcase, Building2, CalendarDays, CircleAlert, CircleCheck, Handshake, HeartHandshake, IdCard, Inbox, Mail, MapPin,
+  Megaphone, Newspaper, PauseCircle, RefreshCw, Trophy, X, type LucideIcon,
+} from "lucide-react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import type { ActionDef } from "../../services/coordination";
 
 const TONES: Record<ActionDef["tone"], string> = {
   primary: "bg-green text-white hover:bg-green-2",
-  danger: "border border-red-700 text-red-800 hover:bg-red-50",
-  neutral: "border border-navy/30 hover:bg-offwhite",
+  danger: "border border-red-700/40 bg-white text-red-800 hover:bg-red-50",
+  neutral: "border border-navy/20 bg-white hover:bg-offwhite",
 };
 
 export function ActionButtons({ actions, busy, onAct }: { actions: ActionDef[]; busy: boolean; onAct: (a: ActionDef) => void }) {
   return (
-    <div className="mt-4 flex flex-wrap gap-3">
+    <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
       {actions.map((a) => (
         <button key={a.id} disabled={busy} onClick={() => onAct(a)}
-          className={`min-h-[48px] rounded-md px-5 text-base font-semibold disabled:opacity-50 ${TONES[a.tone]}`}>{a.label}</button>
+          className={`min-h-[44px] rounded-lg px-4 text-sm font-semibold transition-colors disabled:opacity-50 sm:text-base ${TONES[a.tone]}`}>{a.label}</button>
       ))}
     </div>
   );
@@ -68,3 +72,59 @@ export function ActionForm({ action, busy, onSubmit, onCancel }: {
     </form>
   );
 }
+
+// ---------- Éléments communs de l'Espace Coordination ----------
+export function PageHeader({ title, description, actions }: { title: string; description?: ReactNode; actions?: ReactNode }) {
+  return (
+    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0">
+        <h1 className="text-2xl leading-tight sm:text-3xl">{title}</h1>
+        {description && <p className="mt-1 text-navy/65">{description}</p>}
+      </div>
+      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+    </div>
+  );
+}
+
+export function Panel({ title, icon: Icon, actions, children, className = "" }: {
+  title?: string; icon?: LucideIcon; actions?: ReactNode; children: ReactNode; className?: string;
+}) {
+  return (
+    <section className={`rounded-2xl border border-navy/10 bg-white p-4 shadow-soft sm:p-6 ${className}`}>
+      {(title || actions) && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          {title && <h2 className="flex items-center gap-2 text-lg">{Icon && <Icon className="h-5 w-5 text-green" aria-hidden />}{title}</h2>}
+          {actions}
+        </div>)}
+      {children}
+    </section>
+  );
+}
+
+const PILL: Record<string, string> = {
+  green: "bg-green/10 text-green", gold: "bg-gold/15 text-[#7a5c17]", navy: "bg-navy/10 text-navy", grey: "bg-offwhite text-navy/70", red: "bg-red-50 text-red-800",
+};
+export function Pill({ tone = "grey", children }: { tone?: keyof typeof PILL; children: ReactNode }) {
+  return <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${PILL[tone]}`}>{children}</span>;
+}
+
+/** Message de retour après une action (succès ou erreur), annoncé aux lecteurs d'écran. */
+export function Notice({ notice, onClose }: { notice: { ok: boolean; text: string } | null; onClose?: () => void }) {
+  if (!notice?.text) return null;
+  return (
+    <div role="status" aria-live="polite"
+      className={`mb-4 flex items-start gap-3 rounded-xl border p-3.5 text-sm font-semibold ${notice.ok ? "border-green/30 bg-green/5 text-green" : "border-red-300 bg-red-50 text-red-900"}`}>
+      {notice.ok ? <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> : <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />}
+      <span className="flex-1">{notice.text}</span>
+      {onClose && <button onClick={onClose} className="-m-1 rounded p-1 opacity-70 hover:opacity-100" aria-label="Fermer le message"><X className="h-4 w-4" /></button>}
+    </div>
+  );
+}
+
+/** Icône de chaque file « à traiter » (clé envoyée par le serveur). */
+export const KIND_ICONS: Record<string, LucideIcon> = {
+  organizations: Building2, memberships: IdCard, members: BadgeCheck, renewals: RefreshCw, suspended: PauseCircle,
+  connections: Handshake, opportunities: Megaphone, partnerships: Award, accreditations: Newspaper, awards: Trophy,
+  "business-connect": Briefcase, "event-requests": CalendarDays, volunteers: HeartHandshake, suggestions: MapPin, messages: Mail,
+};
+export const kindIcon = (kind: string): LucideIcon => KIND_ICONS[kind] ?? Inbox;

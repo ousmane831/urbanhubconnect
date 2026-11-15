@@ -66,7 +66,7 @@ export default function BadgePrint() {
       <div className="no-print sticky top-0 z-10 border-b border-navy/10 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div>
-            <Link to="/coordination" className="inline-flex items-center gap-1 text-sm font-semibold text-green"><ArrowLeft className="h-4 w-4" aria-hidden />Espace Coordination</Link>
+            <Link to="/coordination?onglet=checkin" className="inline-flex items-center gap-1 text-sm font-semibold text-green"><ArrowLeft className="h-4 w-4" aria-hidden />Espace Coordination</Link>
             <h1 className="text-xl">{onlyNew ? "Nouveaux badges" : "Tous les badges"} : {data.badges.length}
               {!!data.badges.length && <span className="font-normal text-navy/60"> (n° {first} à {last})</span>}</h1>
             <p className="text-sm text-navy/60">Format A6, 4 badges par feuille A4. Dans la fenêtre d'impression : échelle 100 %, marges « aucune ».</p>

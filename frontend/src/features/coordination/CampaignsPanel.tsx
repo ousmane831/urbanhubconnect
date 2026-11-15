@@ -1,4 +1,4 @@
-import { CalendarClock, FileSpreadsheet, Megaphone, Pencil, Plus, Search, Send, TriangleAlert, Upload, UsersRound, X } from "lucide-react";
+import { CalendarClock, FileSpreadsheet, Pencil, Plus, Search, Send, TriangleAlert, Upload, UsersRound, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Async } from "../../components/ui/Async";
 import { useAsync } from "../../hooks/useAsync";
@@ -7,6 +7,7 @@ import {
   coordApi, type Campaign, type CampaignInput, type CampaignOverview, type CampaignPreview, type CountedValue, type ImportResult,
 } from "../../services/coordination";
 import { apiErrorMessage } from "../../utils/errors";
+import { PageHeader } from "./ui";
 
 const DAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 const todayIso = () => new Date().toISOString().slice(0, 10); // Dakar = GMT
@@ -323,13 +324,9 @@ export function CampaignsPanel() {
   return (
     <Async state={state}>{(data) => (
       <div className="space-y-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="flex items-center gap-2 text-2xl sm:text-3xl"><Megaphone className="h-7 w-7 text-green" aria-hidden />Campagnes d'e-mails</h1>
-            <p className="mt-1 text-navy/70">Communication du Grand Week-End auprès des partenaires. Expéditeur : {data.sending.from}</p>
-          </div>
-          {!editing && <button className={btnPrimary} onClick={() => setEditing("new")}><Plus className="h-4 w-4" aria-hidden />Nouvelle campagne</button>}
-        </div>
+        <PageHeader title="Campagnes d'e-mails"
+          description={<>Communication du Grand Week-End auprès des partenaires.<span className="block text-sm">Expéditeur : {data.sending.from}</span></>}
+          actions={!editing && <button className={btnPrimary} onClick={() => setEditing("new")}><Plus className="h-4 w-4" aria-hidden />Nouvelle campagne</button>} />
 
         {data.sending.problem && (
           <p role="alert" className="flex items-start gap-3 rounded-xl border border-gold/40 bg-gold/10 p-4 text-navy">

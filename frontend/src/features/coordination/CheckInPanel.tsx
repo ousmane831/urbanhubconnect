@@ -1,11 +1,12 @@
 import jsQR from "jsqr";
-import { Camera, CameraOff, CircleCheckBig, CircleX, Download, Printer, ScanLine, Search, Send, Trees, TriangleAlert } from "lucide-react";
+import { Camera, CameraOff, CircleCheckBig, CircleX, Download, Printer, Search, Send, Trees, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAsync } from "../../hooks/useAsync";
 import { useDebounce } from "../../hooks/useDebounce";
 import { Link } from "react-router-dom";
 import { badgesZipUrl, coordApi, type CheckinPerson, type CheckinResult } from "../../services/coordination";
 import { apiErrorMessage } from "../../utils/errors";
+import { PageHeader } from "./ui";
 
 const todayIso = () => new Date().toISOString().slice(0, 10); // Dakar = GMT
 
@@ -196,11 +197,8 @@ export function CheckInPanel() {
   const s = stats.data;
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <div className="flex items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green text-white"><ScanLine className="h-6 w-6" aria-hidden /></span>
-        <div><h2 className="text-2xl">Accueil · scan des badges</h2>
-          <p className="text-navy/75">Scannez le QR code du participant. Un badge est valable une fois par jour, pour les deux journées.</p></div>
-      </div>
+      <PageHeader title="Accueil et badges"
+        description="Scannez le QR code du participant. Un badge est valable une fois par jour, pour les deux journées." />
 
       {s && (
         <dl className="grid grid-cols-3 gap-2 sm:gap-3">
