@@ -3,16 +3,20 @@
 Le QR code contient seulement l'adresse de la page « Mon badge » (…/badge/<code>), avec un code aléatoire impossible à deviner :
 aucune donnée personnelle n'y figure. L'accueil scanne ce code ; le serveur vérifie le badge et enregistre l'arrivée du jour.
 """
+import csv
 import io
 import logging
 import re
 import secrets
+import unicodedata
+import zipfile
 from email.mime.image import MIMEImage
 
 import segno
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.db import IntegrityError, transaction
+from django.db.models import Max
 from django.utils import timezone
 from django.utils.html import escape
 
@@ -33,6 +37,21 @@ def ensure_token(r):
         r.badge_token = secrets.token_urlsafe(16)
         r.save(update_fields=["badge_token", "updated_at"])
     return r.badge_token
+
+
+def ensure_number(r):
+    """Numéro d'ordre du badge, attribué une fois pour toutes (1, 2, 3… dans l'ordre des inscriptions)."""
+    for _ in range(5):
+        if r.badge_number:
+            return r.badge_number
+        n = (EventRequest.objects.aggregate(m=Max("badge_number"))["m"] or 0) + 1
+        try:
+            with transaction.atomic():
+                EventRequest.objects.filter(pk=r.pk, badge_number__isnull=True).update(badge_number=n)
+        except IntegrityError:  # deux inscriptions au même instant : on reprend avec le numéro suivant
+            continue
+        r.refresh_from_db(fields=["badge_number"])
+    return r.badge_number
 
 
 def badge_url(r):
@@ -59,7 +78,7 @@ def event_info():
 
 def payload(r):
     """Informations affichées sur la page « Mon badge » et à l'accueil (jamais l'e-mail ni le téléphone)."""
-    return {"name": r.name, "organization": r.organization, "kind": r.get_kind_display(),
+    return {"name": r.name, "organization": r.organization, "job_title": r.job_title, "number": r.badge_number, "kind": r.get_kind_display(),
             "options": r.options_display() if r.kind == r.Kind.REGISTRATION else ["Grand reboisement du Lac Rose (vendredi après-midi)"],
             "planting": r.wants_planting, "valid": r.status != "rejected",
             "checkins": [{"day": c.day.isoformat(), "at": timezone.localtime(c.at).strftime("%H h %M")} for c in r.checkins.order_by("day")]}
@@ -116,6 +135,7 @@ def issue(r):
     if r.status != "accepted":
         r.status = "accepted"
         r.save(update_fields=["status", "updated_at"])
+    ensure_number(r)  # le badge à imprimer est prêt dès l'inscription, dans l'ordre d'arrivée
     return send_badge(r)
 
 
@@ -150,3 +170,40 @@ def stats(today=None):
         days[c.isoformat()] = days.get(c.isoformat(), 0) + 1
     return {"registered": regs.count(), "today": days.get(today.isoformat(), 0), "by_day": days,
             "planting_taken": EventRequest.planting_taken(), "planting_seats": SiteSettings.load().planting_seats}
+
+
+# ---------- Badges à imprimer (Coordination) ----------
+def printable(only_new=False):
+    """Inscriptions valides, dans l'ordre de leur numéro ; only_new : celles dont le badge n'a pas encore été imprimé."""
+    qs = EventRequest.objects.filter(kind__in=EventRequest.BADGE_KINDS).exclude(status="rejected")
+    for r in qs.filter(badge_number__isnull=True).order_by("created_at", "pk"):
+        ensure_number(r)
+    qs = qs.order_by("badge_number")
+    return qs.filter(badge_printed_at__isnull=True) if only_new else qs
+
+
+def print_row(r):
+    ensure_token(r)
+    return {"id": r.pk, "number": r.badge_number, "name": r.name, "job_title": r.job_title, "organization": r.organization,
+            "token": r.badge_token, "planting": r.wants_planting, "printed_at": r.badge_printed_at.isoformat() if r.badge_printed_at else None}
+
+
+def _slug(text):
+    text = unicodedata.normalize("NFKD", text or "").encode("ascii", "ignore").decode()
+    return re.sub(r"[^A-Za-z0-9]+", "-", text).strip("-")[:60] or "badge"
+
+
+def qr_zip(only_new=False):
+    """Archive ZIP : un QR code par inscrit (« 0007-Awa-Ndiaye.png », triés par numéro) et la liste correspondante (CSV)."""
+    buf = io.BytesIO()
+    rows = list(printable(only_new))
+    listing = io.StringIO()
+    writer = csv.writer(listing, delimiter=";")
+    writer.writerow(["N°", "Prénom et nom", "Fonction", "Organisation", "Reboisement", "Fichier QR"])
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for r in rows:
+            name = f"{r.badge_number:04d}-{_slug(r.name)}.png"
+            z.writestr(f"qr/{name}", qr_png(r, scale=12))
+            writer.writerow([r.badge_number, r.name, r.job_title, r.organization, "oui" if r.wants_planting else "", name])
+        z.writestr("liste-des-badges.csv", "\ufeff" + listing.getvalue())  # BOM : accents corrects à l'ouverture dans Excel
+    return buf.getvalue(), len(rows)

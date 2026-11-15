@@ -94,3 +94,35 @@ def checkin_resend(request):
 @staff_api(["GET"])
 def checkin_stats(request):
     return Response(badges.stats())
+
+
+# ---------- badges à imprimer ----------
+def _only_new(request):
+    return str(request.query_params.get("nouveaux", "")).lower() in ("1", "true", "oui")
+
+
+@staff_api(["GET"])
+def print_list(request):
+    """Badges à imprimer, triés par numéro d'inscription (?nouveaux=1 : seulement ceux pas encore imprimés)."""
+    all_rows = badges.printable()
+    return Response({"total": all_rows.count(), "new": all_rows.filter(badge_printed_at__isnull=True).count(),
+                     "event": badges.event_info(), "badges": [badges.print_row(r) for r in badges.printable(_only_new(request))]})
+
+
+@staff_api(["POST"])
+def print_done(request):
+    """Marque des badges comme imprimés (après impression réussie)."""
+    from django.utils import timezone
+    ids = [int(i) for i in request.data.get("ids", []) if str(i).isdigit()]
+    n = badges.printable().filter(pk__in=ids, badge_printed_at__isnull=True).update(badge_printed_at=timezone.now())
+    return Response({"detail": f"{n} badge{'s' if n > 1 else ''} marqué{'s' if n > 1 else ''} comme imprimé{'s' if n > 1 else ''}."})
+
+
+@staff_api(["GET"])
+def qr_archive(request):
+    """ZIP des QR codes (un fichier par inscrit, nommé par numéro) et de la liste en CSV."""
+    data, n = badges.qr_zip(_only_new(request))
+    response = HttpResponse(data, content_type="application/zip")
+    suffix = "-nouveaux" if _only_new(request) else ""
+    response["Content-Disposition"] = f'attachment; filename="badges-grand-week-end{suffix}.zip"'
+    return response

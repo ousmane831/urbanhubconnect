@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 
 const { person } = vi.hoisted(() => ({
@@ -11,21 +12,30 @@ vi.mock("../../services/coordination", () => ({
     checkinSearch: vi.fn().mockResolvedValue([person]),
     checkin: vi.fn().mockResolvedValue({ result: "ok", message: "Badge valide : arrivée enregistrée.", name: "Awa Ndiaye" }),
     checkinResend: vi.fn().mockResolvedValue("Badge renvoyé à a@x.org."),
+    badgesPrint: vi.fn().mockResolvedValue({ total: 12, new: 5, event: { title: "", dates: "", location: "" }, badges: [] }),
   },
+  badgesZipUrl: () => "/api/coordination/badges/qr.zip",
 }));
 import { coordApi } from "../../services/coordination";
 import { CheckInPanel } from "./CheckInPanel";
 
 describe("Accueil : scan des badges", () => {
   it("affiche les compteurs du jour et du convoi", async () => {
-    render(<CheckInPanel />);
+    render(<MemoryRouter><CheckInPanel /></MemoryRouter>);
     expect(await screen.findByText("arrivés aujourd'hui")).toBeInTheDocument();
     expect(screen.getByText("12")).toBeInTheDocument();
     expect(screen.getByText("/ 40", { exact: false })).toBeInTheDocument();
   });
 
+  it("propose les badges à imprimer et l'archive des QR codes", async () => {
+    render(<MemoryRouter><CheckInPanel /></MemoryRouter>);
+    expect(await screen.findByText(/nouveaux badges à imprimer/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Imprimer les nouveaux" })).toHaveAttribute("href", "/coordination/badges?nouveaux=1");
+    expect(screen.getByRole("link", { name: "QR codes (ZIP)" })).toHaveAttribute("href", "/api/coordination/badges/qr.zip");
+  });
+
   it("permet de valider l'arrivée d'une personne sans QR code", async () => {
-    render(<CheckInPanel />);
+    render(<MemoryRouter><CheckInPanel /></MemoryRouter>);
     await userEvent.type(screen.getByLabelText(/Nom, organisation/), "awa");
     await userEvent.click(await screen.findByRole("button", { name: "Valider l'arrivée" }, { timeout: 2000 }));
     expect(coordApi.checkin).toHaveBeenCalledWith({ id: 7 });

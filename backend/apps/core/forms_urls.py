@@ -110,7 +110,7 @@ class EventRequestCreate(SubmissionCreateView):
     et le badge (QR code) part aussitôt par e-mail."""
     success_message = "Merci. Votre demande a bien été transmise. La Coordination vous recontactera rapidement."
     serializer_class = build_serializer(
-        EventRequest, ["kind", "name", "organization", "email", "phone", "options", "what_offers", "what_needs", "message",
+        EventRequest, ["kind", "name", "organization", "job_title", "email", "phone", "options", "what_offers", "what_needs", "message",
                        "accept_waiver", "accept_privacy"],
         extra={**CONSENT("accept_privacy"),
                # Les anciens types (visite, portes ouvertes) restent en base pour l'historique mais ne sont plus acceptés.

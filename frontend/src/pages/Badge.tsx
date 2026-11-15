@@ -31,7 +31,8 @@ export default function Badge() {
 
           <div className="px-6 py-6 text-center">
             <p className="font-heading text-2xl font-bold leading-tight">{d.name}</p>
-            {d.organization && <p className="mt-1 text-navy/70">{d.organization}</p>}
+            {d.job_title && <p className="mt-1 text-navy/80">{d.job_title}</p>}
+            {d.organization && <p className="mt-1 font-semibold text-navy/70">{d.organization}</p>}
 
             {d.valid ? (
               <>

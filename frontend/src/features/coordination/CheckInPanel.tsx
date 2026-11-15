@@ -1,9 +1,10 @@
 import jsQR from "jsqr";
-import { Camera, CameraOff, CircleCheckBig, CircleX, ScanLine, Search, Send, TriangleAlert, Trees } from "lucide-react";
+import { Camera, CameraOff, CircleCheckBig, CircleX, Download, Printer, ScanLine, Search, Send, Trees, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAsync } from "../../hooks/useAsync";
 import { useDebounce } from "../../hooks/useDebounce";
-import { coordApi, type CheckinPerson, type CheckinResult } from "../../services/coordination";
+import { Link } from "react-router-dom";
+import { badgesZipUrl, coordApi, type CheckinPerson, type CheckinResult } from "../../services/coordination";
 import { apiErrorMessage } from "../../utils/errors";
 
 const todayIso = () => new Date().toISOString().slice(0, 10); // Dakar = GMT
@@ -143,6 +144,25 @@ function ManualSearch({ onDone }: { onDone: () => void }) {
   );
 }
 
+/** Badges à imprimer : même QR code que celui reçu par e-mail, triés par numéro d'inscription, et archive des QR codes. */
+function PrintCard() {
+  const list = useAsync(() => coordApi.badgesPrint(true), []);
+  const d = list.data;
+  const btn = "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-4 font-semibold";
+  return (
+    <section aria-labelledby="impression-titre" className="rounded-2xl border border-navy/10 bg-white p-4 shadow-soft sm:p-6">
+      <h3 id="impression-titre" className="flex items-center gap-2 font-heading text-lg font-bold"><Printer className="h-5 w-5 text-green" aria-hidden />Badges à imprimer</h3>
+      <p className="mt-1 text-sm text-navy/70">Chaque inscription reçoit un numéro dans l'ordre d'arrivée. Le badge imprimé porte le même QR code que celui envoyé par e-mail.</p>
+      {d && <p className="mt-3"><strong className="text-green">{d.new}</strong> nouveau{d.new > 1 ? "x" : ""} badge{d.new > 1 ? "s" : ""} à imprimer · {d.total} au total</p>}
+      <div className="mt-3 grid gap-2 sm:flex sm:flex-wrap">
+        <Link to="/coordination/badges?nouveaux=1" className={`${btn} bg-green text-white hover:bg-green-2`}><Printer className="h-4 w-4" aria-hidden />Imprimer les nouveaux</Link>
+        <Link to="/coordination/badges" className={`${btn} border border-navy/20 hover:bg-offwhite`}>Tous les badges</Link>
+        <a href={badgesZipUrl(false)} className={`${btn} border border-navy/20 hover:bg-offwhite`}><Download className="h-4 w-4" aria-hidden />QR codes (ZIP)</a>
+      </div>
+    </section>
+  );
+}
+
 /** Accueil du Grand Week-End : scan des badges, arrivées du jour, recherche manuelle (comptes Coordination). */
 export function CheckInPanel() {
   const [version, setVersion] = useState(0);
@@ -197,6 +217,7 @@ export function CheckInPanel() {
             <Camera className="h-7 w-7" aria-hidden />Démarrer le scan</button>}
 
       <ManualSearch onDone={() => setVersion((v) => v + 1)} />
+      <PrintCard />
     </div>
   );
 }

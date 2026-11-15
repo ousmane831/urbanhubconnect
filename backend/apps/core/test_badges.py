@@ -129,3 +129,43 @@ class CheckInTests(Base):
         self.assertIn(self.client.post("/api/coordination/checkin/", {"code": self.url}, format="json").status_code, (401, 403))
         self.assertIn(self.client.get("/api/coordination/checkin/search/", {"q": "awa"}).status_code, (401, 403))
         self.assertFalse(CheckIn.objects.exists())
+
+
+class PrintTests(Base):
+    """Badges à imprimer : même QR code que celui envoyé par e-mail, numérotés dans l'ordre des inscriptions."""
+
+    def test_numbers_follow_registration_order_and_job_title_is_kept(self):
+        self.register("a@x.org", job_title="Directrice générale")
+        self.register("b@x.org")
+        a, b = EventRequest.objects.order_by("pk")
+        self.assertEqual((a.badge_number, b.badge_number, a.job_title), (1, 2, "Directrice générale"))
+
+    def test_print_list_zip_and_printed_marker(self):
+        import io as _io
+        import zipfile
+        self.register("a@x.org", name="Awa Ndiaye", job_title="Directrice générale")
+        self.register("b@x.org", name="Moussa Fall")
+        self.register("c@x.org", name="Annulé")
+        EventRequest.objects.filter(email="c@x.org").update(status="rejected")
+        staff = self.staff()
+
+        r = staff.get("/api/coordination/badges/print/")
+        self.assertEqual(r.status_code, 200, r.content)
+        data = r.json()
+        self.assertEqual((data["total"], data["new"]), (2, 2))
+        first = data["badges"][0]
+        self.assertEqual((first["number"], first["name"], first["job_title"]), (1, "Awa Ndiaye", "Directrice générale"))
+        reg = EventRequest.objects.get(email="a@x.org")
+        self.assertEqual(first["token"], reg.badge_token)  # le QR imprimé est celui reçu par e-mail
+
+        z = zipfile.ZipFile(_io.BytesIO(staff.get("/api/coordination/badges/qr.zip").content))
+        self.assertEqual(sorted(n for n in z.namelist() if n.startswith("qr/")), ["qr/0001-Awa-Ndiaye.png", "qr/0002-Moussa-Fall.png"])
+        self.assertIn("Directrice générale", z.read("liste-des-badges.csv").decode("utf-8-sig"))
+
+        staff.post("/api/coordination/badges/printed/", {"ids": [reg.pk]}, format="json")
+        data = staff.get("/api/coordination/badges/print/?nouveaux=1").json()
+        self.assertEqual(([b["name"] for b in data["badges"]], data["new"]), (["Moussa Fall"], 1))
+
+    def test_staff_only(self):
+        self.assertIn(APIClient().get("/api/coordination/badges/print/").status_code, (401, 403))
+        self.assertIn(APIClient().get("/api/coordination/badges/qr.zip").status_code, (401, 403))

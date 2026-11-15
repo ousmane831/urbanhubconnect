@@ -17,6 +17,7 @@ const lazyNamed = (load: () => Promise<Record<string, React.ComponentType>>, nam
 export const router = createBrowserRouter([
   { path: "maintenance", ...lazyPage(() => import("./pages/Maintenance")) },
   { path: "coordination", ...lazyPage(() => import("./pages/Coordination")), errorElement: <ServerError /> },
+  { path: "coordination/badges", ...lazyPage(() => import("./pages/BadgePrint")), errorElement: <ServerError /> },
   {
     
     element: <MaintenanceGuard><MainLayout /></MaintenanceGuard>,

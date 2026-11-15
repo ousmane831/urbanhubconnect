@@ -35,6 +35,9 @@ export const coordApi = {
   checkinSearch: (q: string) => api.get<CheckinPerson[]>("/checkin/search/", { params: { q } }).then((r) => r.data),
   checkinResend: (id: number) => api.post<{ detail: string }>("/checkin/resend/", { id }).then((r) => r.data.detail),
   checkinStats: () => api.get<CheckinStats>("/checkin/stats/").then((r) => r.data),
+  badgesPrint: (onlyNew: boolean) =>
+    api.get<BadgePrintList>("/badges/print/", { params: onlyNew ? { nouveaux: 1 } : undefined }).then((r) => r.data),
+  badgesPrinted: (ids: number[]) => api.post<{ detail: string }>("/badges/printed/", { ids }).then((r) => r.data.detail),
   campaigns: () => api.get<CampaignOverview>("/campaigns/").then((r) => r.data),
   campaignContacts: (search: string) => api.get<CampaignContact[]>("/campaigns/contacts/", { params: search ? { search } : undefined }).then((r) => r.data),
   campaignImport: (file: File) => {
@@ -79,3 +82,10 @@ export interface ImportResult {
   skipped: { sheet?: string; line: number; value: string; reason: string }[]; sheets?: string[]; ignored_sheets?: string[]; split?: number; duplicates?: number;
 }
 export interface CampaignPreview { subject: string; html: string; recipients: number; schedule: string }
+
+export interface PrintBadge {
+  id: number; number: number; name: string; job_title: string; organization: string; token: string; planting: boolean; printed_at: string | null;
+}
+export interface BadgePrintList { total: number; new: number; event: { title: string; dates: string; location: string }; badges: PrintBadge[] }
+/** Téléchargement direct (lien) : la session de la Coordination accompagne la requête. */
+export const badgesZipUrl = (onlyNew: boolean) => `${import.meta.env.VITE_API_URL ?? "/api"}/coordination/badges/qr.zip${onlyNew ? "?nouveaux=1" : ""}`;

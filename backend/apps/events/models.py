@@ -160,6 +160,7 @@ class EventRequest(Submission):
     kind = models.CharField(max_length=20, choices=Kind.choices, db_index=True)
     name = models.CharField(max_length=150)
     organization = models.CharField(max_length=200, blank=True)
+    job_title = models.CharField("fonction", max_length=150, blank=True)
     email = models.EmailField()
     phone = models.CharField(max_length=30, blank=True)
     circuit = models.CharField(max_length=1, blank=True, choices=[("A", "Circuit A (ancien programme)"), ("B", "Circuit B (ancien programme)")])
@@ -172,6 +173,9 @@ class EventRequest(Submission):
     # Badge du Grand Week-End : code secret porté par le QR code (aucune donnée personnelle dedans).
     badge_token = models.CharField("code du badge", max_length=32, unique=True, null=True, blank=True, editable=False)
     badge_sent_at = models.DateTimeField("badge envoyé le", null=True, blank=True, editable=False)
+    # Numéro d'ordre du badge (1, 2, 3… dans l'ordre des inscriptions) : sert à trier les badges imprimés.
+    badge_number = models.PositiveIntegerField("n° de badge", unique=True, null=True, blank=True, editable=False)
+    badge_printed_at = models.DateTimeField("badge imprimé le", null=True, blank=True, editable=False)
 
     BADGE_KINDS = (Kind.REGISTRATION, Kind.CARAVAN)
 

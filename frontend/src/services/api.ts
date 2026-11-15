@@ -39,7 +39,7 @@ export const getPartnerBand = () => get<BandPartner[]>("/partnerships/band/");
 export interface PlantingSeats { seats: number | null; remaining: number | null }
 export const getPlantingSeats = () => get<PlantingSeats>("/events-planting-seats/");
 export interface BadgeInfo {
-  name: string; organization: string; kind: string; options: string[]; planting: boolean; valid: boolean;
+  name: string; organization: string; job_title?: string; number?: number | null; kind: string; options: string[]; planting: boolean; valid: boolean;
   checkins: { day: string; at: string }[]; event: { title: string; dates: string; location: string };
 }
 export const getBadge = (token: string) => get<BadgeInfo>(`/badges/${encodeURIComponent(token)}/`);

@@ -24,8 +24,10 @@ const CONFIG: Record<RequestKind, { message: string; submit: string }> = {
 };
 
 export function EventRequestForm({ kind }: { kind: RequestKind }) {
+  const badge = kind === "registration" || kind === "caravan";  // inscription avec badge imprimé : nom complet et fonction
   const fields = useMemo<FieldDef[]>(() => [
-    { name: "name", label: "Nom", type: "text", required: true },
+    { name: "name", label: badge ? "Prénom et nom" : "Nom", type: "text", required: true, ...(badge ? { hint: "Tel qu'il apparaîtra sur votre badge." } : {}) },
+    ...(badge ? [{ name: "job_title", label: "Fonction", type: "text" as const, hint: "Ex. Directrice générale, chargé de projet…" }] : []),
     { name: "organization", label: "Organisation", type: "text" },
     { name: "email", label: "E-mail", type: "email", required: true },
     { name: "phone", label: "Téléphone", type: "tel" },
