@@ -1,10 +1,11 @@
-import { LogOut, LayoutDashboard, Inbox, FileText, ScanLine } from "lucide-react";
+import { LogOut, LayoutDashboard, Inbox, FileText, Megaphone, ScanLine } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Async } from "../../components/ui/Async";
 import { Loading } from "../../components/ui/States";
 import { HexPattern } from "../../components/ui/HexPattern";
 import { useAsync } from "../../hooks/useAsync";
 import { coordApi, type Me } from "../../services/coordination";
+import { CampaignsPanel } from "./CampaignsPanel";
 import { CheckInPanel } from "./CheckInPanel";
 import { ContentPanel } from "./ContentPanel";
 import { Dashboard } from "./Dashboard";
@@ -12,11 +13,12 @@ import { LoginForm } from "./LoginForm";
 import { QueuePanel } from "./QueuePanel";
 
 type Auth = { status: "loading" } | { status: "anon" } | { status: "in"; me: Me };
-type Tab = "home" | "queue" | "content" | "checkin";
+type Tab = "home" | "queue" | "content" | "campaigns" | "checkin";
 const TABS: [Tab, string, any][] = [
   ["home", "Accueil", LayoutDashboard],
   ["queue", "À traiter", Inbox],
   ["content", "Publications", FileText],
+  ["campaigns", "Campagnes", Megaphone],
   ["checkin", "Scan des badges", ScanLine],
 ];
 
@@ -70,6 +72,7 @@ function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
         {tab === "home" && <Dashboard version={version} onOpen={(k) => { setKind(k); setTab("queue"); }} />}
         {tab === "queue" && <Async state={summary}>{(s) => <QueuePanel kinds={s.queues} kind={kind} onKind={setKind} version={version} onChanged={refresh} />}</Async>}
         {tab === "content" && <ContentPanel me={me} onChanged={refresh} />}
+        {tab === "campaigns" && <CampaignsPanel />}
         {tab === "checkin" && <CheckInPanel />}
       </main>
     </div>

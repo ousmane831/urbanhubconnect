@@ -19,6 +19,7 @@ from apps.core import coordination_api as co
 
 from apps.core import members_network_api as mn
 from apps.events import badge_api as bd
+from apps.campaigns import api as cp
 admin.site.site_header = "Urban Hub Connect · Coordination"
 admin.site.site_title = "Urban Hub Connect"
 admin.site.index_title = "Tableau de bord de la Coordination"
@@ -89,6 +90,15 @@ urlpatterns = [
     path("api/coordination/checkin/search/", bd.checkin_search, name="coord-checkin-search"),
     path("api/coordination/checkin/resend/", bd.checkin_resend, name="coord-checkin-resend"),
     path("api/coordination/checkin/stats/", bd.checkin_stats, name="coord-checkin-stats"),
+    path("api/coordination/campaigns/", cp.overview, name="coord-campaigns"),
+    path("api/coordination/campaigns/new/", cp.campaign_create, name="coord-campaign-create"),
+    path("api/coordination/campaigns/preview/", cp.campaign_preview, name="coord-campaign-preview"),
+    path("api/coordination/campaigns/contacts/", cp.contacts, name="coord-campaign-contacts"),
+    path("api/coordination/campaigns/contacts/import/", cp.contacts_import, name="coord-campaign-import"),
+    path("api/coordination/campaigns/contacts/<int:pk>/remove/", cp.contact_toggle, name="coord-campaign-contact-remove"),
+    path("api/coordination/campaigns/<int:pk>/", cp.campaign_update, name="coord-campaign-update"),
+    path("api/coordination/campaigns/<int:pk>/<str:action>/", cp.campaign_action, name="coord-campaign-action"),
+    path("api/unsubscribe/<uuid:token>/", cp.unsubscribe, name="campaign-unsubscribe"),
     path("api/coordination/csrf/", co.csrf, name="coord-csrf"),
     path("api/coordination/login/", co.LoginView.as_view(), name="coord-login"),
     path("api/coordination/logout/", co.logout_view, name="coord-logout"),

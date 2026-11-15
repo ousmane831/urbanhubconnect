@@ -14,7 +14,7 @@ INSTALLED_APPS = [
     "rest_framework", "corsheaders", "django_filters", "drf_spectacular",
     *[f"apps.{a}" for a in (
         "core", "users", "organizations", "directory", "map", "events", "memberships",
-        "partnerships", "news", "press", "newsletter", "contact", "documents")],
+        "partnerships", "news", "press", "newsletter", "contact", "documents", "campaigns")],
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -107,3 +107,12 @@ DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default=EMAIL_HOST_USER or "co
 
 SITE_URL = config("SITE_URL", default="https://www.urbanhubconnect.com").rstrip("/")
 
+
+# Campagnes d'e-mails de la Coordination : envoyées par un service dédié (Brevo, relais SMTP), jamais par coordination@.
+CAMPAIGN_EMAIL_HOST = config("CAMPAIGN_EMAIL_HOST", default="")          # smtp-relay.brevo.com
+CAMPAIGN_EMAIL_PORT = config("CAMPAIGN_EMAIL_PORT", default=587, cast=int)
+CAMPAIGN_EMAIL_USER = config("CAMPAIGN_EMAIL_USER", default="")          # identifiant SMTP fourni par Brevo
+CAMPAIGN_EMAIL_PASSWORD = config("CAMPAIGN_EMAIL_PASSWORD", default="")  # clé SMTP Brevo
+CAMPAIGN_FROM_EMAIL = config("CAMPAIGN_FROM_EMAIL", default="Urban Hub Connect <infos@urbanhubconnect.com>")
+CAMPAIGN_REPLY_TO = config("CAMPAIGN_REPLY_TO", default=CONTACT_RECIPIENT)  # les réponses des partenaires arrivent à la Coordination
+CAMPAIGN_DAILY_LIMIT = config("CAMPAIGN_DAILY_LIMIT", default=280, cast=int)  # sous le plafond de l'offre gratuite de Brevo

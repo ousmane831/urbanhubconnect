@@ -1,0 +1,9 @@
+[Unit]
+Description=Urban Hub Connect - campagnes d'e-mails (toutes les 15 minutes)
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=false
+
+[Install]
+WantedBy=timers.target

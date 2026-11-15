@@ -3,7 +3,7 @@ from django.db.models import Q
 
 GROUP_NAME = "Coordination"
 PROJECT_APPS = ("core", "organizations", "map", "events", "memberships", "partnerships",
-                "news", "press", "newsletter", "contact", "documents")
+                "news", "press", "newsletter", "contact", "documents", "campaigns")
 
 
 def sync_coordination_group():

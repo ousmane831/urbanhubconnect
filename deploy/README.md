@@ -17,7 +17,33 @@ journalctl -u urbanhubconnect-daily.service -n 5        # doit afficher « … c
 
 Si l'utilisateur du serveur n'est pas `ubuntu`, corrigez la ligne `User=` du fichier `.service` avant de le copier.
 
-## 2. Sauvegardes quotidiennes
+## 2. Campagnes d'e-mails (onglet « Campagnes » de l'Espace Coordination)
+
+Les campagnes partent par **Brevo** (relais SMTP), jamais par la boîte `coordination@`, qui envoie les confirmations et les badges.
+
+1. Créez un compte sur brevo.com, puis dans *Expéditeurs, domaines et IP* : ajoutez le domaine `urbanhubconnect.com`
+   et créez chez OVH (zone DNS) les enregistrements que Brevo indique (code Brevo, DKIM, DMARC). Ajoutez l'expéditeur
+   `infos@urbanhubconnect.com` (alias de `coordination@` chez OVH : le code de vérification de Brevo arrive dans cette boîte).
+2. Dans *SMTP et API › SMTP*, générez une clé SMTP, puis complétez `backend/.env` :
+   ```
+   CAMPAIGN_EMAIL_HOST=smtp-relay.brevo.com
+   CAMPAIGN_EMAIL_PORT=587
+   CAMPAIGN_EMAIL_USER=identifiant-smtp-affiché-par-brevo
+   CAMPAIGN_EMAIL_PASSWORD=clé-smtp-brevo
+   CAMPAIGN_FROM_EMAIL=Urban Hub Connect <infos@urbanhubconnect.com>
+   CAMPAIGN_DAILY_LIMIT=280
+   ```
+   `CAMPAIGN_DAILY_LIMIT` doit rester sous le plafond quotidien de votre offre Brevo.
+3. Installez le minuteur (passage toutes les 15 minutes) :
+   ```bash
+   sudo cp /var/www/urbanhubconnect/deploy/urbanhubconnect-campaigns.service /var/www/urbanhubconnect/deploy/urbanhubconnect-campaigns.timer /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now urbanhubconnect-campaigns.timer
+   sudo systemctl start urbanhubconnect-campaigns.service
+   journalctl -u urbanhubconnect-campaigns.service -n 5    # « Aucun envoi dû. » ou le bilan des envois
+   ```
+
+## 3. Sauvegardes quotidiennes
 
 ```bash
 sudo mkdir -p /var/backups/urbanhubconnect && sudo chown ubuntu /var/backups/urbanhubconnect
@@ -27,7 +53,7 @@ sh /var/www/urbanhubconnect/deploy/backup.sh            # test immédiat
 
 Copiez régulièrement `/var/backups/urbanhubconnect` **hors du serveur** : une sauvegarde restée sur la même machine ne protège pas d'une panne du serveur.
 
-## 3. Vérifications du fichier backend/.env
+## 4. Vérifications du fichier backend/.env
 
 | Variable | Rôle |
 |---|---|
@@ -37,12 +63,13 @@ Copiez régulièrement `/var/backups/urbanhubconnect` **hors du serveur** : une 
 
 Test d'envoi : `python manage.py sendtestemail votre@adresse.com --settings=config.settings.prod`.
 
-## 4. Après chaque mise à jour du code
+## 5. Après chaque mise à jour du code
 
 ```bash
 cd /var/www/urbanhubconnect && git pull
 cd frontend && npm run build
 cd ../backend && source env/bin/activate
+pip install -r requirements/prod.txt     # nouvelles dépendances éventuelles
 python manage.py migrate --settings=config.settings.prod
 sudo systemctl restart urbanhubconnect.service
 ```

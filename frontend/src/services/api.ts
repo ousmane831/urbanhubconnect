@@ -43,6 +43,10 @@ export interface BadgeInfo {
   checkins: { day: string; at: string }[]; event: { title: string; dates: string; location: string };
 }
 export const getBadge = (token: string) => get<BadgeInfo>(`/badges/${encodeURIComponent(token)}/`);
+export interface UnsubscribeState { email: string; unsubscribed: boolean }
+export const getUnsubscribe = (token: string) => get<UnsubscribeState>(`/unsubscribe/${encodeURIComponent(token)}/`);
+export const confirmUnsubscribe = (token: string) =>
+  http.post<UnsubscribeState>(`/unsubscribe/${encodeURIComponent(token)}/`).then((r) => r.data);
 export const badgeQrUrl = (token: string) => `${import.meta.env.VITE_API_URL ?? "/api"}/badges/${encodeURIComponent(token)}/qr.png`;
 export const getPressReleases = () => get<PressRelease[]>("/press/");
 export const getDocuments = (category?: string) => get<DocumentItem[]>("/documents/", { category });
