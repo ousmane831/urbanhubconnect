@@ -76,10 +76,16 @@ function ContactsCard({ data, onChanged }: { data: CampaignOverview; onChanged: 
           <p className="font-semibold text-green">
             Import terminé : {result.created} ajouté{result.created > 1 ? "s" : ""}, {result.updated} mis à jour, {result.unchanged} inchangé{result.unchanged > 1 ? "s" : ""}.
           </p>
+          {!!result.sheets?.length && <p className="mt-1 text-sm text-navy/70">Feuilles lues : {result.sheets.join(", ")}.</p>}
+          {!!result.ignored_sheets?.length && (
+            <p className="mt-1 text-sm font-semibold text-red-900">
+              Feuilles ignorées (pas de colonne « E-mail » dans leurs premières lignes) : {result.ignored_sheets.join(", ")}.
+            </p>)}
           {result.skipped_count > 0 && (
             <details className="mt-2 text-sm">
               <summary className="cursor-pointer font-semibold text-red-900">{result.skipped_count} ligne{result.skipped_count > 1 ? "s" : ""} écartée{result.skipped_count > 1 ? "s" : ""}</summary>
-              <ul className="mt-2 space-y-1">{result.skipped.map((s) => <li key={s.line}>Ligne {s.line}{s.value ? ` (${s.value})` : ""} : {s.reason}</li>)}</ul>
+              <ul className="mt-2 space-y-1">{result.skipped.map((s) => (
+                <li key={`${s.sheet ?? ""}-${s.line}`}>{s.sheet ? `${s.sheet}, l` : "L"}igne {s.line}{s.value ? ` (${s.value})` : ""} : {s.reason}</li>))}</ul>
             </details>
           )}
         </div>

@@ -76,6 +76,6 @@ export interface CampaignOverview {
 export interface CampaignContact { id: number; email: string; organization: string; name: string; segment: string; activity: string; unsubscribed: boolean }
 export interface ImportResult {
   created: number; updated: number; unchanged: number; skipped_count: number; unsubscribed_kept: number; columns: string[];
-  skipped: { line: number; value: string; reason: string }[];
+  skipped: { sheet?: string; line: number; value: string; reason: string }[]; sheets?: string[]; ignored_sheets?: string[];
 }
 export interface CampaignPreview { subject: string; html: string; recipients: number; schedule: string }

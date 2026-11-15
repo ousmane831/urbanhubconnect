@@ -51,6 +51,20 @@ class ImportTests(TestCase):
         self.assertEqual(a.organization, "Nouveau nom")
         self.assertIsNotNone(a.unsubscribed_at)
 
+    def test_every_sheet_of_the_workbook_is_read(self):
+        from openpyxl import Workbook
+        wb = Workbook()
+        wb.active.title = "Industriels"
+        wb.active.append(["E-mail", "Organisation"]); wb.active.append(["a@x.sn", "A"])
+        hotels = wb.create_sheet("Hôtels")
+        hotels.append(["Liste des hôtels"]); hotels.append([]); hotels.append(["Organisation", "Mail"]); hotels.append(["B", "b@x.sn"])
+        notes = wb.create_sheet("Notes")
+        notes.append(["Remarque"]); notes.append(["À relancer en décembre"])
+        buf = io.BytesIO(); wb.save(buf)
+        r = import_contacts("c.xlsx", buf.getvalue())
+        self.assertEqual(r["created"], 2)
+        self.assertEqual((r["sheets"], r["ignored_sheets"]), (["Industriels", "Hôtels"], ["Notes"]))
+
     def test_file_without_email_column_is_refused(self):
         from .importer import ImportError_
         with self.assertRaises(ImportError_):

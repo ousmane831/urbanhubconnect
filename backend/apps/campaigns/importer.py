@@ -38,15 +38,15 @@ def _clean(value):
     return " ".join(str(value).split())
 
 
-def _rows_from_xlsx(data):
+def _sheets_from_xlsx(data):
+    """Toutes les feuilles du classeur : [(nom de la feuille, lignes)]."""
     from openpyxl import load_workbook
     try:
         wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
     except Exception:
         raise ImportError_("Ce fichier Excel est illisible. Enregistrez-le au format .xlsx puis réessayez.")
     try:
-        for row in wb.worksheets[0].iter_rows(values_only=True):
-            yield list(row)
+        return [(ws.title, [list(r) for r in ws.iter_rows(values_only=True)]) for ws in wb.worksheets]
     finally:
         wb.close()
 
@@ -62,7 +62,7 @@ def _rows_from_csv(data):
         dialect = csv.Sniffer().sniff(text[:4096], delimiters=";,\t")
     except csv.Error:
         dialect = csv.excel
-    yield from csv.reader(io.StringIO(text), dialect)
+    return list(csv.reader(io.StringIO(text), dialect))
 
 
 def _header_map(row):
@@ -75,23 +75,15 @@ def _header_map(row):
     return found if "email" in found else None
 
 
-def import_contacts(filename, data):
-    """Retourne le bilan : créés, mis à jour, lignes écartées (avec la raison)."""
-    name = (filename or "").lower()
-    if name.endswith(".xlsx"):
-        rows = _rows_from_xlsx(data)
-    elif name.endswith(".csv"):
-        rows = _rows_from_csv(data)
-    else:
-        raise ImportError_("Format non pris en charge : envoyez un fichier Excel (.xlsx) ou CSV.")
-
-    mapping, line, parsed, skipped = None, 0, {}, []
+def _read_sheet(rows, sheet, parsed, skipped):
+    """Lit une feuille (titres sur l'une des 10 premières lignes). Retourne les colonnes trouvées, ou None."""
+    mapping, line = None, 0
     for row in rows:
         line += 1
         if mapping is None:
             mapping = _header_map(row)
             if mapping is None and line >= 10:
-                break
+                return None
             continue
         if not any(_clean(c) for c in row):
             continue
@@ -100,13 +92,36 @@ def import_contacts(filename, data):
         try:
             validate_email(email)
         except ValidationError:
-            skipped.append({"line": line, "value": email, "reason": "adresse e-mail manquante ou invalide"})
+            skipped.append({"sheet": sheet, "line": line, "value": email, "reason": "adresse e-mail manquante ou invalide"})
             continue
         parsed[email] = {f: get(f)[:LIMITS[f]] for f in LIMITS}  # une adresse en double : la dernière ligne l'emporte
         if len(parsed) > MAX_ROWS:
             raise ImportError_(f"Le fichier dépasse {MAX_ROWS} contacts.")
-    if mapping is None:
-        raise ImportError_("Colonne e-mail introuvable. La première ligne du fichier doit contenir les titres des colonnes, "
+    return mapping
+
+
+def import_contacts(filename, data):
+    """Retourne le bilan : créés, mis à jour, lignes écartées (avec la raison). Un classeur Excel est lu feuille par feuille."""
+    name = (filename or "").lower()
+    if name.endswith(".xlsx"):
+        sheets = _sheets_from_xlsx(data)
+    elif name.endswith(".csv"):
+        sheets = [("", _rows_from_csv(data))]
+    else:
+        raise ImportError_("Format non pris en charge : envoyez un fichier Excel (.xlsx) ou CSV.")
+
+    parsed, skipped, columns, read, ignored = {}, [], set(), [], []
+    for sheet, rows in sheets:
+        if not any(any(_clean(c) for c in r) for r in rows):
+            continue  # feuille vide
+        mapping = _read_sheet(rows, sheet, parsed, skipped)
+        if mapping is None:
+            ignored.append(sheet)
+        else:
+            read.append(sheet)
+            columns |= set(mapping)
+    if not read:
+        raise ImportError_("Colonne e-mail introuvable. La première ligne de chaque feuille doit contenir les titres des colonnes, "
                            "dont une colonne « E-mail ».")
 
     existing = {c.email: c for c in Contact.objects.filter(email__in=parsed)}
@@ -126,4 +141,4 @@ def import_contacts(filename, data):
     unsubscribed = sum(1 for c in existing.values() if c.unsubscribed_at)
     return {"created": created, "updated": updated, "unchanged": len(parsed) - created - updated, "skipped": skipped[:50],
             "skipped_count": len(skipped), "unsubscribed_kept": unsubscribed,
-            "columns": sorted(mapping)}
+            "columns": sorted(columns), "sheets": [x for x in read if x], "ignored_sheets": [x for x in ignored if x]}
