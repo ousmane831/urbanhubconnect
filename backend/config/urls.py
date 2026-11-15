@@ -13,7 +13,7 @@ from apps.core import members_api as mb
 from apps.core import content_api as c
 from apps.core.sitemaps import SITEMAPS
 from apps.core.forms_urls import urlpatterns as form_urls
-from apps.map.api import MapCategoryListView, MapPlaceViewSet
+from apps.map.api import MapCategoryListView, MapPlaceViewSet, route as map_route
 from apps.organizations.api import OrganizationViewSet
 from apps.core import coordination_api as co
 
@@ -41,6 +41,7 @@ urlpatterns = [
     path("sitemap.xml", sitemap, {"sitemaps": SITEMAPS}, name="sitemap"),
     path("admin/", admin.site.urls),
     path("api/map/categories/", MapCategoryListView.as_view(), name="map-categories"),
+    path("api/map/route/", map_route, name="map-route"),
     # Documentation de l'API : réservée au personnel connecté à l'administration.
     path("api/schema/", SpectacularAPIView.as_view(authentication_classes=[SessionAuthentication], permission_classes=[IsAdminUser]), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema", authentication_classes=[SessionAuthentication],

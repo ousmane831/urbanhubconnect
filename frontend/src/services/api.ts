@@ -20,6 +20,12 @@ export const getOrganization = (slug: string) => http.get<OrganizationDetail>(`/
 export const listPlaces = (q: { category?: string; pole?: string; search?: string }) =>
   http.get<MapPlace[]>("/map/places/", { params: clean(q) }).then((r) => r.data);
 export const getMapCategories = () => http.get<MapCategory[]>("/map/categories/").then((r) => r.data);
+export type TravelMode = "driving" | "foot";
+export interface RouteStep { instruction: string; distance: number; duration: number; type: number | null; location: [number, number] | null }
+export interface RouteResult { mode: TravelMode; distance: number; duration: number; geometry: [number, number][]; steps: RouteStep[] }
+/** Trajet par les routes (calculé par notre serveur avec OpenRouteService). La position n'est pas enregistrée. */
+export const getRoute = (from: [number, number], to: [number, number], mode: TravelMode) =>
+  http.get<RouteResult>("/map/route/", { params: { from: from.join(","), to: to.join(","), mode }, timeout: 20000 }).then((r) => r.data);
 export const submitMultipart = (path: string, form: FormData) => http.post<{ detail: string }>(path, form).then((r) => r.data.detail);
 
 const get = <T,>(url: string, params?: object) => http.get<T>(url, { params: params ? clean(params) : undefined }).then((r) => r.data);

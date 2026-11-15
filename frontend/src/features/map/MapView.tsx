@@ -1,10 +1,11 @@
 import L from "leaflet";
-import { useEffect } from "react";
-import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
+import { useEffect, useRef } from "react";
+import { Circle, CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
 import { Link } from "react-router-dom";
 import type { MapPlace } from "../../types/api";
 
 export const DEFAULT_CENTER: [number, number] = [14.7, -17.2];
+type LatLng = [number, number];
 
 // divIcon : évite les images par défaut de Leaflet (cassées par les bundlers).
 // Lieu ordinaire = rond vert ; membre du réseau = losange violet ; sélection = or.
@@ -18,32 +19,47 @@ const icon = (active: boolean, member: boolean) => {
   });
 };
 
-function Viewport({ places, focus, user, route }: {
-  places: MapPlace[]; focus: [number, number] | null; user: [number, number] | null;
-  route: [[number, number], [number, number]] | null;
+/** Recadrages de la carte, chacun déclenché par un changement précis (et non à chaque mise à jour de la position). */
+function Viewport({ places, focus, user, path, recenter }: {
+  places: MapPlace[]; focus: LatLng | null; user: LatLng | null; path: LatLng[] | null; recenter: number;
 }) {
   const map = useMap();
+  const hadUser = useRef(false);
+  useEffect(() => {  // nouveau trajet : on montre tout le parcours
+    if (path && path.length > 1) map.fitBounds(L.latLngBounds(path), { padding: [40, 40], maxZoom: 16 });
+  }, [path, map]);
+  useEffect(() => {  // première position connue (sans trajet) : on s'y rend une fois
+    if (user && !hadUser.current && !path) map.flyTo(user, 14);
+    hadUser.current = !!user;
+  }, [user, path, map]);
+  useEffect(() => { if (recenter && user) map.flyTo(user, 16); }, [recenter]);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (focus) map.flyTo(focus, 16); }, [focus, map]);
   useEffect(() => {
-    if (route) { map.fitBounds(L.latLngBounds(route), { padding: [60, 60], maxZoom: 15 }); return; }
-    if (user) { map.flyTo(user, 14); return; }
-    if (focus) { map.flyTo(focus, 16); return; }
-    if (places.length) map.fitBounds(L.latLngBounds(places.map((p) => [p.latitude, p.longitude] as [number, number])), { padding: [40, 40], maxZoom: 15 });
-  }, [places, focus, user, route, map]);
+    if (!path && !user && places.length) map.fitBounds(L.latLngBounds(places.map((p) => [p.latitude, p.longitude] as LatLng)), { padding: [40, 40], maxZoom: 15 });
+  }, [places]);  // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }
 
 interface Props {
-  places: MapPlace[]; selected: string | null; user: [number, number] | null;
-  route: [[number, number], [number, number]] | null;
+  places: MapPlace[]; selected: string | null; user: LatLng | null; accuracy?: number | null;
+  /** Trajet par les routes ; à défaut (calcul impossible), ligne droite indicative. */
+  path: LatLng[] | null; straight: [LatLng, LatLng] | null;
+  focus: LatLng | null; recenter: number;
   onRoutePlace: (place: MapPlace) => void; className?: string;
 }
 
-export default function MapView({ places, selected, user, route, onRoutePlace, className = "" }: Props) {
+export default function MapView({ places, selected, user, accuracy, path, straight, focus, recenter, onRoutePlace, className = "" }: Props) {
   const focusPlace = places.find((p) => p.slug === selected);
   return (
     <MapContainer center={DEFAULT_CENTER} zoom={11} scrollWheelZoom={false} className={`z-0 ${className}`} aria-label="Carte interactive du Hub">
       <TileLayer attribution='&copy; contributeurs <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      <Viewport places={places} focus={focusPlace ? [focusPlace.latitude, focusPlace.longitude] : null} user={user} route={route} />
+      <Viewport places={places} user={user} path={path} recenter={recenter}
+        focus={focus ?? (focusPlace ? [focusPlace.latitude, focusPlace.longitude] : null)} />
+      {path && path.length > 1 && <>
+        <Polyline positions={path} pathOptions={{ color: "#ffffff", weight: 10, opacity: 0.9 }} />
+        <Polyline positions={path} pathOptions={{ color: "#1E5C3F", weight: 6, opacity: 0.95 }} />
+      </>}
+      {!path && straight && <Polyline positions={straight} pathOptions={{ color: "#1E5C3F", weight: 4, opacity: 0.7, dashArray: "10 8" }} />}
       {places.map((p) => (
         <Marker key={p.slug} position={[p.latitude, p.longitude]} icon={icon(p.slug === selected, p.is_member)} title={p.name}>
           <Popup>
@@ -61,8 +77,11 @@ export default function MapView({ places, selected, user, route, onRoutePlace, c
           </Popup>
         </Marker>
       ))}
-      {user && <CircleMarker center={user} radius={9} pathOptions={{ color: "#0E2240", fillColor: "#0E2240", fillOpacity: 0.8 }}><Popup>Vous êtes ici</Popup></CircleMarker>}
-      {route && <Polyline positions={route} pathOptions={{ color: "#1E5C3F", weight: 5, opacity: 0.85, dashArray: "10 8" }} />}
+      {user && <>
+        {!!accuracy && accuracy < 2000 && <Circle center={user} radius={accuracy} pathOptions={{ color: "#2563eb", weight: 1, fillColor: "#2563eb", fillOpacity: 0.1 }} />}
+        <CircleMarker center={user} radius={9} pathOptions={{ color: "#ffffff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 }}><Popup>Vous êtes ici</Popup></CircleMarker>
+      </>}
+      {focus && <CircleMarker center={focus} radius={7} pathOptions={{ color: "#C39A3E", weight: 3, fillColor: "#ffffff", fillOpacity: 1 }} />}
     </MapContainer>
   );
 }

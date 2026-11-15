@@ -116,3 +116,7 @@ CAMPAIGN_EMAIL_PASSWORD = config("CAMPAIGN_EMAIL_PASSWORD", default="")  # clé 
 CAMPAIGN_FROM_EMAIL = config("CAMPAIGN_FROM_EMAIL", default="Urban Hub Connect <infos@urbanhubconnect.com>")
 CAMPAIGN_REPLY_TO = config("CAMPAIGN_REPLY_TO", default=CONTACT_RECIPIENT)  # les réponses des partenaires arrivent à la Coordination
 CAMPAIGN_DAILY_LIMIT = config("CAMPAIGN_DAILY_LIMIT", default=280, cast=int)  # sous le plafond de l'offre gratuite de Brevo
+
+# Itinéraires de la Cartographie du Hub (openrouteservice.org, clé gratuite). Vide : seuls les liens Google Maps / Waze / Plans.
+ORS_API_KEY = config("ORS_API_KEY", default="")
+ORS_BASE_URL = config("ORS_BASE_URL", default="https://api.heigit.org/openrouteservice")

@@ -104,3 +104,56 @@ class MapApiTests(APITestCase):
 
     def test_read_only(self):
         self.assertEqual(self.client.post(reverse("mapplace-list"), {}).status_code, 405)
+
+
+from unittest import mock as _mock
+
+from django.core.cache import cache as _cache
+from django.test import override_settings as _override
+from rest_framework.test import APITestCase as _APITestCase
+
+ORS_SAMPLE = {"features": [{
+    "geometry": {"coordinates": [[-17.20, 14.70], [-17.19, 14.71], [-17.18, 14.72]]},
+    "properties": {"summary": {"distance": 2450.4, "duration": 312.6}, "segments": [{"steps": [
+        {"instruction": "Partez vers le nord sur N1", "distance": 1200.0, "duration": 150.0, "type": 11, "way_points": [0, 1]},
+        {"instruction": "Tournez à droite", "distance": 1250.4, "duration": 162.6, "type": 1, "way_points": [1, 2]},
+        {"instruction": "Arrivée à destination", "distance": 0, "duration": 0, "type": 10, "way_points": [2, 2]}]}]}}]}
+
+
+@_override(ORS_API_KEY="cle-de-test")
+class RouteTests(_APITestCase):
+    def setUp(self):
+        _cache.clear()
+
+    def get(self, **params):
+        params = {"from": "14.70,-17.20", "to": "14.72,-17.18", **params}
+        return self.client.get("/api/map/route/", params)
+
+    def test_route_follows_roads_with_french_steps(self):
+        with _mock.patch("apps.map.routing._call", return_value=ORS_SAMPLE) as call:
+            r = self.get(mode="foot")
+        self.assertEqual(r.status_code, 200, r.content)
+        data = r.json()
+        self.assertEqual((data["distance"], data["duration"], data["mode"]), (2450, 313, "foot"))
+        self.assertEqual(data["geometry"][0], [14.7, -17.2])  # latitude d'abord, pour Leaflet
+        self.assertEqual(data["steps"][1]["instruction"], "Tournez à droite")
+        self.assertEqual(data["steps"][1]["location"], [14.71, -17.19])
+        self.assertEqual(call.call_args.args[0], "foot-walking")
+
+    def test_same_trip_is_served_from_cache(self):
+        with _mock.patch("apps.map.routing._call", return_value=ORS_SAMPLE) as call:
+            self.get(); self.get()
+        self.assertEqual(call.call_count, 1)
+
+    def test_positions_outside_senegal_and_bad_input_are_refused(self):
+        with _mock.patch("apps.map.routing._call") as call:
+            self.assertEqual(self.get(**{"from": "48.85,2.35"}).status_code, 400)
+            self.assertEqual(self.get(**{"from": "abc"}).status_code, 400)
+            self.assertEqual(self.get(mode="avion").status_code, 400)
+        call.assert_not_called()
+
+    @_override(ORS_API_KEY="")
+    def test_without_key_the_page_falls_back_to_navigation_apps(self):
+        r = self.get()
+        self.assertEqual(r.status_code, 503)
+        self.assertIn("Lancer la navigation", r.json()["detail"])

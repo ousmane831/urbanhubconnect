@@ -59,6 +59,7 @@ Copiez régulièrement `/var/backups/urbanhubconnect` **hors du serveur** : une 
 |---|---|
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | Envoi des e-mails (confirmation, bulletin, invitation, rappels). Sans elles, aucun e-mail ne part. |
 | `SITE_URL` | Adresse du site dans les liens des e-mails (`https://www.urbanhubconnect.com`). |
+| `ORS_API_KEY` | Itinéraires par les routes sur la Cartographie (clé gratuite sur account.heigit.org). Sans elle, la carte propose seulement Google Maps, Waze et Plans. |
 | `MAX_UPLOAD_MB` | Taille maximale des fichiers envoyés (10 pour le dossier de 6 Mo). |
 
 Test d'envoi : `python manage.py sendtestemail votre@adresse.com --settings=config.settings.prod`.

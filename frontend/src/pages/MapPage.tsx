@@ -1,5 +1,5 @@
 import { LocateFixed, Map, Filter, Search, Route } from "lucide-react";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "../components/ui/Button";
 import { Section, SectionHeading } from "../components/ui/Container";
@@ -10,7 +10,9 @@ import { useAsync } from "../hooks/useAsync";
 import { useDebounce } from "../hooks/useDebounce";
 import { useSeo } from "../hooks/useSeo";
 import { useSiteSettings } from "../hooks/useSiteSettings";
-import { getMapCategories, listPlaces } from "../services/api";
+import { RoutePanel } from "../features/map/RoutePanel";
+import { getMapCategories, getRoute, listPlaces, type RouteResult, type TravelMode } from "../services/api";
+import { apiErrorMessage } from "../utils/errors";
 import type { MapPlace } from "../types/api";
 import { POLE_LABELS } from "../utils/constants";
 import { distanceKm } from "../utils/geo";
@@ -28,55 +30,86 @@ export default function MapPage() {
   const search = useDebounce(text);
   const [selected, setSelected] = useState<string | null>(null);
   const [user, setUser] = useState<[number, number] | null>(null);
-  const [routeTarget, setRouteTarget] = useState<string | null>(null);
+  const [accuracy, setAccuracy] = useState<number | null>(null);
   const [geoMsg, setGeoMsg] = useState("");
+  // Itinéraire : lieu visé, mode, point de départ figé au moment de la demande (la position suivie en direct ne relance pas le calcul).
+  const [routeTarget, setRouteTarget] = useState<string | null>(null);
+  const [mode, setMode] = useState<TravelMode>("driving");
+  const [origin, setOrigin] = useState<[number, number] | null>(null);
+  const [route, setRoute] = useState<RouteResult | null>(null);
+  const [routeError, setRouteError] = useState("");
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [activeStep, setActiveStep] = useState<number | null>(null);
+  const [recenter, setRecenter] = useState(0);
+  const watchId = useRef<number | null>(null);
+  const mapBox = useRef<HTMLDivElement>(null);
   const categories = useAsync(getMapCategories);
   const { data, error, loading, retry } = useAsync(() => listPlaces({ category, pole, search }), [category, pole, search]);
 
   const set = (k: string, v: string) => { const n = new URLSearchParams(params); v ? n.set(k, v) : n.delete(k); setParams(n, { replace: true }); };
-  const locate = () => {
-    if (!("geolocation" in navigator)) return setGeoMsg("La géolocalisation n'est pas disponible sur cet appareil.");
-    setGeoMsg("Autorisez la localisation dans la fenêtre de votre navigateur…");
-    // L'autorisation est demandée par le navigateur uniquement après ce clic explicite.
+  const geoError = (err: GeolocationPositionError) => err.code === err.PERMISSION_DENIED
+    ? "Localisation refusée. Autorisez-la dans les réglages du navigateur, ou utilisez Google Maps, Waze ou Plans."
+    : "Votre position n'a pas pu être déterminée. Vérifiez que la localisation de l'appareil est activée, puis réessayez.";
+
+  /** Suivi de la position en direct (point bleu qui avance), lancé uniquement après un clic. */
+  const follow = useCallback(() => {
+    if (watchId.current !== null || !("geolocation" in navigator)) return;
+    watchId.current = navigator.geolocation.watchPosition(
+      (pos) => { setUser([pos.coords.latitude, pos.coords.longitude]); setAccuracy(pos.coords.accuracy); },
+      () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+  }, []);
+  useEffect(() => () => { if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current); }, []);
+
+  /** Position actuelle (une fois), puis suivi en direct. */
+  const position = (onOk: (p: [number, number]) => void, onFail: (msg: string) => void) => {
+    if (!("geolocation" in navigator)) return onFail("La géolocalisation n'est pas disponible sur cet appareil.");
     navigator.geolocation.getCurrentPosition(
-      (pos) => { setUser([pos.coords.latitude, pos.coords.longitude]); setGeoMsg("Lieux triés du plus proche au plus éloigné."); },
-      (err) => setGeoMsg(err.code === err.PERMISSION_DENIED ? "Localisation refusée. Vous pouvez continuer à explorer la carte librement." : "Votre position n'a pas pu être déterminée."),
-      { enableHighAccuracy: false, timeout: 10000 },
+      (pos) => {
+        const here: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        setUser(here); setAccuracy(pos.coords.accuracy); follow(); onOk(here);
+      },
+      (err) => onFail(geoError(err)),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
     );
   };
+
+  const locate = () => {
+    setGeoMsg("Autorisez la localisation dans la fenêtre de votre navigateur…");
+    position(() => setGeoMsg("Lieux triés du plus proche au plus éloigné. Votre position est suivie en direct sur la carte."), setGeoMsg);
+  };
+
   const places = useMemo(() => {
     const list = data ?? [];
     return user ? [...list].sort((a, b) => distanceKm(user, [a.latitude, a.longitude]) - distanceKm(user, [b.latitude, b.longitude])) : list;
   }, [data, user]);
   const reset = () => { setText(""); setParams({}, { replace: true }); };
+
   const showRoute = (place: MapPlace) => {
-    setSelected(place.slug);
-    if (user) {
-      setRouteTarget(place.slug);
-      setGeoMsg(`Tracé direct vers ${place.name} affiché à titre indicatif. Il ne suit pas les routes.`);
-      return;
-    }
-    if (!("geolocation" in navigator)) {
-      setGeoMsg("La géolocalisation n'est pas disponible sur cet appareil. Activez-la pour afficher le tracé.");
-      return;
-    }
-    setGeoMsg("Autorisez la localisation pour afficher un tracé direct vers ce lieu…");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUser([pos.coords.latitude, pos.coords.longitude]);
-        setRouteTarget(place.slug);
-        setGeoMsg(`Tracé direct vers ${place.name} affiché à titre indicatif. Il ne suit pas les routes.`);
-      },
-      (err) => setGeoMsg(err.code === err.PERMISSION_DENIED
-        ? "Localisation refusée. Autorisez-la pour afficher le tracé vers ce lieu."
-        : "Votre position n'a pas pu être déterminée. Réessayez."),
-      { enableHighAccuracy: false, timeout: 10000 },
-    );
+    setSelected(place.slug); setRouteTarget(place.slug); setActiveStep(null); setRoute(null); setRouteError("");
+    if (window.innerWidth < 1024) mapBox.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    if (user) { setOrigin(user); return; }
+    setLocating(true);
+    position((here) => { setLocating(false); setOrigin(here); }, (msg) => { setLocating(false); setRouteError(msg); });
   };
-  const routePlace = places.find((p) => p.slug === routeTarget);
-  const route = useMemo<[[number, number], [number, number]] | null>(() => user && routePlace
-    ? [user, [routePlace.latitude, routePlace.longitude]]
-    : null, [user, routePlace]);
+  const changeMode = (m: TravelMode) => { setMode(m); setActiveStep(null); if (user) setOrigin(user); };
+  const closeRoute = () => { setRouteTarget(null); setRoute(null); setRouteError(""); setActiveStep(null); };
+
+  const routePlace = (data ?? []).find((p) => p.slug === routeTarget);
+  useEffect(() => {
+    if (!routePlace || !origin) return;
+    let live = true;
+    setRouteLoading(true); setRouteError("");
+    getRoute(origin, [routePlace.latitude, routePlace.longitude], mode)
+      .then((r) => { if (live) setRoute(r); })
+      .catch((e) => { if (live) { setRoute(null); setRouteError(apiErrorMessage(e)); } })
+      .finally(() => { if (live) setRouteLoading(false); });
+    return () => { live = false; };
+  }, [routePlace?.slug, origin, mode]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const straight = useMemo<[[number, number], [number, number]] | null>(() => user && routePlace && !route
+    ? [user, [routePlace.latitude, routePlace.longitude]] : null, [user, routePlace, route]);
+  const stepFocus = activeStep !== null ? route?.steps[activeStep]?.location ?? null : null;
 
   return (
     <>
@@ -116,18 +149,18 @@ export default function MapPage() {
       <Section>
         {loading ? <Loading label="Chargement de la carte…" /> : error ? <ErrorState message={error} onRetry={retry} /> :
           !places.length ? <EmptyState message="Aucun lieu ne correspond à ces critères." action={<Button variant="secondary" onClick={reset}>Réinitialiser</Button>} /> : (
-            <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
-              <div className="relative overflow-hidden rounded-2xl border border-navy/10 shadow-soft">
+            <div className="grid gap-6 lg:grid-cols-[1fr_24rem]">
+              <div ref={mapBox} className="relative scroll-mt-20 overflow-hidden rounded-2xl border border-navy/10 shadow-soft">
                 <Suspense fallback={<Loading label="Chargement de la carte…" />}>
-                  <MapView places={places} selected={selected} user={user} route={route} onRoutePlace={showRoute} className="h-[50vh] min-h-[300px] w-full sm:h-[60vh] lg:h-[70vh]" />
+                  <MapView places={places} selected={selected} user={user} accuracy={accuracy} path={route?.geometry ?? null} straight={straight}
+                    focus={stepFocus} recenter={recenter} onRoutePlace={showRoute} className="h-[50vh] min-h-[300px] w-full sm:h-[60vh] lg:h-[70vh]" />
                 </Suspense>
               </div>
-              {route && routePlace && (
-                <p className="rounded-xl border border-green/20 bg-green/5 p-4 text-sm text-navy/80 lg:col-span-2">
-                  <span className="flex items-center gap-2 font-semibold text-green"><Route className="h-4 w-4" aria-hidden="true" />Tracé indicatif vers {routePlace.name}</span>
-                  <span className="mt-1 block">Ligne directe d'environ {distanceKm(route[0], route[1]).toFixed(1)} km, à vol d'oiseau. Ce tracé ne suit pas les routes et ne fournit pas de guidage vocal.</span>
-                </p>
-              )}
+              {routePlace ? (
+                <RoutePanel place={routePlace} mode={mode} route={route} loading={routeLoading} error={routeError} locating={locating}
+                  user={user} activeStep={activeStep} onMode={changeMode} onStep={setActiveStep}
+                  onRecenter={() => { setActiveStep(null); setRecenter((n) => n + 1); }} onClose={closeRoute} />
+              ) : (
               <section aria-label="Liste des lieux" className="relative overflow-hidden rounded-2xl border border-navy/10 bg-white p-4 shadow-soft max-h-[60vh] sm:max-h-[70vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-3">
                   <p className="font-semibold text-navy">{places.length} lieu{places.length > 1 ? "x" : ""}</p>
@@ -148,7 +181,7 @@ export default function MapPage() {
                     </li>
                   ))}
                 </ul>
-              </section>
+              </section>)}
             </div>)}
         <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-navy/80">
           <span className="flex items-center gap-2"><span aria-hidden className="inline-block h-3.5 w-3.5 rounded-full bg-green" />Lieu</span>

@@ -53,3 +53,29 @@ class MapCategoryListView(generics.ListAPIView):
 
     def get_queryset(self):
         return MapCategory.objects.filter(is_active=True)
+
+
+# ---------- Itinéraires (OpenRouteService) ----------
+from rest_framework.decorators import api_view, authentication_classes, permission_classes, throttle_classes  # noqa: E402
+from rest_framework.response import Response  # noqa: E402
+from rest_framework.throttling import AnonRateThrottle  # noqa: E402
+
+from . import routing  # noqa: E402
+
+
+class RouteThrottle(AnonRateThrottle):
+    rate = "60/hour"  # protège le quota du service d'itinéraires
+
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+@throttle_classes([RouteThrottle])
+def route(request):
+    """GET /api/map/route/?from=lat,lng&to=lat,lng&mode=driving|foot → trajet par les routes, durée, étapes en français."""
+    try:
+        start = routing.parse_point(request.query_params.get("from"))
+        end = routing.parse_point(request.query_params.get("to"))
+        return Response(routing.route(start, end, request.query_params.get("mode", "driving")))
+    except routing.RouteError as e:
+        return Response({"detail": str(e)}, status=e.status)
