@@ -75,7 +75,10 @@ const STYLES: Record<CheckinResult["result"], { box: string; icon: typeof Circle
   already: { box: "border-gold bg-gold/20 text-navy", icon: TriangleAlert, title: "Déjà enregistré aujourd'hui" },
   cancelled: { box: "border-red-700 bg-red-50 text-red-900", icon: CircleX, title: "Inscription annulée" },
   invalid: { box: "border-red-700 bg-red-50 text-red-900", icon: CircleX, title: "Badge inconnu" },
+  gala_refused: { box: "border-red-700 bg-red-50 text-red-900", icon: CircleX, title: "Accès au Gala refusé" },
 };
+
+type Point = "site" | "gala";
 
 function ResultCard({ r, onNext }: { r: CheckinResult; onNext: () => void }) {
   const s = STYLES[r.result];
@@ -94,7 +97,7 @@ function ResultCard({ r, onNext }: { r: CheckinResult; onNext: () => void }) {
   );
 }
 
-function ManualSearch({ onDone, full }: { onDone: () => void; full: boolean }) {
+function ManualSearch({ onDone, full, point }: { onDone: () => void; full: boolean; point: Point }) {
   const [q, setQ] = useState("");
   const query = useDebounce(q);
   const [version, setVersion] = useState(0);
@@ -107,7 +110,7 @@ function ManualSearch({ onDone, full }: { onDone: () => void; full: boolean }) {
     setBusy(p.id); setNotice(null);
     try {
       if (action === "checkin") {
-        const r = await coordApi.checkin({ id: p.id });
+        const r = await coordApi.checkin({ id: p.id, point });
         setNotice({ ok: r.result === "ok", text: `${p.name} : ${r.message}${r.today_at && r.result === "already" ? ` (à ${r.today_at})` : ""}` });
         onDone();
       } else if (action === "reissue") setNotice({ ok: true, text: await coordApi.checkinReissue(p.id) });
@@ -199,6 +202,8 @@ function PrintCard() {
 
 /** Accueil du Grand Week-End : scan des badges, arrivées du jour, recherche manuelle (comptes Coordination). */
 export function CheckInPanel({ full = true }: { full?: boolean }) {
+  // Point de contrôle : entrée du site (une fois par jour) ou Gala (contrôle séparé, seulement les badges avec accès Gala)
+  const [point, setPoint] = useState<Point>("site");
   const [version, setVersion] = useState(0);
   const stats = useAsync(coordApi.checkinStats, [version]);
   const [scanning, setScanning] = useState(false);
@@ -213,13 +218,13 @@ export function CheckInPanel({ full = true }: { full?: boolean }) {
     last.current = { code, at: now };
     setBusy(true); setFailure("");
     try {
-      const r = await coordApi.checkin({ code });
+      const r = await coordApi.checkin({ code, point });
       setResult(r);
       navigator.vibrate?.(r.result === "ok" ? 120 : [120, 80, 120]);
       setVersion((v) => v + 1);
     } catch (e) { setFailure(apiErrorMessage(e)); }
     finally { setBusy(false); }
-  }, [busy, result]);
+  }, [busy, result, point]);
 
   useEffect(() => {  // badge valide : retour automatique au scan pour fluidifier la file d'attente
     if (result?.result !== "ok") return;
@@ -240,6 +245,13 @@ export function CheckInPanel({ full = true }: { full?: boolean }) {
           {full && <div className="rounded-xl bg-white p-3 text-center shadow-soft"><dd className="font-heading text-2xl font-extrabold sm:text-3xl">{s.waitlist ?? 0}</dd><dt className="text-xs text-navy/70 sm:text-sm">en liste d'attente</dt></div>}
         </dl>)}
 
+      <fieldset className="grid grid-cols-2 gap-2 rounded-2xl bg-white p-1.5 shadow-soft">
+        <legend className="sr-only">Point de contrôle</legend>
+        {(["site", "gala"] as const).map((p) => (
+          <label key={p} className={`flex min-h-[48px] cursor-pointer items-center justify-center rounded-xl text-center font-semibold ${point === p ? (p === "gala" ? "bg-navy text-gold-light" : "bg-green text-white") : "text-navy/70"}`}>
+            <input type="radio" name="point" value={p} checked={point === p} onChange={() => { setPoint(p); setResult(null); }} className="sr-only" />
+            {p === "site" ? "Entrée du site" : "Entrée du Gala"}</label>))}
+      </fieldset>
       {failure && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 font-semibold text-red-900">{failure}</p>}
       {result && <ResultCard r={result} onNext={() => setResult(null)} />}
       {scanning
@@ -247,7 +259,7 @@ export function CheckInPanel({ full = true }: { full?: boolean }) {
         : <button onClick={() => { setResult(null); setScanning(true); }} className="flex min-h-[64px] w-full items-center justify-center gap-3 rounded-2xl bg-green text-xl font-semibold text-white shadow-soft hover:bg-green-2">
             <Camera className="h-7 w-7" aria-hidden />Démarrer le scan</button>}
 
-      <ManualSearch full={full} onDone={() => setVersion((v) => v + 1)} />
+      <ManualSearch full={full} point={point} onDone={() => setVersion((v) => v + 1)} />
       {full && <UnsentCard />}
       {full && <PrintCard />}
     </div>

@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from apps.core.admin import PublishActionsMixin, SubmissionAdminMixin, TaxonomyAdmin
 from .models import (CheckIn, EventRequest, EventSection, AwardApplication, AwardCategory, BusinessConnectMeeting, BusinessConnectRegistration,
-                     BusinessConnectSlot, Event, EventCategory,
+                     BusinessConnectSlot, Event, EventCategory, GalaRequest, GuestQuota,
                      StandRequest, VolunteerApplication, VolunteerMission)
 
 
@@ -53,6 +53,55 @@ class BusinessConnectMeetingAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+class QuotaGuestInline(admin.TabularInline):
+    model = EventRequest
+    fk_name = "guest_quota"
+    fields = ("name", "job_title", "organization", "email", "status", "gala_access")
+    readonly_fields = fields
+    extra = 0
+    can_delete = False
+    verbose_name_plural = "invités désignés"
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(GuestQuota)
+class GuestQuotaAdmin(admin.ModelAdmin):
+    """Quota attribué d'après une convention, une table du Gala réservée ou une délégation validée. Les invités sont désignés
+    par le contact sur son lien personnel ; aucun invité fictif n'est créé."""
+    list_display = ("__str__", "holder_email", "quota", "invites", "gala_access", "link_sent_at")
+    list_filter = ("kind", "gala_access")
+    search_fields = ("holder_name", "holder_email", "organization")
+    readonly_fields = ("lien", "link_sent_at", "created_at")
+    inlines = [QuotaGuestInline]
+    actions = ["send_links"]
+
+    @admin.display(description="invités désignés")
+    def invites(self, obj):
+        return f"{obj.active_guests().count()} / {obj.quota}"
+
+    @admin.display(description="lien du contact")
+    def lien(self, obj):
+        from . import badges
+        return badges.quota_url(obj) if obj.pk else "Enregistrez d'abord le quota."
+
+    @admin.action(description="Envoyer (ou renvoyer) le lien au contact")
+    def send_links(self, request, queryset):
+        from django.contrib import messages
+        from . import badges
+        sent = sum(1 for q in queryset if badges.send_quota_link(q))
+        messages.success(request, f"{sent} lien(s) envoyé(s).")
+
+
+@admin.register(GalaRequest)
+class GalaRequestAdmin(SubmissionAdminMixin, admin.ModelAdmin):
+    list_display = ("name", "organization", "interest", "seats", "status_badge", "created_at")
+    list_filter = ("status", "interest")
+    search_fields = ("name", "organization", "email")
+    readonly_fields = ("created_at", "updated_at")
 
 
 @admin.register(StandRequest)
@@ -106,7 +155,7 @@ class CheckInInline(admin.TabularInline):
 @admin.register(EventRequest)
 class EventRequestAdmin(SubmissionAdminMixin, admin.ModelAdmin):
     list_display = ("reference", "name", "kind", "badge_category", "organization", "email", "status_badge", "badge_envoye", "arrivees", "created_at")
-    list_filter = ("status", "kind", "badge_category")
+    list_filter = ("status", "kind", "badge_category", "gala_access")
     search_fields = ("name", "organization", "email", "phone", "badge_number")
     readonly_fields = ("created_at", "updated_at", "choix", "badge_sent_at", "lien_badge")
     inlines = [CheckInInline]

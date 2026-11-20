@@ -29,6 +29,7 @@ export const router = createBrowserRouter([
       { path: "jy-serai", ...lazyPage(() => import("./pages/JySerai")) },
       { path: "suivi", ...lazyNamed(() => import("./pages/Suivi"), "SuiviHome") },
       { path: "suivi/:token", ...lazyPage(() => import("./pages/Suivi")) },
+      { path: "invites/:token", ...lazyPage(() => import("./pages/Invites")) },
       { path: "desinscription/:token", ...lazyPage(() => import("./pages/Unsubscribe")) },
       { path: "espace-membres/mot-de-passe", ...lazyPage(() => import("./pages/SetPassword")) },
       { path: "espace-membres/mot-de-passe-oublie", ...lazyPage(() => import("./pages/ForgotPassword")) },

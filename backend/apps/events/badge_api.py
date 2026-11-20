@@ -127,6 +127,7 @@ RESULT_MESSAGES = {
     "already": "Déjà enregistré aujourd'hui.",
     "cancelled": "Inscription annulée : badge non valable.",
     "invalid": "Badge inconnu.",
+    "gala_refused": "Accès au Gala non autorisé : ce badge ne comprend pas le Gala.",
 }
 
 
@@ -139,9 +140,10 @@ def checkin(request):
         r = badges.find_by_code(str(request.data.get("code", "")))
     if r is None:
         return Response({"result": "invalid", "message": RESULT_MESSAGES["invalid"]})
-    result, data = badges.check_in(r, request.user)
+    point = str(request.data.get("point", "site"))
+    result, data = badges.check_in(r, request.user, point=point)
     if result == "ok":
-        audit(request.user, r, "Accueil : arrivée enregistrée")
+        audit(request.user, r, "Accueil : Gala, entrée enregistrée" if point == "gala" else "Accueil : arrivée enregistrée")
     return Response({"result": result, "message": RESULT_MESSAGES[result], "id": r.pk, **data})
 
 
@@ -161,7 +163,8 @@ def _person(r, full):
     return {"id": r.pk, "name": r.name, "organization": r.organization, "email": r.email if full else _mask(r.email),
             "phone": r.phone if full else "", "valid": badges.is_confirmed(r), "status": r.get_status_display(),
             "category": badges.category_label(r), "reference": badges.reference(r), "badge_sent": bool(r.badge_sent_at),
-            "badge_error": r.badge_error if full else "", "checkins": [c.day.isoformat() for c in r.checkins.all()]}
+            "badge_error": r.badge_error if full else "", "gala": r.gala_access,
+            "checkins": [c.day.isoformat() for c in r.checkins.all() if c.point == "site"]}
 
 
 @reception_api(["GET"])

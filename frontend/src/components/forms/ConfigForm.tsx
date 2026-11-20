@@ -1,8 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm, type FieldValues } from "react-hook-form";
 import { z } from "zod";
-import { submitFormFull, submitMultipartFull, type SubmitResult } from "../../services/api";
+import { saveDraft, submitFormFull, submitMultipartFull, type SubmitResult } from "../../services/api";
 import { apiErrorMessage, applyServerErrors } from "../../utils/errors";
 import { FormField, fieldProps } from "./FormField";
 import { Honeypot } from "./Honeypot";
@@ -22,7 +22,18 @@ interface Props {
   endpoint: string; fields: FieldDef[]; submitLabel?: string; extra?: Record<string, unknown>; successFallback?: string;
   /** Valeurs déjà connues (ex. coordonnées reprises de l'inscription) : la personne peut les modifier. */
   initial?: Record<string, unknown>;
+  /** Dossier long : « Enregistrer et reprendre plus tard » (brouillon non déposé, lien envoyé par e-mail). */
+  draft?: { form: string; token?: string };
+  /** Dossier long : progression des champs obligatoires. */
+  showProgress?: boolean;
+  /** Sauvegarde automatique dans le navigateur : une coupure ne fait pas perdre le texte saisi. */
+  autosaveKey?: string;
 }
+
+const readSaved = (key?: string): Record<string, unknown> | null => {
+  if (!key) return null;
+  try { return JSON.parse(window.localStorage.getItem(key) || "null"); } catch { return null; }
+};
 
 const REQUIRED = "Ce champ est obligatoire.";
 
@@ -47,12 +58,30 @@ export function buildSchema(fields: FieldDef[]) {
   return z.object(shape);
 }
 
-export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, successFallback, initial }: Props) {
+export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, successFallback, initial, draft, showProgress, autosaveKey }: Props) {
+  const start = useMemo(() => initial ?? readSaved(autosaveKey) ?? undefined, [initial, autosaveKey]);
   const schema = useMemo(() => buildSchema(fields), [fields]);
-  const defaults = useMemo(() => Object.fromEntries(fields.filter((f) => f.type !== "file").map((f) => [f.name, f.type === "multi" ? [] : f.type === "consent" || f.type === "check" ? false : (initial?.[f.name] as string | undefined) ?? ""])), [fields, initial]);
+  const defaults = useMemo(() => Object.fromEntries(fields.filter((f) => f.type !== "file").map((f) => [f.name, f.type === "multi" ? [] : f.type === "consent" || f.type === "check" ? (start?.[f.name] === true) : (start?.[f.name] as string | undefined) ?? ""])), [fields, start]);
   const { register, handleSubmit, setError, watch, formState: { errors, isSubmitting } } = useForm<FieldValues>({ resolver: zodResolver(schema), defaultValues: defaults });
   const values = watch();
   const visible = (f: FieldDef) => !f.showIf || !!values[f.showIf];
+  const [draftNotice, setDraftNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [draftToken, setDraftToken] = useState(draft?.token);
+  const textValues = () => Object.fromEntries(Object.entries(values).filter(([k, v]) => k !== "company_website" && !(typeof FileList !== "undefined" && v instanceof FileList)));
+  const snapshot = JSON.stringify(textValues());
+  useEffect(() => {  // sauvegarde locale à chaque saisie
+    if (!autosaveKey) return;
+    try { window.localStorage.setItem(autosaveKey, snapshot); } catch { /* stockage indisponible : sans effet */ }
+  }, [autosaveKey, snapshot]);
+  const required = fields.filter((f) => visible(f) && (f.required || f.type === "consent"));
+  const filled = required.filter((f) => (f.type === "consent" ? values[f.name] === true : String(values[f.name] ?? "").trim() !== "")).length;
+  const keepForLater = async () => {
+    if (!draft) return;
+    const email = String(values.email ?? "").trim();
+    if (!email) return setDraftNotice({ ok: false, text: "Indiquez d'abord votre e-mail : le lien pour reprendre y sera envoyé." });
+    try { const r = await saveDraft(draft.form, email, textValues(), draftToken); setDraftToken(r.token); setDraftNotice({ ok: true, text: r.detail }); }
+    catch (e) { setDraftNotice({ ok: false, text: apiErrorMessage(e) }); }
+  };
   const [done, setDone] = useState<SubmitResult | null>(null);
   const [failure, setFailure] = useState("");
   const err = (n: string) => errors[n]?.message as string | undefined;
@@ -80,6 +109,7 @@ export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, s
         r = await submitMultipartFull(endpoint, form);
       } else r = await submitFormFull(endpoint, payload);
       setDone({ ...r, detail: r.detail || successFallback || "Merci." });
+      if (autosaveKey) try { window.localStorage.removeItem(autosaveKey); } catch { /* sans effet */ }
     }
     catch (e) { if (!applyServerErrors(e, setError as never)) setFailure(apiErrorMessage(e)); }
   };
@@ -88,6 +118,11 @@ export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, s
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="relative grid gap-5 sm:grid-cols-2">
       <Honeypot register={register} />
+      {showProgress && !!required.length && (
+        <div className="sm:col-span-2" aria-live="polite">
+          <p className="mb-1 text-sm font-semibold">Progression : {filled} / {required.length} champs obligatoires remplis</p>
+          <div className="h-2 overflow-hidden rounded-full bg-navy/10"><div className="h-full rounded-full bg-green transition-all" style={{ width: `${(filled / required.length) * 100}%` }} /></div>
+        </div>)}
       {fields.filter(visible).map((f) => {
         const e = err(f.name), id = `f-${f.name}`;
         if (f.type === "consent") return (
@@ -124,6 +159,11 @@ export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, s
         <button disabled={isSubmitting} className="inline-flex min-h-[52px] w-full items-center justify-center rounded-lg bg-green px-8 text-lg font-semibold text-white shadow-sm transition-colors hover:bg-green-2 disabled:opacity-60 sm:w-auto">
           {isSubmitting ? "Envoi en cours…" : submitLabel}
         </button>
+        {draft && (
+          <button type="button" onClick={keepForLater} className="mt-3 inline-flex min-h-[48px] w-full items-center justify-center rounded-lg border border-navy/20 px-6 font-semibold hover:bg-offwhite sm:ml-3 sm:mt-0 sm:w-auto">
+            Enregistrer et reprendre plus tard</button>)}
+        {draft && <p className="mt-2 text-sm text-navy/60">Un brouillon n'est pas déposé. Les pièces jointes ne sont pas conservées dans le brouillon.</p>}
+        {draftNotice && <p role="status" className={`mt-2 text-sm font-semibold ${draftNotice.ok ? "text-green" : "text-red-800"}`}>{draftNotice.text}</p>}
       </div>
     </form>
   );

@@ -110,7 +110,16 @@ def _stand(s):
             "et les badges de votre équipe. Aucun paiement n'est demandé à ce stade.")
 
 
+def _gala(g):
+    return (g.email, "Votre demande d'information sur le Gala du Pôle",
+            f"Bonjour {g.name},\n\nNous avons bien reçu votre demande d'information ({g.get_interest_display().lower()}, "
+            f"{g.seats} place{'s' if g.seats > 1 else ''}).\nCe n'est ni un achat ni une réservation : aucun paiement n'est demandé "
+            "par ce site. Les places relèvent de la billetterie commune avec The Ground ou d'une invitation. "
+            "Le badge du Grand Week-End ne donne pas accès au Gala.")
+
+
 BUILDERS = {
+    "GalaRequest": _gala,
     "StandRequest": _stand,
     "ContactMessage": _contact, "PartnershipApplication": _partnership, "PressAccreditation": _press, "AwardApplication": _award,
     "BusinessConnectRegistration": _business_connect, "VolunteerApplication": _volunteer, "EventRequest": _event_request,

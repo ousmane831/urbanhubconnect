@@ -23,7 +23,7 @@ const TABS: { id: Tab; label: string; short: string; icon: LucideIcon }[] = [
   { id: "bc", label: "Business Connect", short: "Rendez-vous", icon: Handshake },
   { id: "checkin", label: "Accueil et badges", short: "Badges", icon: ScanLine },
 ];
-const ROLE_LABEL: Record<string, string> = { ADMIN: "Administrateur", COORDINATION: "Coordination", ACCUEIL: "Accueil" };
+const ROLE_LABEL: Record<string, string> = { ADMIN: "Administrateur", COORDINATION: "Coordination", ACCUEIL: "Accueil", AWARDS: "Équipe Awards" };
 
 /** Onglet courant gardé dans l'adresse (?onglet=…) : un rechargement ou un lien partagé rouvre le même écran. */
 function useTab(): [Tab, (t: Tab) => void] {
@@ -46,11 +46,12 @@ const countLabel = (n: number) => (n > 99 ? "99+" : String(n));
 
 function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   // Agent d'accueil : uniquement le contrôle des badges (ni dossiers, ni contenus, ni campagnes)
-  const reception = me.role === "ACCUEIL";
+  // Équipe Awards : uniquement les candidatures (onglet « À traiter », file Awards)
+  const reception = me.role === "ACCUEIL", jury = me.role === "AWARDS";
   const [chosen, setTab] = useTab();
-  const tab: Tab = reception ? "checkin" : chosen;
-  const tabs = reception ? TABS.filter((t) => t.id === "checkin") : TABS;
-  const [kind, setKind] = useState("organizations");
+  const tab: Tab = reception ? "checkin" : jury ? "queue" : chosen;
+  const tabs = reception ? TABS.filter((t) => t.id === "checkin") : jury ? TABS.filter((t) => t.id === "queue") : TABS;
+  const [kind, setKind] = useState(me.role === "AWARDS" ? "awards" : "organizations");
   const [version, setVersion] = useState(0);
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
   const summary = useAsync(() => (reception ? Promise.resolve(null) : coordApi.summary()), [version, reception]);

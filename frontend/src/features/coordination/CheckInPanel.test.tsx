@@ -39,7 +39,7 @@ describe("Accueil : scan des badges", () => {
     render(<MemoryRouter><CheckInPanel /></MemoryRouter>);
     await userEvent.type(screen.getByLabelText(/Nom, organisation/), "awa");
     await userEvent.click(await screen.findByRole("button", { name: "Valider l'arrivée" }, { timeout: 2000 }));
-    expect(coordApi.checkin).toHaveBeenCalledWith({ id: 7 });
+    expect(coordApi.checkin).toHaveBeenCalledWith({ id: 7, point: "site" });
     expect(await screen.findByText(/Awa Ndiaye : Badge valide/)).toBeInTheDocument();
   });
 

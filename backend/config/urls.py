@@ -21,6 +21,8 @@ from apps.core import members_network_api as mn
 from apps.core import suivi_api as sv
 from apps.events import badge_api as bd
 from apps.events import bc_api as bcx
+from apps.events import guests_api as gst
+from apps.core import drafts_api as drf
 from apps.campaigns import api as cp
 admin.site.site_header = "Urban Hub Connect · Coordination"
 admin.site.site_title = "Urban Hub Connect"
@@ -28,7 +30,7 @@ admin.site.index_title = "Tableau de bord de la Coordination"
 
 def robots(request):
     # Pages privées (badges, désinscription, espaces réservés) : jamais indexées.
-    private = "".join(f"Disallow: {p}\n" for p in ("/admin/", "/api/", "/badge/", "/suivi/", "/desinscription/", "/coordination", "/espace-membres"))
+    private = "".join(f"Disallow: {p}\n" for p in ("/admin/", "/api/", "/badge/", "/suivi/", "/invites/", "/desinscription/", "/coordination", "/espace-membres"))
     body = f"User-agent: *\nAllow: /\n{private}\nSitemap: {settings.SITE_URL}/sitemap.xml\n"
     return HttpResponse(body, content_type="text/plain")
 
@@ -104,6 +106,12 @@ urlpatterns = [
     path("api/badges/<str:token>/coordonnees/", bd.badge_contact, name="badge-contact"),
     # Business Connect : créneaux publiés et rendez-vous
     path("api/business-connect/slots/", bcx.public_slots, name="bc-slots"),
+    # Gala, invités d'un quota, brouillons
+    path("api/gwe/gala/", gst.gala_info, name="gwe-gala"),
+    path("api/invites/<str:token>/", gst.guests, name="quota-guests"),
+    path("api/invites/<str:token>/<int:pk>/retirer/", gst.remove_guest, name="quota-guest-remove"),
+    path("api/brouillons/", drf.save, name="draft-save"),
+    path("api/brouillons/<str:token>/", drf.load, name="draft-load"),
     path("api/coordination/business-connect/", bcx.board, name="coord-bc"),
     path("api/coordination/business-connect/meetings/", bcx.meeting_create, name="coord-bc-create"),
     path("api/coordination/business-connect/meetings/<int:pk>/confirm/", bcx.meeting_confirm, name="coord-bc-confirm"),

@@ -7,6 +7,7 @@ class User(AbstractUser):
         ADMIN = "ADMIN", "Administrateur"
         COORDINATION = "COORDINATION", "Coordination"
         ACCUEIL = "ACCUEIL", "Accueil (contrôle des badges)"
+        AWARDS = "AWARDS", "Équipe Awards (candidatures uniquement)"
         MEMBER = "MEMBER", "Membre"
 
     email = models.EmailField("email", unique=True)

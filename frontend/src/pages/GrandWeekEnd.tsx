@@ -16,7 +16,7 @@ import { EventRequestForm } from "../features/events/EventRequestForm";
 import { PartnerBand } from "../features/events/PartnerBand";
 import { useAsync } from "../hooks/useAsync";
 import { useSeo } from "../hooks/useSeo";
-import { getAwardCategoryStates, getBadgeContact, getBcSlots, getDocuments, getEvent, getGwePlaces, getVolunteerMissions, type AwardCategoryState } from "../services/api";
+import { getAwardCategoryStates, getBadgeContact, getBcSlots, getGalaInfo, loadDraft, getDocuments, getEvent, getGwePlaces, getVolunteerMissions, type AwardCategoryState } from "../services/api";
 import type { EventDetail } from "../types/api";
 import { fmtDate, fmtDays } from "../utils/format";
 import { parseBlocks } from "../utils/richtext";
@@ -291,6 +291,10 @@ export default function GrandWeekEnd() {
   const search = new URLSearchParams(useLocation().search);
   const badgeToken = search.get("badge"), badgeKey = search.get("cle");
   const contact = useAsync(() => (badgeToken && badgeKey ? getBadgeContact(badgeToken, badgeKey) : Promise.resolve(null)), [badgeToken, badgeKey]);
+  const galaInfo = useAsync(getGalaInfo);
+  // Brouillon de candidature (?brouillon=…) : reprise du dossier non déposé
+  const draftToken = search.get("brouillon");
+  const draft = useAsync(() => (draftToken ? loadDraft(draftToken).catch(() => null) : Promise.resolve(null)), [draftToken]);
   const missions = useAsync(getVolunteerMissions);
   const dossier = useAsync(() => getDocuments("partnership"));
   const rules = useAsync(() => getDocuments("awards_rules"));
@@ -372,6 +376,15 @@ export default function GrandWeekEnd() {
     { name: "message", label: "Message (facultatif)", type: "textarea" },
     { name: "accept_charter", label: "J'accepte la Charte des bénévoles.", type: "consent" },
     { name: "photo_consent", label: "J'accepte d'être pris(e) en photo et que ces photos soient diffusées (facultatif).", type: "check" }];
+  const galaFields: FieldDef[] = [
+    { name: "interest", label: "Votre demande", type: "select", required: true, options: [
+      { value: "seat", label: "Place individuelle (100 000 ou 150 000 FCFA)" }, { value: "table", label: "Table nominative de 10 (1 750 000 FCFA)" },
+      { value: "invitation", label: "Invitation" }] },
+    { name: "seats", label: "Nombre de places", type: "number", required: true },
+    { name: "name", label: "Prénom et nom", type: "text", required: true }, { name: "organization", label: "Organisation", type: "text" },
+    { name: "email", label: "E-mail", type: "email", required: true }, { name: "phone", label: "Téléphone", type: "tel" },
+    { name: "message", label: "Message (facultatif)", type: "textarea" },
+    { name: "accept_privacy", label: "J'accepte la politique de confidentialité.", type: "consent" }];
   const stand: FieldDef[] = [
     { name: "space", label: "Espace souhaité", type: "select", required: true,
       options: [{ value: "village", label: "Stand au Village du Pôle" }, { value: "terroir", label: "Marché du terroir" }] },
@@ -468,7 +481,9 @@ export default function GrandWeekEnd() {
               </div>)}
             <div className="grid gap-3 sm:flex sm:flex-wrap sm:items-start">
               {awards.data?.length
-                ? <Reveal label="Déposer une candidature" tone="light" block><ConfigForm key={awards.data.length} endpoint="/awards/applications/" fields={aw} submitLabel="Envoyer ma candidature" successFallback="Merci. Votre candidature a bien été transmise." /></Reveal>
+                ? <Reveal label="Déposer une candidature" tone="light" block defaultOpen={!!draft.data}><ConfigForm key={`${awards.data.length}-${draft.data ? "brouillon" : "neuf"}`}
+                    endpoint="/awards/applications/" fields={aw} initial={draft.data?.data} showProgress autosaveKey="uhc-candidature-awards"
+                    draft={{ form: "awards", token: draft.data?.token }} submitLabel="Envoyer ma candidature" successFallback="Merci. Votre candidature a bien été transmise." /></Reveal>
                 : <p className="text-white/75">Les candidatures ouvriront prochainement.</p>}
               {rules.data?.[0] ? <DocButton doc={rules.data[0]} label="Télécharger le règlement" light /> : <p className="self-center text-white/65">Le règlement sera disponible prochainement.</p>}
             </div>
@@ -511,6 +526,18 @@ export default function GrandWeekEnd() {
               <h2 className="font-heading text-3xl text-gold-light sm:text-5xl">{gala.title}</h2>
               <div className="mx-auto mt-6 h-px w-24 bg-gold/60" />
               <p className="mt-6 text-left text-lg leading-relaxed text-white/90 sm:text-center">{gala.body}</p>
+              <div className="mt-8 flex flex-col items-center gap-3">
+                {galaInfo.data?.ticket_url
+                  ? <a href={galaInfo.data.ticket_url} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex min-h-[48px] items-center justify-center rounded-lg bg-gold px-6 font-semibold text-navy hover:bg-gold-light">Billetterie officielle (avec The Ground)</a>
+                  : <p className="text-sm text-white/70">Le lien de la billetterie officielle sera communiqué ici. En attendant, vous pouvez demander des informations.</p>}
+              </div>
+            </div>
+            <div className="mx-auto mt-6 max-w-3xl text-left">
+              <Reveal label="Demander des informations sur le Gala" tone="light" block>
+                <p className="mb-4 rounded-lg bg-offwhite p-3 text-sm text-navy/75">Ce formulaire n'est ni un achat ni une réservation, et aucun paiement n'est demandé ici. Le badge du Grand Week-End ne donne pas accès au Gala.</p>
+                <ConfigForm endpoint="/gala/" fields={galaFields} submitLabel="Envoyer ma demande" />
+              </Reveal>
             </div>
           </Container>
         </section>)}

@@ -25,7 +25,7 @@ from django.utils import timezone
 from django.utils.crypto import constant_time_compare, salted_hmac
 from django.utils.html import escape
 
-from .models import CheckIn, Event, EventRequest
+from .models import CheckIn, Event, EventRequest, GuestQuota
 
 logger = logging.getLogger(__name__)
 EVENT_SLUG = "grand-week-end-du-pole-2026"
@@ -124,7 +124,7 @@ def badge_png(r):
     from .badge_image import render
     info = event_info()
     return render(name=r.name, job_title=r.job_title, organization=r.organization, number=ensure_number(r),
-                  category=category_label(r), event_title=re.sub(r"\s+\d{4}$", "", info["title"]), dates=info["dates"],
+                  category=category_label(r) + (" · Gala" if r.gala_access else ""), event_title=re.sub(r"\s+\d{4}$", "", info["title"]), dates=info["dates"],
                   location=info["location"], qr_data=badge_url(r))
 
 
@@ -152,8 +152,9 @@ def payload(r):
     """Informations du badge pour son titulaire et pour l'accueil (jamais l'e-mail ni le téléphone)."""
     return {"name": r.name, "organization": r.organization, "job_title": r.job_title, "number": r.badge_number,
             "reference": reference(r), "kind": r.get_kind_display(), "category": category_label(r), "days": r.days_display(),
-            "valid": is_confirmed(r), "confirmed": is_confirmed(r), "status": r.get_status_display(),
-            "checkins": [{"day": c.day.isoformat(), "at": timezone.localtime(c.at).strftime("%H h %M")} for c in r.checkins.order_by("day")]}
+            "valid": is_confirmed(r), "confirmed": is_confirmed(r), "status": r.get_status_display(), "gala": r.gala_access,
+            "checkins": [{"day": c.day.isoformat(), "at": timezone.localtime(c.at).strftime("%H h %M"), "point": c.point}
+                         for c in r.checkins.order_by("day")]}
 
 
 # ---------- E-mail ----------
@@ -301,19 +302,23 @@ def find_by_code(code):
     return EventRequest.objects.filter(badge_token=m.group(1), kind__in=EventRequest.BADGE_KINDS).first() if m else None
 
 
-def check_in(r, user=None, today=None):
-    """Enregistre l'arrivée du jour. Retourne (résultat, données) ; résultat : ok, already, cancelled."""
+def check_in(r, user=None, today=None, point="site"):
+    """Enregistre le passage du jour à un point de contrôle (entrée du site ou Gala).
+    Retourne (résultat, données) ; résultat : ok, already, cancelled, gala_refused."""
     today = today or timezone.localdate()
+    point = point if point in CheckIn.Point.values else CheckIn.Point.SITE
     if not is_confirmed(r):
         return "cancelled", payload(r)
+    if point == CheckIn.Point.GALA and not r.gala_access:  # le badge visiteur ne donne pas accès au Gala
+        return "gala_refused", payload(r)
     try:
         with transaction.atomic():
-            CheckIn.objects.create(registration=r, day=today, by=user if user and user.is_authenticated else None)
+            CheckIn.objects.create(registration=r, day=today, point=point, by=user if user and user.is_authenticated else None)
         result = "ok"
-    except IntegrityError:  # déjà scanné aujourd'hui (même si deux téléphones scannent en même temps)
+    except IntegrityError:  # déjà scanné aujourd'hui à ce point (même si deux téléphones scannent en même temps)
         result = "already"
     data = payload(r)
-    data["today_at"] = next((c["at"] for c in data["checkins"] if c["day"] == today.isoformat()), "")
+    data["today_at"] = next((c["at"] for c in data["checkins"] if c["day"] == today.isoformat() and c["point"] == point), "")
     return result, data
 
 
@@ -321,7 +326,7 @@ def stats(today=None):
     today = today or timezone.localdate()
     regs = EventRequest.objects.filter(kind__in=EventRequest.BADGE_KINDS, status="accepted")
     days = {}
-    for c in CheckIn.objects.filter(registration__in=regs).values_list("day", flat=True):
+    for c in CheckIn.objects.filter(registration__in=regs, point=CheckIn.Point.SITE).values_list("day", flat=True):
         days[c.isoformat()] = days.get(c.isoformat(), 0) + 1
     base = EventRequest.objects.filter(kind__in=EventRequest.BADGE_KINDS)
     return {"registered": regs.count(), "today": days.get(today.isoformat(), 0), "by_day": days,
@@ -366,3 +371,74 @@ def qr_zip(only_new=False):
             writer.writerow([r.badge_number, reference(r), r.name, r.job_title, r.organization, category_label(r), name])
         z.writestr("liste-des-badges.csv", "﻿" + listing.getvalue())  # BOM : accents corrects à l'ouverture dans Excel
     return buf.getvalue(), len(rows)
+
+
+# ---------- Invités d'un quota (table du Gala, partenaire, délégation) ----------
+QUOTA_CATEGORY = {"gala_table": "participant", "partner": "partner", "delegation": "institution"}
+
+
+def quota_url(q):
+    return f"{frontend_url()}/invites/{q.token}"
+
+
+def send_quota_link(q):
+    """Lien personnel du contact : il désigne ses invités, dans la limite du quota."""
+    from django.core.mail import send_mail
+    from apps.core import dossiers
+    body = (f"Bonjour {q.holder_name},\n\nLa Coordination vous attribue {q.quota} accréditation{'s' if q.quota > 1 else ''} "
+            f"({q.get_kind_display().lower()}) pour le Grand Week-End du Pôle.\n\n"
+            f"Désignez vos invités depuis ce lien personnel (ne le transmettez pas) :\n{quota_url(q)}\n\n"
+            "Chaque invité reçoit un badge nominatif valable pour les deux journées."
+            + (" Ces badges donnent aussi accès au Gala du Pôle." if q.gala_access else " Ces badges ne donnent pas accès au Gala.")
+            + f"\n\nUrban Hub Connect\n\n--\n{dossiers.footer()}")
+    try:
+        send_mail("Grand Week-End du Pôle : désignez vos invités", body, settings.DEFAULT_FROM_EMAIL, [q.holder_email], fail_silently=False)
+    except Exception:
+        logger.exception("Lien de quota non envoyé (%s)", q.pk)
+        return False
+    q.link_sent_at = timezone.now()
+    q.save(update_fields=["link_sent_at"])
+    return True
+
+
+def add_guest(q, name, job_title="", organization="", email=""):
+    """Invité désigné par le contact : inscription confirmée (attribution validée), badge envoyé à l'invité ou au contact."""
+    if q.remaining() <= 0:
+        raise ValueError("Le quota est atteint.")
+    r = EventRequest.objects.create(
+        kind=EventRequest.Kind.REGISTRATION, name=name.strip()[:150], job_title=job_title.strip()[:150],
+        organization=(organization or q.organization).strip()[:200], email=(email or q.holder_email).strip(), accept_privacy=True,
+        badge_category=QUOTA_CATEGORY.get(q.kind, "participant"), gala_access=q.gala_access, guest_quota=q)
+    issue(r, force=True)  # quota validé : hors liste d'attente
+    return r
+
+
+# ---------- Rappel pratique (un seul par personne et par édition) ----------
+def send_reminders(limit=40):
+    """Envoie le rappel pratique aux inscriptions confirmées qui ne l'ont pas reçu, si la Coordination l'a activé."""
+    from django.core.mail import send_mail
+    from apps.core import dossiers
+    from apps.core.models import SiteSettings
+    site = SiteSettings.load()
+    if not site.reminder_enabled:
+        return 0
+    info, sent = event_info(), 0
+    title = re.sub(r"\s+\d{4}$", "", re.sub(r"^(le|la)\s+", "", info["title"], flags=re.I))
+    qs = (EventRequest.objects.filter(kind__in=EventRequest.BADGE_KINDS, status="accepted", reminder_sent_at__isnull=True)
+          .order_by("badge_number")[:limit])
+    for r in qs:
+        body = (f"Bonjour {r.name},\n\nRappel : le {title} a lieu les {info['dates']} {_where(info['location'])}.\n\n"
+                + (f"{site.reminder_text.strip()}\n\n" if site.reminder_text.strip() else "")
+                + f"Votre badge (référence {reference(r)}) : {owner_url(r)}\nPrésentez-le à l'accueil, sur votre téléphone ou imprimé.\n\n"
+                f"Urban Hub Connect\n\n--\n"
+                "Ce message est automatique. Aucune réponse n'est nécessaire. Si vous avez besoin d'aide, utilisez le formulaire "
+                f"d'assistance : {dossiers.site()}/suivi#aide")
+        try:
+            send_mail(f"Rappel : {title}", body, settings.DEFAULT_FROM_EMAIL, [r.email], fail_silently=False)
+        except Exception:
+            logger.exception("Rappel non envoyé (inscription %s)", r.pk)
+            continue
+        r.reminder_sent_at = timezone.now()
+        r.save(update_fields=["reminder_sent_at", "updated_at"])
+        sent += 1
+    return sent

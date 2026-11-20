@@ -334,6 +334,12 @@ class EventRequest(Submission):
 
     # Catégorie imprimée en toutes lettres sur le badge ; modifiable par la Coordination dans l'administration.
     badge_category = models.CharField("catégorie du badge", max_length=15, choices=BadgeCategory.choices, default=BadgeCategory.PARTICIPANT)
+    # Droit Gala : jamais déduit de la catégorie ; seulement après attribution validée ou preuve de réservation officielle
+    gala_access = models.BooleanField("accès au Gala", default=False,
+                                      help_text="À cocher seulement après attribution validée ou preuve de réservation de la billetterie officielle.")
+    guest_quota = models.ForeignKey("GuestQuota", null=True, blank=True, on_delete=models.SET_NULL, related_name="guests",
+                                    verbose_name="invité au titre de")
+    reminder_sent_at = models.DateTimeField("rappel envoyé le", null=True, blank=True, editable=False)
 
     BADGE_KINDS = (Kind.REGISTRATION, Kind.CARAVAN)
 
@@ -363,16 +369,84 @@ class EventRequest(Submission):
             raise ValidationError({"options": "Choix inconnu."})
 
 
+class GalaRequest(Submission):
+    """Demande d'information sur le Gala : jamais un achat ni un encaissement local (billetterie commune avec The Ground)."""
+    class Interest(models.TextChoices):
+        SEAT = "seat", "Place individuelle"
+        TABLE = "table", "Table nominative de 10"
+        INVITATION = "invitation", "Invitation"
+
+    name = models.CharField(max_length=150)
+    organization = models.CharField(max_length=200, blank=True)
+    email = models.EmailField()
+    phone = models.CharField(max_length=30, blank=True)
+    interest = models.CharField("demande", max_length=12, choices=Interest.choices)
+    seats = models.PositiveSmallIntegerField("nombre de places", default=1)
+    message = models.TextField(blank=True)
+    accept_privacy = models.BooleanField(default=False)
+
+    class Meta(Submission.Meta):
+        verbose_name, verbose_name_plural = "demande d'information Gala", "demandes d'information Gala"
+
+    def __str__(self):
+        return f"{self.name} — {self.get_interest_display()}"
+
+
+class GuestQuota(models.Model):
+    """Quota d'invités attribué par la Coordination (table du Gala, partenaire d'après convention, délégation). Le contact
+    désigne ses invités par un lien personnel, dans la limite du quota ; chaque invité reçoit un badge nominatif."""
+    class Kind(models.TextChoices):
+        GALA_TABLE = "gala_table", "Table nominative du Gala"
+        PARTNER = "partner", "Partenaire (d'après la convention)"
+        DELEGATION = "delegation", "Délégation institutionnelle"
+
+    kind = models.CharField("type", max_length=12, choices=Kind.choices)
+    holder_name = models.CharField("contact", max_length=150)
+    holder_email = models.EmailField("e-mail du contact")
+    organization = models.CharField(max_length=200, blank=True)
+    quota = models.PositiveSmallIntegerField("nombre d'invités")
+    gala_access = models.BooleanField("les invités ont accès au Gala", default=False,
+                                      help_text="Seulement après attribution validée ou preuve de réservation officielle.")
+    token = models.CharField(max_length=32, unique=True, editable=False)
+    link_sent_at = models.DateTimeField("lien envoyé le", null=True, blank=True, editable=False)
+    note = models.TextField("note interne", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name, verbose_name_plural = "quota d'invités", "quotas d'invités"
+
+    def __str__(self):
+        return f"{self.organization or self.holder_name} · {self.get_kind_display()} ({self.quota})"
+
+    def save(self, *args, **kwargs):
+        if not self.token:
+            import secrets
+            self.token = secrets.token_urlsafe(16)
+        super().save(*args, **kwargs)
+
+    def active_guests(self):
+        return self.guests.exclude(status__in=["rejected", "cancelled"])
+
+    def remaining(self):
+        return max(0, self.quota - self.active_guests().count())
+
+
 class CheckIn(models.Model):
-    """Arrivée d'un participant, enregistrée au scan de son badge : une par jour au plus."""
+    """Arrivée enregistrée au scan du badge : une par jour et par point de contrôle (site, Gala)."""
+    class Point(models.TextChoices):
+        SITE = "site", "Entrée du site"
+        GALA = "gala", "Gala"
+
     registration = models.ForeignKey(EventRequest, on_delete=models.CASCADE, related_name="checkins", verbose_name="inscription")
+    point = models.CharField("point de contrôle", max_length=4, choices=Point.choices, default=Point.SITE)
     day = models.DateField("jour")
     at = models.DateTimeField("heure d'arrivée", auto_now_add=True)
     by = models.ForeignKey("users.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="scanné par")
 
     class Meta:
         ordering = ["-at"]
-        unique_together = [("registration", "day")]
+        unique_together = [("registration", "day", "point")]
         verbose_name, verbose_name_plural = "arrivée", "arrivées"
 
     def __str__(self):

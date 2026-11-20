@@ -47,7 +47,7 @@ export const coordApi = {
   act: (kind: string, id: number, action: string, data: Record<string, string> = {}) => api.post<{ detail: string }>(`/queue/${kind}/${id}/${action}/`, data).then((r) => r.data.detail),
   content: () => api.get<{ articles: ContentItem[]; events: ContentItem[] }>("/content/").then((r) => r.data),
   contentAct: (kind: string, id: number, action: string) => api.post<{ detail: string }>(`/content/${kind}/${id}/${action}/`).then((r) => r.data.detail),
-  checkin: (body: { code: string } | { id: number }) => api.post<CheckinResult>("/checkin/", body).then((r) => r.data),
+  checkin: (body: ({ code: string } | { id: number }) & { point?: "site" | "gala" }) => api.post<CheckinResult>("/checkin/", body).then((r) => r.data),
   checkinSearch: (q: string) => api.get<CheckinPerson[]>("/checkin/search/", { params: { q } }).then((r) => r.data),
   checkinResend: (id: number) => api.post<{ detail: string }>("/checkin/resend/", { id }).then((r) => r.data.detail),
   checkinReissue: (id: number) => api.post<{ detail: string }>("/checkin/reissue/", { id }).then((r) => r.data.detail),
@@ -73,7 +73,7 @@ export const coordApi = {
 };
 
 export interface CheckinResult {
-  result: "ok" | "already" | "cancelled" | "invalid"; message: string; id?: number; name?: string; organization?: string;
+  result: "ok" | "already" | "cancelled" | "invalid" | "gala_refused"; message: string; gala?: boolean; id?: number; name?: string; organization?: string;
   reference?: string; days?: string[]; today_at?: string; checkins?: { day: string; at: string }[];
 }
 export interface CheckinPerson {

@@ -41,6 +41,15 @@ class SiteSettings(models.Model):
         "jauge du Grand Week-End", null=True, blank=True,
         help_text="Nombre maximal d'inscriptions confirmées. Au-delà, les nouvelles inscriptions passent en liste d'attente, "
                   "sans badge. Vide = pas de limite.")
+    gala_ticket_url = models.URLField(
+        "lien officiel de la billetterie du Gala", blank=True,
+        help_text="Billetterie commune avec The Ground. Vide : le site propose seulement une demande d'information (aucun achat).")
+    reminder_enabled = models.BooleanField(
+        "envoyer le rappel pratique du Grand Week-End", default=False,
+        help_text="Un seul rappel par personne et par édition, aux inscriptions confirmées (envoi par lots, toutes les 15 minutes).")
+    reminder_text = models.TextField(
+        "informations pratiques du rappel", blank=True,
+        help_text="Seules les informations pratiques approuvées (accès, accueil…). Le lieu, les dates et le badge sont ajoutés automatiquement.")
     payment_instructions = models.TextField("modalités de paiement de la cotisation", blank=True,
                                             help_text="Texte envoyé avec le bulletin d'adhésion (virement, Wave, Orange Money…).")
 
@@ -124,6 +133,20 @@ class ActionItem(Taxonomy):
     class Meta(Taxonomy.Meta):
         ordering = ["kind", "display_order", "name"]
         verbose_name, verbose_name_plural = "programme, cercle ou outil", "programmes, cercles et outils"
+
+
+class FormDraft(models.Model):
+    """Brouillon « Enregistrer et reprendre plus tard » d'un dossier long : il n'est pas déposé et expire après 30 jours.
+    Les pièces jointes ne sont pas conservées."""
+    token = models.CharField(max_length=32, unique=True)
+    form = models.CharField(max_length=30)
+    email = models.EmailField()
+    data = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name, verbose_name_plural = "brouillon de dossier", "brouillons de dossiers"
 
 
 class SubmissionReceipt(models.Model):

@@ -27,6 +27,21 @@ export const getBcSlots = () => http.get<{ id: number; label: string }[]>("/busi
 export type BadgeContact = { participant_name: string; organization: string; job_title: string; email: string; phone: string };
 export const getBadgeContact = (token: string, key: string) =>
   http.get<BadgeContact>(`/badges/${encodeURIComponent(token)}/coordonnees/`, { params: { cle: key } }).then((r) => r.data);
+export const getGalaInfo = () => http.get<{ ticket_url: string | null }>("/gwe/gala/").then((r) => r.data);
+export interface GuestState {
+  kind: string; organization: string; holder: string; quota: number; remaining: number; gala: boolean;
+  guests: { id: number; name: string; job_title: string; organization: string; reference: string; badge_sent: boolean }[];
+}
+type GuestResult = GuestState & { detail: string };
+export const getGuests = (token: string) => http.get<GuestState>(`/invites/${encodeURIComponent(token)}/`).then((r) => r.data);
+export const addGuest = (token: string, g: { name: string; job_title: string; organization: string; email: string }) =>
+  http.post<GuestResult>(`/invites/${encodeURIComponent(token)}/`, g).then((r) => r.data);
+export const removeGuest = (token: string, id: number) =>
+  http.post<GuestResult>(`/invites/${encodeURIComponent(token)}/${id}/retirer/`).then((r) => r.data);
+export const saveDraft = (form: string, email: string, data: Record<string, unknown>, token?: string) =>
+  http.post<{ detail: string; token: string }>("/brouillons/", { form, email, data, token }).then((r) => r.data);
+export const loadDraft = (token: string) =>
+  http.get<{ form: string; data: Record<string, unknown>; token: string }>(`/brouillons/${encodeURIComponent(token)}/`).then((r) => r.data);
 export const getGwePlaces = () => http.get<{ limited: boolean; full: boolean }>("/gwe/places/").then((r) => r.data);
 export interface AwardCategoryState { name: string; slug: string; description: string; closes_on: string | null; is_open: boolean }
 export const getAwardCategoryStates = () => http.get<AwardCategoryState[]>("/awards/categories/").then((r) => r.data);

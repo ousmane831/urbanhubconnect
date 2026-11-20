@@ -17,7 +17,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from apps.events.models import (AwardApplication, BusinessConnectRegistration, Event, EventRequest, StandRequest,
+from apps.events.models import (AwardApplication, BusinessConnectRegistration, Event, EventRequest, GalaRequest, StandRequest,
                                 VolunteerApplication)
 from apps.contact.models import ContactMessage
 from apps.map.models import MapPlace, PlaceSuggestion
@@ -87,6 +87,33 @@ def is_reception(user):
 class IsReception(BasePermission):
     def has_permission(self, request, view):
         return is_reception(request.user)
+
+
+def is_awards_team(user):
+    return bool(user and user.is_authenticated and user.is_active and user.role == User.Role.AWARDS)
+
+
+def is_console(user):
+    """Comptes admis dans l'Espace Coordination : Coordination, Accueil (badges) ou Équipe Awards (candidatures)."""
+    return is_reception(user) or is_awards_team(user)
+
+
+class IsConsole(BasePermission):
+    def has_permission(self, request, view):
+        return is_console(request.user)
+
+
+def console_api(methods):
+    def decorator(fn):
+        fn = permission_classes([IsConsole])(fn)
+        fn = authentication_classes([SessionAuthentication])(fn)
+        return api_view(methods)(fn)
+    return decorator
+
+
+def _allowed_kinds(user):
+    """Files visibles : toutes pour la Coordination ; seulement les candidatures aux Awards pour l'Équipe Awards."""
+    return list(KINDS) if is_coordination(user) else (["awards"] if is_awards_team(user) else [])
 
 
 def reception_api(methods):
@@ -246,6 +273,11 @@ KINDS = {
                                ("Jours", " et ".join(get(o, "days", []) or [])), ("Disponibilités", get(o, "availability")),
                                ("Charte acceptée", "oui" if get(o, "accept_charter", False) else "non"),
                                ("Photos", "accepte" if get(o, "photo_consent", False) else "n'accepte pas"),
+                               ("Message", get(o, "message")))),
+    "gala": dict(
+        label="Demandes d'information Gala", model=GalaRequest, qs=lambda: GalaRequest.objects.filter(status__in=OPEN),
+        title=lambda o: get(o, "name"), subtitle=lambda o: f"{label(o, 'interest')} · {get(o, 'seats')} place(s)", actions=_status_actions,
+        details=lambda o: rows(("Organisation", get(o, "organization")), ("E-mail", get(o, "email")), ("Téléphone", get(o, "phone")),
                                ("Message", get(o, "message")))),
     "stands": dict(
         label="Demandes de stand", model=StandRequest, qs=lambda: StandRequest.objects.filter(status__in=OPEN),
@@ -547,7 +579,7 @@ class LoginView(APIView):
 
     def post(self, request):
         user = authenticate(request._request, username=str(request.data.get("username", "")), password=str(request.data.get("password", "")))
-        if not is_reception(user):  # même message pour un mauvais mot de passe et un compte non autorisé
+        if not is_console(user):  # même message pour un mauvais mot de passe et un compte non autorisé
             return Response({"detail": "Identifiant ou mot de passe incorrect."}, status=400)
         login(request._request, user)
         return Response(_me(user))
@@ -561,13 +593,19 @@ def logout_view(request):
     return Response({"detail": "Déconnecté."})
 
 
-@reception_api(["GET"])
+@console_api(["GET"])
 def me(request):
     return Response(_me(request.user))
 
 
-@staff_api(["GET"])
+@console_api(["GET"])
 def summary(request):
+    if not is_coordination(request.user):  # Équipe Awards : seulement ses files, sans statistiques du réseau
+        allowed = _allowed_kinds(request.user)
+        if not allowed:  # agent d'accueil : pas de tableau de bord
+            return Response({"detail": "Accès réservé à la Coordination."}, status=403)
+        queues = [{"kind": k, "label": KINDS[k]["label"], "count": safe(lambda k=k: KINDS[k]["qs"]().count(), 0, k)} for k in allowed]
+        return Response({"queues": queues, "stats": [], "to_handle": sum(q["count"] for q in queues)})
     safe(ms.expire_overdue, 0, "échéances")  # met à jour les cotisations dépassées
     now = timezone.now()
     queues = [{"kind": k, "label": v["label"], "count": safe(lambda v=v: v["qs"]().count(), 0, k)} for k, v in KINDS.items()]
@@ -582,10 +620,12 @@ def summary(request):
     return Response({"queues": queues, "stats": stats, "to_handle": sum(q["count"] for q in queues if q["kind"] not in ("members", "suspended"))})
 
 
-@staff_api(["GET"])
+@console_api(["GET"])
 def queue(request, kind):
     if kind not in KINDS:
         return Response({"detail": "Introuvable."}, status=404)
+    if kind not in _allowed_kinds(request.user):
+        return Response({"detail": "Accès réservé à la Coordination."}, status=403)
     queryset = KINDS[kind]["qs"]()
     search = request.query_params.get("search", "").strip()
     if search and "search" in KINDS[kind]:
@@ -593,10 +633,12 @@ def queue(request, kind):
     return Response({"label": KINDS[kind]["label"], "items": [_item(kind, o) for o in queryset.order_by("created_at")[:50]]})
 
 
-@staff_api(["POST"])
+@console_api(["POST"])
 def queue_action(request, kind, pk, action):
     if kind not in KINDS:
         return Response({"detail": "Introuvable."}, status=404)
+    if kind not in _allowed_kinds(request.user):
+        return Response({"detail": "Accès réservé à la Coordination."}, status=403)
     obj = KINDS[kind]["qs"]().filter(pk=pk).first()
     if obj is None:
         return Response({"detail": "Cet élément a déjà été traité ou n'existe plus."}, status=404)

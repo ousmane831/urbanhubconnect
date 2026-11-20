@@ -4,6 +4,7 @@ from rest_framework.response import Response
 
 from apps.contact.models import ContactMessage
 from apps.events.models import (AwardApplication, AwardCategory, BusinessConnectRegistration, BusinessConnectSlot, Event, EventRequest,
+                                GalaRequest,
                                 StandRequest, VolunteerApplication, VolunteerMission)
 from apps.map.models import MapCategory, PlaceSuggestion
 from apps.memberships.models import MembershipApplication, MembershipCategory
@@ -198,6 +199,10 @@ urlpatterns = [
     path("press/accreditation/", submission_view(build_serializer(
         PressAccreditation, ["request_type", "media", "name", "role", "phone", "email", "attendance_days", "coverage", "guests"]),
         name="AccreditationCreate")),
+    path("gala/", submission_view(build_serializer(
+        GalaRequest, ["name", "organization", "email", "phone", "interest", "seats", "message", "accept_privacy"], extra=CONSENT("accept_privacy")),
+        "Merci. Votre demande d'information sur le Gala est reçue. Ce n'est ni un achat ni une réservation : la Coordination "
+        "vous répondra. Le badge du Grand Week-End ne donne pas accès au Gala.", "GalaRequestCreate")),
     path("stands/", submission_view(build_serializer(
         StandRequest, ["space", "structure", "commune", "products", "manager", "email", "phone", "needs", "team_size", "message",
                        "accept_privacy"], extra=CONSENT("accept_privacy")),
