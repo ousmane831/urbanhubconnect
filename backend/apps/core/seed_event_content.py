@@ -1,7 +1,7 @@
 """Contenus éditoriaux du Grand Week-End 2026, de la page Événements et des Awards : cahier des charges, mis à jour par
 la note de la Coordination du 5 novembre 2026 (la migration events 0004 applique cette mise à jour aux bases existantes).
 Créés une seule fois (get_or_create) : les modifications faites ensuite dans l'admin ne sont jamais écrasées."""
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from django.utils.text import slugify
@@ -84,6 +84,10 @@ PARTNERSHIP = [
     ("Pack PME du Pôle", 250_000, "", "Réservé aux PME, TPE et entrepreneurs des deux pôles : espace PME, Business Connect, Achetons Local, 1 place au Gala du Pôle, 1 accréditation, référencement dans l'Annuaire"),
 ]
 
+# Clôture des candidatures : seule « Jeune talent du Pôle » est prolongée (cahier des charges du 20 novembre 2026).
+AWARDS_CLOSE_ON = date(2026, 11, 20)
+AWARDS_EXTENDED = {"jeune-talent-du-pole": date(2026, 11, 25)}
+
 AWARDS = [
     ("Entreprise engagée pour le territoire", "Entreprise installée sur l'un des deux pôles qui contribue au territoire par l'emploi local, les achats locaux, l'accueil de jeunes ou des actions d'intérêt général."),
     ("PME de l'année", "PME ou TPE des deux pôles qui se distingue par sa croissance, la qualité de ses services ou sa capacité d'adaptation."),
@@ -125,7 +129,10 @@ def seed_event_content(event):
         _, new = EventSection.objects.get_or_create(event=event, slug=slug, defaults={"title": title, "body": body, "order": order})
         created += new
     for order, (name, description) in enumerate(AWARDS, start=1):
-        _, new = AwardCategory.objects.get_or_create(slug=slugify(name), defaults={"name": name, "description": description, "display_order": order})
+        slug = slugify(name)
+        _, new = AwardCategory.objects.get_or_create(slug=slug, defaults={
+            "name": name, "description": description, "display_order": order,
+            "closes_on": AWARDS_EXTENDED.get(slug, AWARDS_CLOSE_ON)})
         created += new
     for slug, title, content in PAGES:
         _, new = PageContent.objects.get_or_create(slug=slug, defaults={"title": title, "content": content, "is_published": True})

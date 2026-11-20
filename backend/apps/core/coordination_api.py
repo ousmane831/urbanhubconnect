@@ -17,7 +17,8 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from apps.events.models import (AwardApplication, BusinessConnectRegistration, Event, EventRequest, VolunteerApplication)
+from apps.events.models import (AwardApplication, BusinessConnectRegistration, Event, EventRequest, StandRequest,
+                                VolunteerApplication)
 from apps.contact.models import ContactMessage
 from apps.map.models import MapPlace, PlaceSuggestion
 from apps.memberships import accounts as acc
@@ -78,6 +79,25 @@ class IsCoordinationStaff(BasePermission):
         return is_coordination(request.user)
 
 
+def is_reception(user):
+    """Coordination, ou agent d'accueil : contrôle des badges uniquement (ni dossiers, ni administration)."""
+    return is_coordination(user) or bool(user and user.is_authenticated and user.is_active and user.role == User.Role.ACCUEIL)
+
+
+class IsReception(BasePermission):
+    def has_permission(self, request, view):
+        return is_reception(request.user)
+
+
+def reception_api(methods):
+    """Vue réservée à l'accueil le jour J (Coordination ou rôle Accueil)."""
+    def decorator(fn):
+        fn = permission_classes([IsReception])(fn)
+        fn = authentication_classes([SessionAuthentication])(fn)
+        return api_view(methods)(fn)
+    return decorator
+
+
 def staff_api(methods):
     """Vue DRF réservée à la Coordination. Ordre voulu : permissions et authentification posées AVANT api_view."""
     def decorator(fn):
@@ -99,6 +119,9 @@ def rows(*pairs):
 # ---------- Files « à traiter » ----------
 def _status_actions(obj):
     from . import dossiers
+    if isinstance(obj, EventRequest) and obj.status == "waitlist":
+        return [{"id": "accept", "label": "Confirmer et envoyer le badge", "tone": "primary"},
+                {"id": "reject", "label": "Refuser", "tone": "danger"}]
     acts = [{"id": "accept", "label": "Accepter", "tone": "primary"}, {"id": "reject", "label": "Refuser", "tone": "danger"}]
     if obj.status != "reviewing":
         acts.append({"id": "review", "label": "Marquer « en cours d'examen »", "tone": "neutral"})
@@ -177,17 +200,26 @@ KINDS = {
     "partnerships": dict(
         label="Demandes de partenariat", model=PartnershipApplication, qs=lambda: PartnershipApplication.objects.filter(status__in=OPEN).select_related(),
         title=lambda o: get(o, "company"), subtitle=lambda o: label(o, "tier") or "Formule non précisée", actions=_status_actions,
-        details=lambda o: rows(("Contact", get(o, "contact_name")), ("Fonction", get(o, "role")), ("Téléphone", get(o, "phone")),
-                               ("E-mail", get(o, "email")), ("Message", get(o, "message")))),
+        details=lambda o: rows(("Secteur", get(o, "sector")), ("Contact", get(o, "contact_name")), ("Fonction", get(o, "role")),
+                               ("Téléphone", get(o, "phone")), ("E-mail", get(o, "email")),
+                               ("Souhaite en discuter", "oui" if get(o, "wants_discussion", False) else ""),
+                               ("Partenariat institutionnel", "oui" if get(o, "institutional", False) else ""),
+                               ("Apport en nature", get(o, "in_kind_description") if get(o, "in_kind", False) else ""),
+                               ("Message", get(o, "message")))),
     "accreditations": dict(
         label="Accréditations presse", model=PressAccreditation, qs=lambda: PressAccreditation.objects.filter(status__in=OPEN),
-        title=lambda o: get(o, "name"), subtitle=lambda o: get(o, "media"), actions=_status_actions,
+        title=lambda o: get(o, "name"), subtitle=lambda o: f"{label(o, 'request_type')} · {get(o, 'media')}", actions=_status_actions,
         details=lambda o: rows(("Fonction", get(o, "role")), ("Téléphone", get(o, "phone")), ("E-mail", get(o, "email")),
-                               ("Jours de présence", get(o, "attendance_days")))),
+                               ("Jours de présence", get(o, "attendance_days")), ("Couverture", get(o, "coverage")),
+                               ("Invités de la délégation", get(o, "guests")))),
     "awards": dict(
         label="Candidatures Awards", model=AwardApplication, qs=lambda: AwardApplication.objects.filter(status__in=OPEN).select_related(),
-        title=lambda o: get(o, "applicant_name"), subtitle=lambda o: label(o, "category"), actions=_status_actions,
-        details=lambda o: rows(("E-mail", get(o, "email")), ("Téléphone", get(o, "phone")), ("Candidature", str(get(o, "description"))[:400]))),
+        title=lambda o: get(o, "applicant_name"),
+        subtitle=lambda o: " + ".join(x for x in (label(o, "category"), label(o, "category_2")) if x), actions=_status_actions,
+        details=lambda o: rows(("Commune", get(o, "commune")), ("E-mail", get(o, "email")), ("Téléphone", get(o, "phone")),
+                               ("Présentée par", get(o, "submitter_name") if get(o, "on_behalf", False) else ""),
+                               ("Candidature", str(get(o, "description"))[:400]), ("Éléments probants", str(get(o, "evidence"))[:400]),
+                               ("Pièces jointes", str(sum(1 for f in ("supporting_document", "document_2", "document_3") if get(o, f))) or ""))),
     "business-connect": dict(
         label="Inscriptions Business Connect", model=BusinessConnectRegistration,
         qs=lambda: BusinessConnectRegistration.objects.filter(status__in=OPEN).select_related(),
@@ -196,7 +228,9 @@ KINDS = {
                                ("Propose", get(o, "what_offers")), ("Recherche", get(o, "what_needs")),
                                ("Rencontres souhaitées", get(o, "preferred_meetings")))),
     "event-requests": dict(
-        label="Demandes liées aux événements", model=EventRequest, qs=lambda: EventRequest.objects.filter(status__in=OPEN),
+        label="Demandes liées aux événements", model=EventRequest,
+        # + inscriptions en liste d'attente (jauge atteinte) : la Coordination les confirme quand une place se libère
+        qs=lambda: EventRequest.objects.filter(Q(status__in=OPEN) | Q(status="waitlist", kind__in=EventRequest.BADGE_KINDS)),
         title=lambda o: get(o, "name"), subtitle=lambda o: " · ".join(x for x in (label(o, "kind"), get(o, "organization")) if x),
         actions=_status_actions,
         details=lambda o: rows(("E-mail", get(o, "email")), ("Téléphone", get(o, "phone")), ("Circuit", label(o, "circuit")),
@@ -206,8 +240,17 @@ KINDS = {
     "volunteers": dict(
         label="Candidatures de bénévoles", model=VolunteerApplication, qs=lambda: VolunteerApplication.objects.filter(status__in=OPEN),
         title=lambda o: get(o, "name"), subtitle=lambda o: ", ".join(names(o, "missions")) or "Aucune mission précisée", actions=_status_actions,
-        details=lambda o: rows(("E-mail", get(o, "email")), ("Téléphone", get(o, "phone")), ("Disponibilités", get(o, "availability")),
+        details=lambda o: rows(("E-mail", get(o, "email")), ("Téléphone", get(o, "phone")), ("Commune", get(o, "commune")),
+                               ("Jours", " et ".join(get(o, "days", []) or [])), ("Disponibilités", get(o, "availability")),
+                               ("Charte acceptée", "oui" if get(o, "accept_charter", False) else "non"),
+                               ("Photos", "accepte" if get(o, "photo_consent", False) else "n'accepte pas"),
                                ("Message", get(o, "message")))),
+    "stands": dict(
+        label="Demandes de stand", model=StandRequest, qs=lambda: StandRequest.objects.filter(status__in=OPEN),
+        title=lambda o: get(o, "structure"), subtitle=lambda o: f"{label(o, 'space')} · {get(o, 'commune')}", actions=_status_actions,
+        details=lambda o: rows(("Responsable", get(o, "manager")), ("Téléphone", get(o, "phone")), ("E-mail", get(o, "email")),
+                               ("Produits ou services", get(o, "products")), ("Besoins d'installation", get(o, "needs")),
+                               ("Personnes sur le stand", get(o, "team_size")), ("Message", get(o, "message")))),
     "suggestions": dict(
         label="Lieux suggérés pour la carte", model=PlaceSuggestion, qs=lambda: PlaceSuggestion.objects.filter(status__in=OPEN).select_related(),
         title=lambda o: get(o, "name"), subtitle=lambda o: label(o, "category"), actions=_status_actions,
@@ -445,6 +488,10 @@ def _apply(kind, obj, action, user, data=None):
                        else "Fiche acceptée : elle sera publiée quand la cotisation sera à jour.")
         return msg
     from . import dossiers
+    if isinstance(obj, EventRequest) and obj.kind in EventRequest.BADGE_KINDS and obj.status == "waitlist" and action == "accept":
+        from apps.events import badges
+        sent = badges.issue(obj, force=True)  # place proposée : message distinct avec le badge
+        return "Inscription confirmée : " + ("badge envoyé." if sent else "le badge n'a pas pu partir, renvoyez-le depuis l'accueil.")
     status = {"accept": "accepted", "reject": "rejected", "review": "reviewing", "incomplete": "incomplete"}.get(action)
     if not status:
         raise ValidationError("Action inconnue.")
@@ -498,7 +545,7 @@ class LoginView(APIView):
 
     def post(self, request):
         user = authenticate(request._request, username=str(request.data.get("username", "")), password=str(request.data.get("password", "")))
-        if not is_coordination(user):  # même message pour un mauvais mot de passe et un compte non autorisé
+        if not is_reception(user):  # même message pour un mauvais mot de passe et un compte non autorisé
             return Response({"detail": "Identifiant ou mot de passe incorrect."}, status=400)
         login(request._request, user)
         return Response(_me(user))
@@ -512,7 +559,7 @@ def logout_view(request):
     return Response({"detail": "Déconnecté."})
 
 
-@staff_api(["GET"])
+@reception_api(["GET"])
 def me(request):
     return Response(_me(request.user))
 

@@ -2,15 +2,19 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMemo, useState } from "react";
 import { useForm, type FieldValues } from "react-hook-form";
 import { z } from "zod";
-import { submitFormFull, type SubmitResult } from "../../services/api";
+import { submitFormFull, submitMultipartFull, type SubmitResult } from "../../services/api";
 import { apiErrorMessage, applyServerErrors } from "../../utils/errors";
 import { FormField, fieldProps } from "./FormField";
 import { Honeypot } from "./Honeypot";
 import { ErrorMessage, SuccessMessage } from "./FormMessage";
 
 export interface FieldDef {
-  name: string; label: string; type: "text" | "email" | "tel" | "textarea" | "select" | "multi" | "consent" | "check";
-  required?: boolean; options?: { value: string; label: string }[]; hint?: string; full?: boolean;
+  name: string; label: string; type: "text" | "email" | "tel" | "number" | "textarea" | "select" | "multi" | "consent" | "check" | "file";
+  required?: boolean; options?: { value: string; label: string; disabled?: boolean }[]; hint?: string; full?: boolean;
+  /** Champ affiché seulement quand la case (ou le choix) nommé est coché ; le serveur vérifie s'il est alors exigé. */
+  showIf?: string;
+  /** Fichiers acceptés (champ « file ») : ex. ".pdf,application/pdf". */
+  accept?: string;
 }
 interface Props { endpoint: string; fields: FieldDef[]; submitLabel?: string; extra?: Record<string, unknown>; successFallback?: string }
 
@@ -20,6 +24,11 @@ export function buildSchema(fields: FieldDef[]) {
   const shape: Record<string, z.ZodTypeAny> = { company_website: z.string().optional() };
   for (const f of fields) {
     let s: z.ZodTypeAny;
+    if (f.type === "file") { shape[f.name] = z.any(); continue; }
+    if (f.showIf) {  // conditionnel : jamais bloquant côté navigateur
+      shape[f.name] = f.type === "check" ? z.boolean() : f.type === "multi" ? z.array(z.string()) : z.string().trim();
+      continue;
+    }
     if (f.type === "consent") s = z.literal(true, { errorMap: () => ({ message: "Ce consentement est obligatoire." }) });
     else if (f.type === "check") s = z.boolean();
     else if (f.type === "multi") s = f.required ? z.array(z.string()).min(1, "Cochez au moins une case.") : z.array(z.string());
@@ -33,8 +42,10 @@ export function buildSchema(fields: FieldDef[]) {
 
 export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, successFallback }: Props) {
   const schema = useMemo(() => buildSchema(fields), [fields]);
-  const defaults = useMemo(() => Object.fromEntries(fields.map((f) => [f.name, f.type === "multi" ? [] : f.type === "consent" || f.type === "check" ? false : ""])), [fields]);
-  const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<FieldValues>({ resolver: zodResolver(schema), defaultValues: defaults });
+  const defaults = useMemo(() => Object.fromEntries(fields.filter((f) => f.type !== "file").map((f) => [f.name, f.type === "multi" ? [] : f.type === "consent" || f.type === "check" ? false : ""])), [fields]);
+  const { register, handleSubmit, setError, watch, formState: { errors, isSubmitting } } = useForm<FieldValues>({ resolver: zodResolver(schema), defaultValues: defaults });
+  const values = watch();
+  const visible = (f: FieldDef) => !f.showIf || !!values[f.showIf];
   const [done, setDone] = useState<SubmitResult | null>(null);
   const [failure, setFailure] = useState("");
   const err = (n: string) => errors[n]?.message as string | undefined;
@@ -42,9 +53,25 @@ export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, s
   const onSubmit = async (v: FieldValues) => {
     setFailure("");
     const payload: Record<string, unknown> = { ...extra };
-    for (const [k, val] of Object.entries(v)) if (val !== "" && val !== undefined) payload[k] = val;
+    const shown = new Set(fields.filter(visible).map((f) => f.name));
+    const files: [string, File][] = [];
+    for (const [k, val] of Object.entries(v)) {
+      if (val === "" || val === undefined || (fields.some((f) => f.name === k) && !shown.has(k))) continue;
+      if (typeof FileList !== "undefined" && val instanceof FileList) { if (val[0]) files.push([k, val[0]]); continue; }
+      payload[k] = val;
+    }
     try {
-      const r = await submitFormFull(endpoint, payload);
+      let r: SubmitResult;
+      if (files.length) {  // pièces jointes : envoi en multipart
+        const form = new FormData();
+        form.append("company_website", "");
+        for (const [k, val] of Object.entries(payload)) {
+          if (Array.isArray(val)) val.forEach((x) => form.append(k, String(x)));
+          else form.append(k, String(val));
+        }
+        files.forEach(([k, file]) => form.append(k, file));
+        r = await submitMultipartFull(endpoint, form);
+      } else r = await submitFormFull(endpoint, payload);
       setDone({ ...r, detail: r.detail || successFallback || "Merci." });
     }
     catch (e) { if (!applyServerErrors(e, setError as never)) setFailure(apiErrorMessage(e)); }
@@ -54,7 +81,7 @@ export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, s
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="relative grid gap-5 sm:grid-cols-2">
       <Honeypot register={register} />
-      {fields.map((f) => {
+      {fields.filter(visible).map((f) => {
         const e = err(f.name), id = `f-${f.name}`;
         if (f.type === "consent") return (
           <div key={f.name} className="sm:col-span-2">
@@ -78,7 +105,9 @@ export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, s
         return (
           <FormField key={f.name} id={id} label={f.label} required={f.required} error={e} hint={f.hint} className={wide ? "sm:col-span-2" : ""}>
             {f.type === "textarea" ? <textarea rows={5} className="field" {...fieldProps(id, e)} {...register(f.name)} />
-              : f.type === "select" ? <select className="field" {...fieldProps(id, e)} {...register(f.name)}><option value="">Choisir…</option>{f.options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
+              : f.type === "select" ? <select className="field" {...fieldProps(id, e)} {...register(f.name)}><option value="">Choisir…</option>{f.options?.map((o) => <option key={o.value} value={o.value} disabled={o.disabled}>{o.label}</option>)}</select>
+              : f.type === "file" ? <input type="file" accept={f.accept} className="field py-2" {...fieldProps(id, e)} {...register(f.name)} />
+              : f.type === "number" ? <input type="number" inputMode="numeric" min={0} className="field" {...fieldProps(id, e)} {...register(f.name)} />
               : <input type={f.type} className="field" {...fieldProps(id, e)} {...register(f.name)} />}
           </FormField>);
       })}

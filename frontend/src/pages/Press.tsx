@@ -9,10 +9,15 @@ import { getDocuments, getPressReleases } from "../services/api";
 import { fmtDate } from "../utils/format";
 
 const FIELDS: FieldDef[] = [
-  { name: "media", label: "Média", type: "text", required: true }, { name: "name", label: "Nom", type: "text", required: true },
+  { name: "request_type", label: "Type de demande", type: "select", required: true, full: true,
+    options: [{ value: "press", label: "Presse" }, { value: "institution", label: "Délégation institutionnelle" }],
+    hint: "L'accréditation est examinée avant d'être attribuée ; le badge n'est émis qu'après validation. Elle ne donne pas accès au Gala." },
+  { name: "media", label: "Média ou organisme", type: "text", required: true }, { name: "name", label: "Prénom et nom", type: "text", required: true },
   { name: "role", label: "Fonction", type: "text" }, { name: "phone", label: "Téléphone", type: "tel", required: true },
   { name: "email", label: "E-mail", type: "email", required: true },
-  { name: "attendance_days", label: "Jours de présence", type: "text", hint: "Exemple : vendredi et samedi" },
+  { name: "attendance_days", label: "Jours envisagés", type: "text", hint: "Exemple : vendredi et samedi" },
+  { name: "coverage", label: "Type de couverture (presse)", type: "text", hint: "Écrit, radio, télévision, web, photo…" },
+  { name: "guests", label: "Délégation : invités (un nom par ligne)", type: "textarea", hint: "Pour une délégation, vous êtes le référent ; indiquez ici vos invités." },
 ];
 const DownloadLink = ({ href, label }: { href: string; label: string }) => (
   <a href={href} download className="inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded-lg border border-navy/20 px-4 font-semibold text-navy hover:bg-offwhite">

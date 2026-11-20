@@ -4,7 +4,7 @@ from rest_framework.response import Response
 
 from apps.contact.models import ContactMessage
 from apps.events.models import (AwardApplication, AwardCategory, BusinessConnectRegistration, Event, EventRequest,
-                                VolunteerApplication, VolunteerMission)
+                                StandRequest, VolunteerApplication, VolunteerMission)
 from apps.map.models import MapCategory, PlaceSuggestion
 from apps.memberships.models import MembershipApplication, MembershipCategory
 from apps.newsletter.models import NewsletterSubscriber
@@ -165,6 +165,10 @@ class EventRequestCreate(SubmissionCreateView):
             return
         from apps.events import badges
         sent = badges.issue(obj)
+        if obj.status == "waitlist":  # jauge atteinte : ni badge ni QR code avant confirmation
+            self.success_message = ("Votre demande est en liste d'attente. Votre accès n'est pas encore confirmé. "
+                                    "Si une place vous est proposée, vous recevrez un message distinct.")
+            return
         # Écran de confirmation : liens utiles pour la personne qui vient de s'inscrire (son propre dossier uniquement)
         self.extra_response = {"badge_url": badges.owner_url(obj), "visual_url": badges.visual_url(obj)}
         if sent:
@@ -183,29 +187,44 @@ urlpatterns = [
         message="Merci. Votre fiche a bien été transmise. La Coordination vous contactera sous 72 heures "
                 "pour finaliser votre adhésion et publier votre fiche.")),
     path("partnerships/", submission_view(build_serializer(
-        PartnershipApplication, ["company", "tier", "contact_name", "role", "phone", "email", "message", "accept_privacy"],
+        PartnershipApplication, ["company", "sector", "tier", "contact_name", "role", "phone", "email", "wants_discussion", "in_kind",
+                                 "in_kind_description", "institutional", "message", "accept_privacy"],
         slugs={"tier": (active(PartnershipTier), False)}, extra=CONSENT("accept_privacy")), name="PartnershipCreate")),
     path("newsletter/", NewsletterView.as_view()),
     path("contact/", submission_view(build_serializer(
         ContactMessage, ["name", "organization", "phone", "email", "subject", "message", "consent"],
         extra=CONSENT("consent")), "Merci. Votre message a bien été envoyé.", "ContactCreate", notify_contact)),
     path("press/accreditation/", submission_view(build_serializer(
-        PressAccreditation, ["media", "name", "role", "phone", "email", "attendance_days"]), name="AccreditationCreate")),
+        PressAccreditation, ["request_type", "media", "name", "role", "phone", "email", "attendance_days", "coverage", "guests"]),
+        name="AccreditationCreate")),
+    path("stands/", submission_view(build_serializer(
+        StandRequest, ["space", "structure", "commune", "products", "manager", "email", "phone", "needs", "team_size", "message",
+                       "accept_privacy"], extra=CONSENT("accept_privacy")),
+        "Merci. Votre demande de stand est reçue. Elle ne réserve pas encore de stand : la Coordination vous confirmera "
+        "l'emplacement, les conditions et le montant. Aucun paiement n'est demandé à ce stade.", "StandRequestCreate")),
     path("map/suggest/", submission_view(build_serializer(
         PlaceSuggestion, ["name", "category", "address", "latitude", "longitude", "description", "website", "phone",
                           "email", "opening_hours", "photo", "submitter_name", "submitter_email"],
         slugs={"category": (active(MapCategory), True)}),
         "Merci. Votre proposition a bien été transmise : la Coordination vérifie chaque information avant publication.", "PlaceSuggest")),
     path("awards/applications/", submission_view(build_serializer(
-        AwardApplication, ["category", "applicant_name", "organization", "email", "phone", "description",
-                           "supporting_document", "accept_privacy"],
-        slugs={"category": (active(AwardCategory), True)}, extra=CONSENT("accept_privacy")), name="AwardApply")),
+        AwardApplication, ["category", "category_2", "applicant_name", "organization", "commune", "email", "phone", "description",
+                           "evidence", "on_behalf", "submitter_name", "candidate_agrees", "supporting_document", "document_2",
+                           "document_3", "accept_rules", "accept_privacy"],
+        slugs={"category": (active(AwardCategory), True), "category_2": (active(AwardCategory), False)},
+        extra=CONSENT("accept_rules", "accept_privacy")),
+        "Merci. Votre candidature est reçue. Le dépôt ne vaut ni nomination ni badge d'accès.", "AwardApply")),
     path("business-connect/", submission_view(build_serializer(
         BusinessConnectRegistration, ["event", "participant_name", "organization", "email", "phone", "what_offers",
                                       "what_needs", "preferred_meetings", "accept_privacy"],
         slugs={"event": (Event.objects.public(), True)}, extra=CONSENT("accept_privacy")), name="BusinessConnect")),
     path("event-requests/", EventRequestCreate.as_view()),
     path("volunteers/", submission_view(build_serializer(
-        VolunteerApplication, ["name", "email", "phone", "organization", "missions", "availability", "message"],
-        many_slugs={"missions": (active(VolunteerMission), False)}), name="VolunteerApply")),
+        VolunteerApplication, ["name", "email", "phone", "organization", "commune", "days", "missions", "availability", "message",
+                               "accept_charter", "photo_consent"],
+        many_slugs={"missions": (active(VolunteerMission), False)},
+        extra={**CONSENT("accept_charter"),
+               "days": serializers.ListField(child=serializers.ChoiceField(choices=["vendredi", "samedi"]), required=False)}),
+        "Merci. Votre candidature de bénévole est reçue. Après sélection, la Coordination vous enverra votre mission, "
+        "l'adresse du rendez-vous et votre badge.", "VolunteerApply")),
 ]

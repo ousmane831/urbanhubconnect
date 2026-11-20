@@ -45,8 +45,10 @@ class ConfirmationTests(APITestCase):
         self.assertIn("accréditation", self.to("j@x.org")[0].subject)
 
     def test_awards_application(self):
-        self.post("/api/awards/applications/", {"category": AwardCategory.objects.first().slug, "applicant_name": "Awa", "email": "aw@x.org",
-                                                "description": "Notre projet", "accept_privacy": True})
+        cat = AwardCategory.objects.first()
+        AwardCategory.objects.filter(pk=cat.pk).update(closes_on=None)  # catégorie ouverte
+        self.post("/api/awards/applications/", {"category": cat.slug, "applicant_name": "Awa", "email": "aw@x.org",
+                                                "description": "Notre projet", "accept_rules": True, "accept_privacy": True})
         self.assertIn("1er décembre", self.to("aw@x.org")[0].body)
 
     def test_business_connect(self):
@@ -58,7 +60,7 @@ class ConfirmationTests(APITestCase):
 
     def test_volunteer(self):
         mission = VolunteerMission.objects.filter(is_active=True).first()
-        self.post("/api/volunteers/", {"name": "Awa", "email": "v@x.org", "phone": "77", "missions": [mission.slug]})
+        self.post("/api/volunteers/", {"name": "Awa", "email": "v@x.org", "phone": "77", "missions": [mission.slug], "accept_charter": True})
         body = self.to("v@x.org")[0].body
         self.assertIn(mission.name, body)
         self.assertIn("Après sélection", body)

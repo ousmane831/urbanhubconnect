@@ -6,6 +6,7 @@ class User(AbstractUser):
     class Role(models.TextChoices):
         ADMIN = "ADMIN", "Administrateur"
         COORDINATION = "COORDINATION", "Coordination"
+        ACCUEIL = "ACCUEIL", "Accueil (contrôle des badges)"
         MEMBER = "MEMBER", "Membre"
 
     email = models.EmailField("email", unique=True)

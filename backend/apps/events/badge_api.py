@@ -10,9 +10,9 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
-from apps.core.coordination_api import IsCoordinationStaff, audit, staff_api
+from apps.core.coordination_api import IsCoordinationStaff, audit, is_coordination, reception_api, staff_api
 from . import badges
-from .models import EventRequest
+from .models import CheckIn, EventRequest
 
 
 def _get(token):
@@ -100,6 +100,15 @@ def badge_pdf(request, token):
     return response
 
 
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def places(request):
+    """Jauge du Grand Week-End : la page annonce la liste d'attente quand elle est atteinte."""
+    left = badges.places_left()
+    return Response({"limited": left is not None, "full": left == 0})
+
+
 # ---------- accueil (Coordination) ----------
 RESULT_MESSAGES = {
     "ok": "Badge valide : arrivée enregistrée.",
@@ -109,7 +118,7 @@ RESULT_MESSAGES = {
 }
 
 
-@staff_api(["POST"])
+@reception_api(["POST"])
 def checkin(request):
     """Scan d'un badge (contenu du QR code) ou validation manuelle (id d'une inscription trouvée par la recherche)."""
     if request.data.get("id"):
@@ -130,7 +139,20 @@ def _ref_number(q):
     return int(digits) if digits.isdigit() else -1
 
 
-@staff_api(["GET"])
+def _mask(email):
+    user, _, domain = (email or "").partition("@")
+    return f"{user[:2]}…@{domain}" if domain else ""
+
+
+def _person(r, full):
+    """Ligne de recherche : l'agent d'accueil ne voit que l'utile (ni téléphone, ni adresse complète)."""
+    return {"id": r.pk, "name": r.name, "organization": r.organization, "email": r.email if full else _mask(r.email),
+            "phone": r.phone if full else "", "valid": badges.is_confirmed(r), "status": r.get_status_display(),
+            "category": badges.category_label(r), "reference": badges.reference(r), "badge_sent": bool(r.badge_sent_at),
+            "badge_error": r.badge_error if full else "", "checkins": [c.day.isoformat() for c in r.checkins.all()]}
+
+
+@reception_api(["GET"])
 def checkin_search(request):
     q = str(request.query_params.get("q", "")).strip()
     if len(q) < 2:
@@ -139,10 +161,35 @@ def checkin_search(request):
           .filter(Q(name__icontains=q) | Q(organization__icontains=q) | Q(email__icontains=q) | Q(phone__icontains=q)
                   | Q(badge_number=_ref_number(q)))
           .prefetch_related("checkins")[:20])
-    return Response([{"id": r.pk, "name": r.name, "organization": r.organization, "email": r.email, "phone": r.phone,
-                      "valid": badges.is_confirmed(r), "status": r.get_status_display(), "category": badges.category_label(r),
-                      "reference": badges.reference(r), "badge_sent": bool(r.badge_sent_at),
-                      "checkins": [c.day.isoformat() for c in r.checkins.all()]} for r in qs])
+    full = is_coordination(request.user)
+    return Response([_person(r, full) for r in qs])
+
+
+@staff_api(["GET"])
+def checkin_unsent(request):
+    """Badges non envoyés (échec d'envoi ou jamais parti) : à renvoyer ou à corriger (adresse mal saisie)."""
+    qs = (EventRequest.objects.filter(kind__in=EventRequest.BADGE_KINDS, status="accepted", badge_sent_at__isnull=True)
+          .prefetch_related("checkins").order_by("created_at")[:100])
+    return Response([_person(r, True) for r in qs])
+
+
+@staff_api(["GET"])
+def attendance_export(request):
+    """Export des présences pour le bilan (CSV, sans coordonnées)."""
+    import csv
+    import io
+    out = io.StringIO()
+    w = csv.writer(out, delimiter=";")
+    days = sorted({c.day for c in CheckIn.objects.all()})
+    w.writerow(["Référence", "Prénom et nom", "Fonction", "Organisation", "Catégorie", "Statut"] + [f"Présent le {d:%d/%m}" for d in days])
+    qs = EventRequest.objects.filter(kind__in=EventRequest.BADGE_KINDS).exclude(badge_number__isnull=True).prefetch_related("checkins").order_by("badge_number")
+    for r in qs:
+        here = {c.day for c in r.checkins.all()}
+        w.writerow([badges.reference(r), r.name, r.job_title, r.organization, badges.category_label(r), r.get_status_display()]
+                   + ["oui" if d in here else "" for d in days])
+    response = HttpResponse("\ufeff" + out.getvalue(), content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="presences-grand-week-end.csv"'
+    return response
 
 
 @staff_api(["POST"])
@@ -167,7 +214,7 @@ def checkin_cancel(request):
     return Response({"detail": f"Inscription {badges.reference(r)} annulée : le badge n'est plus valable."})
 
 
-@staff_api(["POST"])
+@reception_api(["POST"])
 def checkin_resend(request):
     r = EventRequest.objects.filter(pk=request.data.get("id"), kind__in=EventRequest.BADGE_KINDS).first()
     if r is None:
@@ -175,10 +222,10 @@ def checkin_resend(request):
     if not badges.send_badge(r):
         return Response({"detail": "Le badge n'a pas pu être envoyé : vérifiez l'adresse e-mail et la configuration d'envoi."}, status=400)
     audit(request.user, r, "Accueil : badge renvoyé")
-    return Response({"detail": f"Badge renvoyé à {r.email}."})
+    return Response({"detail": f"Badge renvoyé à {r.email if is_coordination(request.user) else _mask(r.email)}."})
 
 
-@staff_api(["GET"])
+@reception_api(["GET"])
 def checkin_stats(request):
     return Response(badges.stats())
 
@@ -192,8 +239,13 @@ def _only_new(request):
 def print_list(request):
     """Badges à imprimer, triés par numéro d'inscription (?nouveaux=1 : seulement ceux pas encore imprimés)."""
     all_rows = badges.printable()
+    rows = badges.printable(_only_new(request))
+    category = str(request.query_params.get("categorie", ""))
+    if category:
+        rows = rows.filter(badge_category=category)
     return Response({"total": all_rows.count(), "new": all_rows.filter(badge_printed_at__isnull=True).count(),
-                     "event": badges.event_info(), "badges": [badges.print_row(r) for r in badges.printable(_only_new(request))]})
+                     "categories": [{"value": v, "label": l} for v, l in EventRequest.BadgeCategory.choices],
+                     "event": badges.event_info(), "badges": [badges.print_row(r) for r in rows]})
 
 
 @staff_api(["POST"])

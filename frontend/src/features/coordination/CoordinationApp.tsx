@@ -21,7 +21,7 @@ const TABS: { id: Tab; label: string; short: string; icon: LucideIcon }[] = [
   { id: "campaigns", label: "Campagnes", short: "Campagnes", icon: Megaphone },
   { id: "checkin", label: "Accueil et badges", short: "Badges", icon: ScanLine },
 ];
-const ROLE_LABEL: Record<string, string> = { ADMIN: "Administrateur", COORDINATION: "Coordination" };
+const ROLE_LABEL: Record<string, string> = { ADMIN: "Administrateur", COORDINATION: "Coordination", ACCUEIL: "Accueil" };
 
 /** Onglet courant gardé dans l'adresse (?onglet=…) : un rechargement ou un lien partagé rouvre le même écran. */
 function useTab(): [Tab, (t: Tab) => void] {
@@ -43,11 +43,15 @@ function useTab(): [Tab, (t: Tab) => void] {
 const countLabel = (n: number) => (n > 99 ? "99+" : String(n));
 
 function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
-  const [tab, setTab] = useTab();
+  // Agent d'accueil : uniquement le contrôle des badges (ni dossiers, ni contenus, ni campagnes)
+  const reception = me.role === "ACCUEIL";
+  const [chosen, setTab] = useTab();
+  const tab: Tab = reception ? "checkin" : chosen;
+  const tabs = reception ? TABS.filter((t) => t.id === "checkin") : TABS;
   const [kind, setKind] = useState("organizations");
   const [version, setVersion] = useState(0);
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
-  const summary = useAsync(coordApi.summary, [version]);
+  const summary = useAsync(() => (reception ? Promise.resolve(null) : coordApi.summary()), [version, reception]);
   const toHandle = summary.data?.to_handle ?? 0;
   const initials = me.name.split(/\s+/).filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "UH";
 
@@ -60,7 +64,7 @@ function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
           <p className="mt-3 text-xs font-bold uppercase tracking-[0.16em] text-gold-light">Espace Coordination</p>
         </div>
         <nav aria-label="Sections" className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-          {TABS.map((t) => {
+          {tabs.map((t) => {
             const active = tab === t.id;
             return (
               <button key={t.id} onClick={() => setTab(t.id)} aria-current={active ? "page" : undefined}
@@ -99,17 +103,17 @@ function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
 
         <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 sm:px-6 lg:px-10 lg:pb-12 lg:pt-10">
           {tab === "home" && <Dashboard me={me} version={version} onOpen={(k) => { setKind(k); setTab("queue"); }} onGo={setTab} />}
-          {tab === "queue" && <Async state={summary}>{(s) => <QueuePanel kinds={s.queues} kind={kind} onKind={setKind} version={version} onChanged={refresh} />}</Async>}
+          {tab === "queue" && <Async state={summary}>{(s) => s && <QueuePanel kinds={s.queues} kind={kind} onKind={setKind} version={version} onChanged={refresh} />}</Async>}
           {tab === "content" && <ContentPanel me={me} onChanged={refresh} />}
           {tab === "campaigns" && <CampaignsPanel />}
-          {tab === "checkin" && <CheckInPanel />}
+          {tab === "checkin" && <CheckInPanel full={!reception} />}
         </main>
       </div>
 
       {/* Onglets en bas d'écran (téléphone et tablette) : à portée de pouce */}
       <nav aria-label="Sections (mobile)" className="fixed inset-x-0 bottom-0 z-30 border-t border-navy/10 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgba(14,34,64,0.06)] lg:hidden">
         <div className="mx-auto grid max-w-xl grid-cols-5">
-          {TABS.map((t) => {
+          {tabs.map((t) => {
             const active = tab === t.id;
             return (
               <button key={t.id} onClick={() => setTab(t.id)} aria-current={active ? "page" : undefined}

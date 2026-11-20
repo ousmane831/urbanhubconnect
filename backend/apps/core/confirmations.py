@@ -100,7 +100,16 @@ def _newsletter(n):
             "Chaque mois : l'agenda du réseau, les nouveaux membres, les opportunités et les portraits d'acteurs des deux pôles.")
 
 
+def _stand(s):
+    return (s.email, f"Votre demande : {s.get_space_display()}",
+            f"Bonjour {s.manager},\n\nNous avons bien reçu la demande de {s.structure} ({s.get_space_display().lower()}, "
+            f"{s.team_size} personne{'s' if s.team_size > 1 else ''}).\n"
+            "Cette demande ne réserve pas encore de stand. La Coordination vous confirmera l'emplacement, les conditions, le montant "
+            "et les badges de votre équipe. Aucun paiement n'est demandé à ce stade.")
+
+
 BUILDERS = {
+    "StandRequest": _stand,
     "ContactMessage": _contact, "PartnershipApplication": _partnership, "PressAccreditation": _press, "AwardApplication": _award,
     "BusinessConnectRegistration": _business_connect, "VolunteerApplication": _volunteer, "EventRequest": _event_request,
     "PlaceSuggestion": _place, "NewsletterSubscriber": _newsletter,

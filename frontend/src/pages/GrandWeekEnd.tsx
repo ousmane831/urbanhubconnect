@@ -16,7 +16,7 @@ import { EventRequestForm } from "../features/events/EventRequestForm";
 import { PartnerBand } from "../features/events/PartnerBand";
 import { useAsync } from "../hooks/useAsync";
 import { useSeo } from "../hooks/useSeo";
-import { getAwardCategories, getDocuments, getEvent, getVolunteerMissions } from "../services/api";
+import { getAwardCategoryStates, getDocuments, getEvent, getGwePlaces, getVolunteerMissions, type AwardCategoryState } from "../services/api";
 import type { EventDetail } from "../types/api";
 import { fmtDate, fmtDays } from "../utils/format";
 import { parseBlocks } from "../utils/richtext";
@@ -221,12 +221,16 @@ function Card({ id, icon, iconClass, title, children }: { id: string; icon: Icon
     </article>);
 }
 
+const fmtShort = (iso: string) => new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long" }).format(new Date(`${iso}T12:00:00Z`));
+const awardState = (c: AwardCategoryState) => (c.is_open ? (c.closes_on ? ` (jusqu'au ${fmtShort(c.closes_on)})` : "") : " (close)");
+
 /* ---------- Orientation : liens directs vers chaque démarche (cahier des charges du 20 novembre 2026) ---------- */
 function OtherSteps({ has }: { has: (id: string) => boolean }) {
   const steps: { to: string; label: string; text: string; icon: Icon; on: boolean }[] = [
     { to: "#business-connect", label: "Business Connect", text: "Demander des rendez-vous d'affaires", icon: Handshake, on: has("business-connect") },
     { to: "/partenaires", label: "Partenariat", text: "Soutenir l'événement et le réseau", icon: Sparkles, on: true },
     { to: "/presse", label: "Presse", text: "Demander une accréditation", icon: Newspaper, on: true },
+    { to: "#stands", label: "Stand ou Marché du terroir", text: "Exposer au Village du Pôle", icon: Store, on: true },
     { to: "#benevoles", label: "Bénévolat", text: "Proposer votre aide", icon: HandHeart, on: has("benevoles") },
     { to: "#awards", label: "Awards du Pôle", text: "Déposer une candidature", icon: Award, on: has("awards") },
     { to: "#gala", label: "Gala du Pôle", text: "Billetterie et invitations", icon: Ticket, on: has("gala") },
@@ -280,7 +284,8 @@ function MobileCta({ hero, open }: { hero: RefObject<HTMLElement>; open: boolean
 
 export default function GrandWeekEnd() {
   const ev = useAsync(() => getEvent(SLUG));
-  const awards = useAsync(getAwardCategories);
+  const awards = useAsync(getAwardCategoryStates);
+  const places = useAsync(getGwePlaces);
   const missions = useAsync(getVolunteerMissions);
   const dossier = useAsync(() => getDocuments("partnership"));
   const rules = useAsync(() => getDocuments("awards_rules"));
@@ -326,17 +331,44 @@ export default function GrandWeekEnd() {
     { name: "what_offers", label: "Ce que vous proposez", type: "textarea" }, { name: "what_needs", label: "Ce que vous recherchez", type: "textarea" },
     { name: "preferred_meetings", label: "Rencontres souhaitées (vendredi, samedi ou les deux)", type: "textarea" },
     { name: "accept_privacy", label: "J'accepte la politique de confidentialité.", type: "consent" }];
+  // Awards : l'état de chaque catégorie est vérifié au dépôt (une catégorie close reste visible mais ne peut pas être choisie)
+  const catOptions = (awards.data ?? []).map((c) => ({ value: c.slug, label: `${c.name}${awardState(c)}`, disabled: !c.is_open }));
+  const PDF = ".pdf,application/pdf";
   const aw: FieldDef[] = [
-    { name: "category", label: "Catégorie", type: "select", required: true, options: opt(awards.data) },
-    { name: "applicant_name", label: "Organisation ou personne", type: "text", required: true }, { name: "organization", label: "Structure", type: "text" },
-    { name: "email", label: "E-mail", type: "email", required: true }, { name: "phone", label: "Téléphone", type: "tel" },
-    { name: "description", label: "Présentation de la candidature", type: "textarea", required: true },
+    { name: "category", label: "Catégorie", type: "select", required: true, options: catOptions },
+    { name: "category_2", label: "Seconde catégorie (facultatif)", type: "select", options: catOptions, hint: "Deux catégories au plus." },
+    { name: "applicant_name", label: "Nom du candidat (organisation ou personne)", type: "text", required: true },
+    { name: "organization", label: "Structure", type: "text" },
+    { name: "commune", label: "Commune ou zone d'activité", type: "text" },
+    { name: "email", label: "E-mail de contact", type: "email", required: true }, { name: "phone", label: "Téléphone", type: "tel" },
+    { name: "description", label: "Projet ou parcours", type: "textarea", required: true,
+      hint: "Pour « Jeune talent du Pôle », décrivez l'avancement de votre projet : aucun résultat chiffré n'est exigé." },
+    { name: "evidence", label: "Éléments probants (facultatif)", type: "textarea", hint: "Réalisations, chiffres, articles, témoignages…" },
+    { name: "supporting_document", label: "Pièce 1 (PDF, facultatif)", type: "file", accept: PDF, hint: "PDF, 5 Mo maximum par pièce, trois pièces au plus." },
+    { name: "document_2", label: "Pièce 2 (PDF, facultatif)", type: "file", accept: PDF },
+    { name: "document_3", label: "Pièce 3 (PDF, facultatif)", type: "file", accept: PDF },
+    { name: "on_behalf", label: "Je présente cette candidature pour quelqu'un d'autre", type: "check" },
+    { name: "submitter_name", label: "Votre nom", type: "text", showIf: "on_behalf" },
+    { name: "candidate_agrees", label: "Je confirme que le candidat est d'accord avec cette candidature", type: "check", showIf: "on_behalf" },
+    { name: "accept_rules", label: "J'accepte le règlement des Awards du Pôle.", type: "consent" },
     { name: "accept_privacy", label: "J'accepte la politique de confidentialité.", type: "consent" }];
   const vol: FieldDef[] = [
-    { name: "name", label: "Nom", type: "text", required: true }, { name: "email", label: "E-mail", type: "email", required: true },
-    { name: "phone", label: "Téléphone", type: "tel", required: true }, { name: "organization", label: "Organisation", type: "text" },
-    { name: "missions", label: "Missions souhaitées", type: "multi", options: opt(missions.data) },
-    { name: "availability", label: "Disponibilités", type: "text", full: true }, { name: "message", label: "Message", type: "textarea" }];
+    { name: "name", label: "Prénom et nom", type: "text", required: true }, { name: "email", label: "E-mail", type: "email", required: true },
+    { name: "phone", label: "Téléphone joignable", type: "tel", required: true }, { name: "commune", label: "Commune", type: "text" },
+    { name: "days", label: "Disponibilités", type: "multi", options: [{ value: "vendredi", label: "Vendredi 11 décembre" }, { value: "samedi", label: "Samedi 12 décembre" }] },
+    { name: "missions", label: "Missions préférées", type: "multi", options: opt(missions.data) },
+    { name: "message", label: "Message (facultatif)", type: "textarea" },
+    { name: "accept_charter", label: "J'accepte la Charte des bénévoles.", type: "consent" },
+    { name: "photo_consent", label: "J'accepte d'être pris(e) en photo et que ces photos soient diffusées (facultatif).", type: "check" }];
+  const stand: FieldDef[] = [
+    { name: "space", label: "Espace souhaité", type: "select", required: true,
+      options: [{ value: "village", label: "Stand au Village du Pôle" }, { value: "terroir", label: "Marché du terroir" }] },
+    { name: "structure", label: "Structure ou activité", type: "text", required: true }, { name: "commune", label: "Commune", type: "text", required: true },
+    { name: "products", label: "Produits ou services présentés", type: "textarea", required: true },
+    { name: "manager", label: "Responsable du stand", type: "text", required: true }, { name: "phone", label: "Téléphone", type: "tel", required: true },
+    { name: "email", label: "E-mail", type: "email", required: true }, { name: "team_size", label: "Nombre de personnes sur le stand", type: "number", required: true },
+    { name: "needs", label: "Besoins d'installation (électricité, table, eau…)", type: "textarea" },
+    { name: "accept_privacy", label: "J'accepte la politique de confidentialité.", type: "consent" }];
 
   return (
     <>
@@ -410,6 +442,8 @@ export default function GrandWeekEnd() {
                     <Award className="mt-0.5 h-5 w-5 shrink-0 text-gold-light" aria-hidden />
                     <div>
                       <h3 className="text-base font-bold leading-snug text-white">{c.name}</h3>
+                      <p className={`mt-0.5 text-xs font-bold uppercase tracking-wide ${c.is_open ? "text-gold-light" : "text-white/50"}`}>
+                        {c.is_open ? (c.closes_on ? `Ouverte jusqu'au ${fmtShort(c.closes_on)}` : "Ouverte") : "Candidatures closes"}</p>
                       {c.description && <p className="mt-1 text-sm text-white/75">{c.description}</p>}
                     </div>
                   </li>))}
@@ -445,6 +479,15 @@ export default function GrandWeekEnd() {
               </Card>)}
           </div>
         </Section>)}
+
+      {/* ---- Stand au Village du Pôle ou Marché du terroir ---- */}
+      <Section>
+        <Card id="stands" icon={Store} iconClass="bg-gold text-white" title="Stand au Village du Pôle ou Marché du terroir">
+          <p className="text-navy/85">Entreprises, institutions, écoles, associations et producteurs des communes du Pôle : demandez un stand au Village du Pôle (à partir de 100 000 FCFA HT, distinct du Pack PME et des billets du Gala) ou un espace au Marché du terroir.</p>
+          <p className="mt-3 rounded-lg bg-offwhite p-3 text-sm text-navy/75">Le dépôt ne réserve pas de stand et aucun paiement n'est demandé ici. La Coordination vous confirme l'emplacement, les conditions, le montant et les badges de votre équipe.</p>
+          <div className="mt-auto pt-4"><Reveal label="Demander un stand" block><ConfigForm endpoint="/stands/" fields={stand} submitLabel="Envoyer ma demande" /></Reveal></div>
+        </Card>
+      </Section>
 
       {/* ---- Gala du Pôle ---- */}
       {gala && (
@@ -494,6 +537,7 @@ export default function GrandWeekEnd() {
               <H2 light>S'inscrire au Grand Week-End du Pôle</H2>
               <p className="mt-4 text-lg text-white/85">L'inscription donne droit à un badge nominatif valable pour les deux journées. Le Gala du Pôle ne fait pas l'objet d'une inscription : il est accessible sur invitation et par la billetterie commune avec The Ground.</p>
               <p className="mt-3 text-white/85">Dès votre inscription, votre badge (QR code) vous est envoyé par e-mail : présentez-le à l'accueil, sur votre téléphone ou imprimé.</p>
+              {places.data?.full && <p className="mt-3 rounded-xl bg-white/10 p-3 font-semibold">La jauge est atteinte : les nouvelles inscriptions sont placées en liste d'attente, sans badge. Si une place se libère, vous recevrez un message distinct.</p>}
               <p className="mt-3"><Link to="/suivi" className="font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white">Déjà inscrit ? Retrouver mon inscription ou mon dossier</Link></p>
             </div>
             <div className="rounded-2xl bg-white p-4 shadow-lg sm:p-8">

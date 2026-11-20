@@ -37,6 +37,10 @@ class SiteSettings(models.Model):
                                                  help_text="Décocher pour publier les annonces Urban Opportunities immédiatement.")
     planting_seats = models.PositiveIntegerField("places dans le convoi du reboisement", null=True, blank=True,
                                                  help_text="Grand Week-End du Pôle : nombre maximal d'inscrits au reboisement. Vide = pas de limite.")
+    gwe_capacity = models.PositiveIntegerField(
+        "jauge du Grand Week-End", null=True, blank=True,
+        help_text="Nombre maximal d'inscriptions confirmées. Au-delà, les nouvelles inscriptions passent en liste d'attente, "
+                  "sans badge. Vide = pas de limite.")
     payment_instructions = models.TextField("modalités de paiement de la cotisation", blank=True,
                                             help_text="Texte envoyé avec le bulletin d'adhésion (virement, Wave, Orange Money…).")
 

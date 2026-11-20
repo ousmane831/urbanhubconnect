@@ -36,12 +36,19 @@ class PressRelease(PublishableModel):
 
 
 class PressAccreditation(Submission):
-    media = models.CharField("média", max_length=200)
+    class RequestType(models.TextChoices):
+        PRESS = "press", "Presse"
+        INSTITUTION = "institution", "Délégation institutionnelle"
+
+    request_type = models.CharField("type de demande", max_length=12, choices=RequestType.choices, default=RequestType.PRESS)
+    media = models.CharField("média ou organisme", max_length=200)
     name = models.CharField(max_length=150)
     role = models.CharField("fonction", max_length=150, blank=True)
     phone = models.CharField(max_length=30)
     email = models.EmailField()
     attendance_days = models.CharField("jours de présence", max_length=200, blank=True)
+    coverage = models.CharField("type de couverture", max_length=200, blank=True)
+    guests = models.TextField("invités de la délégation", blank=True, help_text="Un nom par ligne (référent exclu).")
 
     class Meta(Submission.Meta):
         verbose_name, verbose_name_plural = "accréditation presse", "accréditations presse"

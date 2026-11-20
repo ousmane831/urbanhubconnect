@@ -2,6 +2,7 @@ from django_filters import rest_framework as django_filters
 from django.utils import timezone
 from django.db.models import Q
 from rest_framework import generics, serializers, viewsets
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -150,7 +151,13 @@ def taxonomy_list(model, extra=()):
 
 EventCategoryList = taxonomy_list(EventCategory)
 ArticleCategoryList = taxonomy_list(ArticleCategory)
-AwardCategoryList = taxonomy_list(AwardCategory, ("criteria",))
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def AwardCategoryList(request):
+    """Catégories des Awards avec leur état au jour du dépôt (ouverte jusqu'au…, ou close)."""
+    return Response([{"name": c.name, "slug": c.slug, "description": c.description, "criteria": c.criteria,
+                      "closes_on": c.closes_on.isoformat() if c.closes_on else None, "is_open": c.is_open()}
+                     for c in AwardCategory.objects.filter(is_active=True).order_by("display_order", "name")])
 VolunteerMissionList = taxonomy_list(VolunteerMission)
 
 

@@ -15,15 +15,28 @@ class PartnershipTier(Taxonomy):
 class PartnershipApplication(Submission):
     company = models.CharField("entreprise / institution", max_length=200)
     tier = models.ForeignKey(PartnershipTier, null=True, blank=True, on_delete=models.SET_NULL, related_name="applications")
+    sector = models.CharField("secteur", max_length=150, blank=True)
     contact_name = models.CharField(max_length=150)
     role = models.CharField("fonction", max_length=150, blank=True)
     phone = models.CharField(max_length=30)
     email = models.EmailField()
+    wants_discussion = models.BooleanField("souhaite en discuter", default=False)
+    in_kind = models.BooleanField("apport en nature", default=False)
+    in_kind_description = models.TextField("description de l'apport en nature", blank=True)
+    institutional = models.BooleanField("partenariat institutionnel", default=False)
     message = models.TextField(blank=True)
     accept_privacy = models.BooleanField(default=False)
+    # Quota d'accréditations saisi d'après la convention ou la validation écrite (jamais déduit de la demande)
+    accreditations_quota = models.PositiveSmallIntegerField("quota d'accréditations validé", null=True, blank=True)
 
     class Meta(Submission.Meta):
         verbose_name, verbose_name_plural = "demande de partenariat", "demandes de partenariat"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        super().clean()
+        if self.in_kind and not self.in_kind_description.strip():
+            raise ValidationError({"in_kind_description": "Décrivez l'apport en nature envisagé."})
 
     def __str__(self):
         return self.company

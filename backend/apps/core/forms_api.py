@@ -12,7 +12,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
-CONSENT_FIELDS = ("accept_charter", "accept_privacy", "consent")
+CONSENT_FIELDS = ("accept_charter", "accept_privacy", "accept_rules", "consent")
 HONEYPOT = "company_website"  # champ invisible : rempli uniquement par les robots
 REPLAY_WINDOW = timedelta(minutes=10)
 ALREADY_DONE = "Cette demande a déjà été enregistrée : vous n'avez rien à refaire."

@@ -199,23 +199,63 @@ def send_badge(r):
     msg.attach(pdf)
     try:
         msg.send(fail_silently=False)
-    except Exception:
+    except Exception as exc:
         logger.exception("Badge non envoyé (inscription %s)", r.pk)
+        r.badge_error = f"{timezone.localtime():%d/%m %H:%M} · {type(exc).__name__} : {exc}"[:255]
+        r.save(update_fields=["badge_error", "updated_at"])
         return False
-    r.badge_sent_at = timezone.now()
-    r.save(update_fields=["badge_sent_at", "updated_at"])
+    r.badge_sent_at, r.badge_error = timezone.now(), ""
+    r.save(update_fields=["badge_sent_at", "badge_error", "updated_at"])
     return True
 
 
-def issue(r):
-    """Après une inscription en ligne : inscription confirmée d'office (aucune validation manuelle) et badge envoyé."""
+def capacity():
+    from apps.core.models import SiteSettings
+    return SiteSettings.load().gwe_capacity
+
+
+def confirmed_count():
+    return EventRequest.objects.filter(kind__in=EventRequest.BADGE_KINDS, status="accepted").count()
+
+
+def places_left():
+    """Places restantes selon la jauge (None : pas de jauge)."""
+    cap = capacity()
+    return None if cap is None else max(0, cap - confirmed_count())
+
+
+def issue(r, force=False):
+    """Inscription en ligne : confirmée d'office et badge envoyé, sauf jauge atteinte (liste d'attente, sans badge ni QR code).
+    force : confirmation par la Coordination d'une personne en liste d'attente (place libérée)."""
     if r.kind not in EventRequest.BADGE_KINDS:
         return False
     if r.status != "accepted":
+        if not force and places_left() == 0:
+            r.status = "waitlist"
+            r.save(update_fields=["status", "updated_at"])
+            ensure_number(r)  # sert de référence ; aucun QR code n'est créé
+            send_waitlist(r)
+            return False
         r.status = "accepted"
         r.save(update_fields=["status", "updated_at"])
     ensure_number(r)  # le badge à imprimer est prêt dès l'inscription, dans l'ordre d'arrivée
     return send_badge(r)
+
+
+def send_waitlist(r):
+    """« Liste d'attente » : texte du cahier des charges, sans badge."""
+    from django.core.mail import send_mail
+    from apps.core import dossiers
+    body = (f"Bonjour {r.name},\n\nVotre demande est en liste d'attente. Votre accès n'est pas encore confirmé. "
+            "Si une place vous est proposée, vous recevrez un message distinct.\n\n"
+            f"Référence : {reference(r)}\nSuivre votre demande : {dossiers.tracking_url(r.email)}\n\nUrban Hub Connect\n\n--\n{dossiers.footer()}")
+    try:
+        send_mail("Grand Week-End du Pôle : votre demande est en liste d'attente", body, settings.DEFAULT_FROM_EMAIL, [r.email],
+                  fail_silently=False)
+        return True
+    except Exception:
+        logger.exception("E-mail de liste d'attente non envoyé (inscription %s)", r.pk)
+        return False
 
 
 def reissue(r):
@@ -277,7 +317,10 @@ def stats(today=None):
     days = {}
     for c in CheckIn.objects.filter(registration__in=regs).values_list("day", flat=True):
         days[c.isoformat()] = days.get(c.isoformat(), 0) + 1
-    return {"registered": regs.count(), "today": days.get(today.isoformat(), 0), "by_day": days}
+    base = EventRequest.objects.filter(kind__in=EventRequest.BADGE_KINDS)
+    return {"registered": regs.count(), "today": days.get(today.isoformat(), 0), "by_day": days,
+            "waitlist": base.filter(status="waitlist").count(), "capacity": capacity(),
+            "unsent": regs.filter(badge_sent_at__isnull=True).count()}
 
 
 # ---------- Badges à imprimer (Coordination) ----------
@@ -293,7 +336,7 @@ def printable(only_new=False):
 def print_row(r):
     token = ensure_token(r)
     return {"id": r.pk, "number": r.badge_number, "name": r.name, "job_title": r.job_title, "organization": r.organization,
-            "category": category_label(r), "token": token, "key": owner_key(token), "printed_at": r.badge_printed_at.isoformat() if r.badge_printed_at else None}
+            "category": category_label(r), "reference": reference(r), "token": token, "key": owner_key(token), "printed_at": r.badge_printed_at.isoformat() if r.badge_printed_at else None}
 
 
 def _slug(text):

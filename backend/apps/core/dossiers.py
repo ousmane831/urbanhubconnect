@@ -16,7 +16,7 @@ SALT = "dossier-suivi"
 
 
 def _models():
-    from apps.events.models import AwardApplication, BusinessConnectRegistration, EventRequest, VolunteerApplication
+    from apps.events.models import AwardApplication, BusinessConnectRegistration, EventRequest, StandRequest, VolunteerApplication
     from apps.partnerships.models import PartnershipApplication
     from apps.press.models import PressAccreditation
     # (modèle, clé publique, préfixe, libellé du type, champ du nom)
@@ -27,6 +27,7 @@ def _models():
         (VolunteerApplication, "volunteers", "BEN", "Candidature de bénévole", "name"),
         (PressAccreditation, "press", "PRE", "Accréditation presse", "name"),
         (PartnershipApplication, "partnerships", "PAR", "Demande de partenariat", "contact_name"),
+        (StandRequest, "stands", "STD", "Demande de stand", "manager"),
     ]
 
 

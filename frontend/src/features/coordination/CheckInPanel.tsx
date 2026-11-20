@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAsync } from "../../hooks/useAsync";
 import { useDebounce } from "../../hooks/useDebounce";
 import { Link } from "react-router-dom";
-import { badgesZipUrl, coordApi, type CheckinPerson, type CheckinResult } from "../../services/coordination";
+import { attendanceCsvUrl, badgesZipUrl, coordApi, type CheckinPerson, type CheckinResult } from "../../services/coordination";
 import { apiErrorMessage } from "../../utils/errors";
 import { PageHeader } from "./ui";
 
@@ -94,7 +94,7 @@ function ResultCard({ r, onNext }: { r: CheckinResult; onNext: () => void }) {
   );
 }
 
-function ManualSearch({ onDone }: { onDone: () => void }) {
+function ManualSearch({ onDone, full }: { onDone: () => void; full: boolean }) {
   const [q, setQ] = useState("");
   const query = useDebounce(q);
   const [version, setVersion] = useState(0);
@@ -138,8 +138,8 @@ function ManualSearch({ onDone }: { onDone: () => void }) {
               <div className="mt-2 grid gap-2 sm:flex">
                 {p.valid && !here && <button disabled={busy === p.id} onClick={() => run(p, "checkin")} className="min-h-[44px] rounded-lg bg-green px-4 font-semibold text-white disabled:opacity-60">Valider l'arrivée</button>}
                 {p.valid && <button disabled={busy === p.id} onClick={() => run(p, "resend")} className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-navy/20 px-4 font-semibold disabled:opacity-60"><Send className="h-4 w-4" aria-hidden />Renvoyer le badge</button>}
-                {p.valid && <button disabled={busy === p.id} onClick={() => run(p, "reissue")} className="min-h-[44px] rounded-lg border border-navy/20 px-4 font-semibold disabled:opacity-60">Réémettre (nouveau QR)</button>}
-                {p.valid && <button disabled={busy === p.id} onClick={() => run(p, "cancel")} className="min-h-[44px] rounded-lg border border-red-300 px-4 font-semibold text-red-800 disabled:opacity-60">Annuler l'inscription</button>}
+                {full && p.valid && <button disabled={busy === p.id} onClick={() => run(p, "reissue")} className="min-h-[44px] rounded-lg border border-navy/20 px-4 font-semibold disabled:opacity-60">Réémettre (nouveau QR)</button>}
+                {full && p.valid && <button disabled={busy === p.id} onClick={() => run(p, "cancel")} className="min-h-[44px] rounded-lg border border-red-300 px-4 font-semibold text-red-800 disabled:opacity-60">Annuler l'inscription</button>}
               </div>
             </li>);
         })}
@@ -150,6 +150,33 @@ function ManualSearch({ onDone }: { onDone: () => void }) {
 }
 
 /** Badges à imprimer : même QR code que celui reçu par e-mail, triés par numéro d'inscription, et archive des QR codes. */
+/** Badges confirmés qui ne sont pas partis (adresse refusée, serveur indisponible) : à renvoyer ou à corriger. */
+function UnsentCard() {
+  const [version, setVersion] = useState(0);
+  const list = useAsync(coordApi.checkinUnsent, [version]);
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  if (!list.data?.length) return null;
+  const resend = async (id: number) => {
+    try { setNotice({ ok: true, text: await coordApi.checkinResend(id) }); }
+    catch (e) { setNotice({ ok: false, text: apiErrorMessage(e) }); }
+    setVersion((v) => v + 1);
+  };
+  return (
+    <section aria-labelledby="nonenvoyes-titre" className="rounded-2xl border border-red-200 bg-white p-4 shadow-soft sm:p-6">
+      <h3 id="nonenvoyes-titre" className="flex items-center gap-2 font-heading text-lg font-bold"><TriangleAlert className="h-5 w-5 text-red-700" aria-hidden />Badges non envoyés ({list.data.length})</h3>
+      <p className="mt-1 text-sm text-navy/70">Vérifiez l'adresse (corrigeable dans l'administration), puis renvoyez. Les refus arrivés plus tard par e-mail se trouvent dans la boîte coordination@.</p>
+      {notice && <p role="status" className={`mt-3 text-sm font-semibold ${notice.ok ? "text-green" : "text-red-800"}`}>{notice.text}</p>}
+      <ul className="mt-3 divide-y divide-navy/10">{list.data.map((p) => (
+        <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+          <div className="min-w-0"><p className="font-semibold">{p.name} <span className="text-sm font-normal text-navy/60">{p.reference}</span></p>
+            <p className="break-all text-sm text-navy/70">{p.email}</p>
+            {p.badge_error && <p className="text-xs text-red-800">{p.badge_error}</p>}</div>
+          <button onClick={() => resend(p.id)} className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-navy/20 px-4 font-semibold hover:bg-offwhite"><Send className="h-4 w-4" aria-hidden />Renvoyer</button>
+        </li>))}</ul>
+    </section>
+  );
+}
+
 function PrintCard() {
   const list = useAsync(() => coordApi.badgesPrint(true), []);
   const d = list.data;
@@ -163,13 +190,15 @@ function PrintCard() {
         <Link to="/coordination/badges?nouveaux=1" className={`${btn} bg-green text-white hover:bg-green-2`}><Printer className="h-4 w-4" aria-hidden />Imprimer les nouveaux</Link>
         <Link to="/coordination/badges" className={`${btn} border border-navy/20 hover:bg-offwhite`}>Tous les badges</Link>
         <a href={badgesZipUrl(false)} className={`${btn} border border-navy/20 hover:bg-offwhite`}><Download className="h-4 w-4" aria-hidden />QR codes (ZIP)</a>
+        <Link to="/coordination/badges?liste=1" className={`${btn} border border-navy/20 hover:bg-offwhite`}>Liste papier de secours</Link>
+        <a href={attendanceCsvUrl()} className={`${btn} border border-navy/20 hover:bg-offwhite`}><Download className="h-4 w-4" aria-hidden />Présences (CSV)</a>
       </div>
     </section>
   );
 }
 
 /** Accueil du Grand Week-End : scan des badges, arrivées du jour, recherche manuelle (comptes Coordination). */
-export function CheckInPanel() {
+export function CheckInPanel({ full = true }: { full?: boolean }) {
   const [version, setVersion] = useState(0);
   const stats = useAsync(coordApi.checkinStats, [version]);
   const [scanning, setScanning] = useState(false);
@@ -205,9 +234,10 @@ export function CheckInPanel() {
         description="Scannez le QR code du participant. Un badge est valable une fois par jour, pour les deux journées." />
 
       {s && (
-        <dl className="grid grid-cols-2 gap-2 sm:gap-3">
+        <dl className={`grid gap-2 sm:gap-3 ${full ? "grid-cols-3" : "grid-cols-2"}`}>
           <div className="rounded-xl bg-white p-3 text-center shadow-soft"><dd className="font-heading text-2xl font-extrabold sm:text-3xl">{s.today}</dd><dt className="text-xs text-navy/70 sm:text-sm">arrivés aujourd'hui</dt></div>
-          <div className="rounded-xl bg-white p-3 text-center shadow-soft"><dd className="font-heading text-2xl font-extrabold sm:text-3xl">{s.registered}</dd><dt className="text-xs text-navy/70 sm:text-sm">inscrits</dt></div>
+          <div className="rounded-xl bg-white p-3 text-center shadow-soft"><dd className="font-heading text-2xl font-extrabold sm:text-3xl">{s.registered}{s.capacity ? <span className="text-base font-bold text-navy/50"> / {s.capacity}</span> : null}</dd><dt className="text-xs text-navy/70 sm:text-sm">inscrits confirmés</dt></div>
+          {full && <div className="rounded-xl bg-white p-3 text-center shadow-soft"><dd className="font-heading text-2xl font-extrabold sm:text-3xl">{s.waitlist ?? 0}</dd><dt className="text-xs text-navy/70 sm:text-sm">en liste d'attente</dt></div>}
         </dl>)}
 
       {failure && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 font-semibold text-red-900">{failure}</p>}
@@ -217,8 +247,9 @@ export function CheckInPanel() {
         : <button onClick={() => { setResult(null); setScanning(true); }} className="flex min-h-[64px] w-full items-center justify-center gap-3 rounded-2xl bg-green text-xl font-semibold text-white shadow-soft hover:bg-green-2">
             <Camera className="h-7 w-7" aria-hidden />Démarrer le scan</button>}
 
-      <ManualSearch onDone={() => setVersion((v) => v + 1)} />
-      <PrintCard />
+      <ManualSearch full={full} onDone={() => setVersion((v) => v + 1)} />
+      {full && <UnsentCard />}
+      {full && <PrintCard />}
     </div>
   );
 }

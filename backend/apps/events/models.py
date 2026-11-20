@@ -53,6 +53,13 @@ class Event(PublishableModel):
 
 class AwardCategory(Taxonomy):
     criteria = models.TextField("critères", blank=True, help_text="[à compléter]")
+    # État vérifié pour chaque catégorie au dépôt : la Coordination modifie la date ; rien ne s'ouvre ni ne se ferme implicitement.
+    closes_on = models.DateField("candidatures jusqu'au", null=True, blank=True,
+                                 help_text="Dernier jour de dépôt (inclus). Vide : catégorie ouverte.")
+
+    def is_open(self, today=None):
+        from django.utils import timezone
+        return self.is_active and (self.closes_on is None or (today or timezone.localdate()) <= self.closes_on)
 
     class Meta(Taxonomy.Meta):
         verbose_name, verbose_name_plural = "catégorie d'Awards", "catégories d'Awards"
@@ -60,13 +67,40 @@ class AwardCategory(Taxonomy):
 
 class AwardApplication(Submission):
     category = models.ForeignKey(AwardCategory, on_delete=models.PROTECT, related_name="applications")
-    applicant_name = models.CharField("organisation ou personne", max_length=200)
+    category_2 = models.ForeignKey(AwardCategory, on_delete=models.PROTECT, related_name="second_applications", null=True, blank=True,
+                                   verbose_name="seconde catégorie")
+    applicant_name = models.CharField("candidat (organisation ou personne)", max_length=200)
     organization = models.CharField(max_length=200, blank=True)
+    commune = models.CharField("commune ou zone d'activité", max_length=150, blank=True)
     email = models.EmailField()
     phone = models.CharField(max_length=30, blank=True)
-    description = models.TextField()
+    description = models.TextField("projet ou parcours")
+    evidence = models.TextField("éléments probants", blank=True)
+    on_behalf = models.BooleanField("présentée par un tiers", default=False)
+    submitter_name = models.CharField("nom de la personne qui présente", max_length=150, blank=True)
+    candidate_agrees = models.BooleanField("accord du candidat confirmé", default=False)
     supporting_document = models.FileField(upload_to="awards/", blank=True, validators=[validate_pdf, validate_upload_size])
+    document_2 = models.FileField("pièce 2", upload_to="awards/", blank=True, validators=[validate_pdf, validate_upload_size])
+    document_3 = models.FileField("pièce 3", upload_to="awards/", blank=True, validators=[validate_pdf, validate_upload_size])
+    accept_rules = models.BooleanField("règlement accepté", default=False)
     accept_privacy = models.BooleanField(default=False)
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        cats = [c for c in (getattr(self, "category", None), getattr(self, "category_2", None)) if c is not None]
+        if self.pk is None:
+            closed = [c.name for c in cats if not c.is_open()]
+            if closed:
+                errors["category"] = f"Les candidatures sont closes pour : {', '.join(closed)}."
+        if len(cats) == 2 and cats[0].pk == cats[1].pk:
+            errors["category_2"] = "Choisissez une seconde catégorie différente."
+        if self.on_behalf and not self.candidate_agrees:
+            errors["candidate_agrees"] = "Confirmez l'accord du candidat."
+        if self.on_behalf and not self.submitter_name.strip():
+            errors["submitter_name"] = "Indiquez votre nom."
+        if errors:
+            raise ValidationError(errors)
 
     class Meta(Submission.Meta):
         verbose_name, verbose_name_plural = "candidature Awards", "candidatures Awards"
@@ -103,6 +137,10 @@ class VolunteerApplication(Submission):
     email = models.EmailField()
     phone = models.CharField(max_length=30)
     organization = models.CharField(max_length=200, blank=True)
+    commune = models.CharField(max_length=150, blank=True)
+    days = models.JSONField("jours disponibles", default=list, blank=True)
+    accept_charter = models.BooleanField("Charte des bénévoles acceptée", default=False)
+    photo_consent = models.BooleanField("accepte la prise et la diffusion de photos", default=False)
     missions = models.ManyToManyField(VolunteerMission, blank=True, related_name="applications")
     availability = models.CharField("disponibilités", max_length=255, blank=True)
     message = models.TextField(blank=True)
@@ -112,6 +150,32 @@ class VolunteerApplication(Submission):
 
     def __str__(self):
         return self.name
+
+
+class StandRequest(Submission):
+    """Demande de stand (Village du Pôle) ou d'espace au Marché du terroir. Le dépôt ne réserve pas de stand et ne donne
+    lieu à aucun paiement : la Coordination confirme emplacement, conditions, montant et badges d'équipe."""
+    class Space(models.TextChoices):
+        VILLAGE = "village", "Stand au Village du Pôle"
+        TERROIR = "terroir", "Marché du terroir"
+
+    space = models.CharField("espace", max_length=10, choices=Space.choices)
+    structure = models.CharField("structure ou activité", max_length=200)
+    commune = models.CharField(max_length=150)
+    products = models.TextField("produits ou services présentés")
+    manager = models.CharField("responsable", max_length=150)
+    email = models.EmailField()
+    phone = models.CharField(max_length=30)
+    needs = models.TextField("besoins d'installation", blank=True)
+    team_size = models.PositiveSmallIntegerField("nombre de personnes sur le stand", default=1)
+    message = models.TextField(blank=True)
+    accept_privacy = models.BooleanField(default=False)
+
+    class Meta(Submission.Meta):
+        verbose_name, verbose_name_plural = "demande de stand", "demandes de stand"
+
+    def __str__(self):
+        return f"{self.structure} — {self.get_space_display()}"
 
 
 class EventSection(models.Model):
@@ -182,6 +246,8 @@ class EventRequest(Submission):
     # Numéro d'ordre du badge (1, 2, 3… dans l'ordre des inscriptions) : sert à trier les badges imprimés.
     badge_number = models.PositiveIntegerField("n° de badge", unique=True, null=True, blank=True, editable=False)
     badge_printed_at = models.DateTimeField("badge imprimé le", null=True, blank=True, editable=False)
+    # Dernier échec d'envoi du badge (adresse refusée, serveur indisponible…) : visible à l'accueil et dans l'administration.
+    badge_error = models.CharField("échec d'envoi du badge", max_length=255, blank=True, editable=False)
 
     class BadgeCategory(models.TextChoices):
         PARTICIPANT = "participant", "Participant"

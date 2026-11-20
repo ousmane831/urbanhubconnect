@@ -31,11 +31,16 @@ export default function Partners() {
   const dossier = useAsync(() => getDocuments("partnership"));
   const site = useSiteSettings();
   const fields: FieldDef[] = [
-    { name: "company", label: "Entreprise ou institution", type: "text", required: true },
-    { name: "tier", label: "Formule envisagée", type: "select", options: tiers.data?.map((t) => ({ value: t.slug, label: `${t.name} · ${fmtFcfa(t.amount_fcfa)} HT` })) },
-    { name: "contact_name", label: "Nom du contact", type: "text", required: true }, { name: "role", label: "Fonction", type: "text" },
+    { name: "company", label: "Organisation", type: "text", required: true }, { name: "sector", label: "Secteur", type: "text" },
+    { name: "contact_name", label: "Prénom et nom du contact", type: "text", required: true }, { name: "role", label: "Fonction", type: "text" },
     { name: "phone", label: "Téléphone", type: "tel", required: true }, { name: "email", label: "E-mail", type: "email", required: true },
-    { name: "message", label: "Message", type: "textarea" },
+    { name: "tier", label: "Formule envisagée", type: "select", full: true, options: tiers.data?.map((t) => ({ value: t.slug, label: `${t.name} · ${fmtFcfa(t.amount_fcfa)} HT` })),
+      hint: "Facultatif. La demande n'est ni une convention ni une attribution de places." },
+    { name: "wants_discussion", label: "Je souhaite en discuter avant de choisir une formule", type: "check" },
+    { name: "institutional", label: "Il s'agit d'un partenariat institutionnel", type: "check" },
+    { name: "in_kind", label: "Je propose un apport en nature", type: "check" },
+    { name: "in_kind_description", label: "Description de l'apport en nature", type: "textarea", showIf: "in_kind" },
+    { name: "message", label: "Message (facultatif)", type: "textarea" },
     { name: "accept_privacy", label: "J'accepte la politique de confidentialité.", type: "consent" },
   ];
   return (

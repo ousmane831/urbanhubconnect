@@ -21,6 +21,9 @@ export interface DossierRow {
   kind: string; id: number; type: string; reference: string; name: string; status: string; status_label: string; next_step: string;
   created_at: string; can_complete: boolean; can_cancel: boolean; badge_url?: string; visual_url?: string;
 }
+export const getGwePlaces = () => http.get<{ limited: boolean; full: boolean }>("/gwe/places/").then((r) => r.data);
+export interface AwardCategoryState { name: string; slug: string; description: string; closes_on: string | null; is_open: boolean }
+export const getAwardCategoryStates = () => http.get<AwardCategoryState[]>("/awards/categories/").then((r) => r.data);
 export const requestTrackingLink = (email: string) => http.post<{ detail: string }>("/suivi/", { email }).then((r) => r.data.detail);
 export const getTracking = (token: string) =>
   http.get<{ email: string; dossiers: DossierRow[] }>(`/suivi/${encodeURIComponent(token)}/`).then((r) => r.data);
@@ -46,6 +49,7 @@ export interface RouteResult { mode: TravelMode; distance: number; duration: num
 export const getRoute = (from: [number, number], to: [number, number], mode: TravelMode) =>
   http.get<RouteResult>("/map/route/", { params: { from: from.join(","), to: to.join(","), mode }, timeout: 20000 }).then((r) => r.data);
 export const submitMultipart = (path: string, form: FormData) => http.post<{ detail: string }>(path, form).then((r) => r.data.detail);
+export const submitMultipartFull = (path: string, form: FormData) => http.post<SubmitResult>(path, form).then((r) => r.data);
 
 const get = <T,>(url: string, params?: object) => http.get<T>(url, { params: params ? clean(params) : undefined }).then((r) => r.data);
 export const listEvents = (q: { category?: string; upcoming?: boolean; page?: number }) =>

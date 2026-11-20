@@ -12,9 +12,11 @@ vi.mock("../../services/coordination", () => ({
     checkinSearch: vi.fn().mockResolvedValue([person]),
     checkin: vi.fn().mockResolvedValue({ result: "ok", message: "Badge valide : arrivée enregistrée.", name: "Awa Ndiaye" }),
     checkinResend: vi.fn().mockResolvedValue("Badge renvoyé à a@x.org."),
+    checkinUnsent: vi.fn().mockResolvedValue([]),
     badgesPrint: vi.fn().mockResolvedValue({ total: 12, new: 5, event: { title: "", dates: "", location: "" }, badges: [] }),
   },
   badgesZipUrl: () => "/api/coordination/badges/qr.zip",
+  attendanceCsvUrl: () => "/api/coordination/checkin/presences.csv",
 }));
 import { coordApi } from "../../services/coordination";
 import { CheckInPanel } from "./CheckInPanel";
@@ -39,5 +41,15 @@ describe("Accueil : scan des badges", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Valider l'arrivée" }, { timeout: 2000 }));
     expect(coordApi.checkin).toHaveBeenCalledWith({ id: 7 });
     expect(await screen.findByText(/Awa Ndiaye : Badge valide/)).toBeInTheDocument();
+  });
+
+  it("l'agent d'accueil ne voit ni l'impression, ni l'annulation, ni la réémission", async () => {
+    render(<MemoryRouter><CheckInPanel full={false} /></MemoryRouter>);
+    expect(await screen.findByText("arrivés aujourd'hui")).toBeInTheDocument();
+    expect(screen.queryByText(/Badges à imprimer/)).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText(/Nom, organisation/), "awa");
+    expect(await screen.findByRole("button", { name: "Valider l'arrivée" }, { timeout: 2000 })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Annuler l'inscription/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Réémettre/ })).not.toBeInTheDocument();
   });
 });

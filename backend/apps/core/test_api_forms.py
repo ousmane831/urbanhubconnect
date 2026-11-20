@@ -103,7 +103,7 @@ class FormSubmissionTests(FormsBase):
                                              "submitter_name": "S", "submitter_email": "s@x.org"})
         self.assertEqual(r.status_code, 201)
         self.assertEqual(PlaceSuggestion.objects.get().status, "pending")
-        r = self.post("/api/volunteers/", {"name": "V", "email": "v@x.org", "phone": "1",
+        r = self.post("/api/volunteers/", {"name": "V", "email": "v@x.org", "phone": "1", "accept_charter": True,
                                             "missions": [VolunteerMission.objects.first().slug]})
         self.assertEqual(r.status_code, 201)
         self.assertEqual(VolunteerApplication.objects.get().missions.count(), 1)

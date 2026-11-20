@@ -36,9 +36,10 @@ export const coordApi = {
   checkinResend: (id: number) => api.post<{ detail: string }>("/checkin/resend/", { id }).then((r) => r.data.detail),
   checkinReissue: (id: number) => api.post<{ detail: string }>("/checkin/reissue/", { id }).then((r) => r.data.detail),
   checkinCancel: (id: number) => api.post<{ detail: string }>("/checkin/cancel/", { id }).then((r) => r.data.detail),
+  checkinUnsent: () => api.get<CheckinPerson[]>("/checkin/unsent/").then((r) => r.data),
   checkinStats: () => api.get<CheckinStats>("/checkin/stats/").then((r) => r.data),
-  badgesPrint: (onlyNew: boolean) =>
-    api.get<BadgePrintList>("/badges/print/", { params: onlyNew ? { nouveaux: 1 } : undefined }).then((r) => r.data),
+  badgesPrint: (onlyNew: boolean, category = "") =>
+    api.get<BadgePrintList>("/badges/print/", { params: { ...(onlyNew ? { nouveaux: 1 } : {}), ...(category ? { categorie: category } : {}) } }).then((r) => r.data),
   badgesPrinted: (ids: number[]) => api.post<{ detail: string }>("/badges/printed/", { ids }).then((r) => r.data.detail),
   campaigns: () => api.get<CampaignOverview>("/campaigns/").then((r) => r.data),
   campaignContacts: (search: string) => api.get<CampaignContact[]>("/campaigns/contacts/", { params: search ? { search } : undefined }).then((r) => r.data),
@@ -60,9 +61,11 @@ export interface CheckinResult {
   reference?: string; days?: string[]; today_at?: string; checkins?: { day: string; at: string }[];
 }
 export interface CheckinPerson {
-  id: number; name: string; organization: string; email: string; phone: string; valid: boolean; status: string; category: string; reference: string; badge_sent: boolean; checkins: string[];
+  id: number; name: string; organization: string; email: string; phone: string; valid: boolean; status: string; category: string; reference: string; badge_sent: boolean; badge_error?: string; checkins: string[];
 }
-export interface CheckinStats { registered: number; today: number; by_day: Record<string, number> }
+export interface CheckinStats {
+  registered: number; today: number; by_day: Record<string, number>; waitlist?: number; capacity?: number | null; unsent?: number;
+}
 
 export interface CampaignInput {
   title: string; subject: string; body: string; cta_label: string; cta_url: string; segments: string[]; activities: string[];
@@ -86,8 +89,13 @@ export interface ImportResult {
 export interface CampaignPreview { subject: string; html: string; recipients: number; schedule: string }
 
 export interface PrintBadge {
-  id: number; number: number; name: string; job_title: string; organization: string; token: string; key: string; printed_at: string | null;
+  id: number; number: number; name: string; job_title: string; organization: string; category: string; reference: string;
+  token: string; key: string; printed_at: string | null;
 }
-export interface BadgePrintList { total: number; new: number; event: { title: string; dates: string; location: string }; badges: PrintBadge[] }
+export interface BadgePrintList {
+  total: number; new: number; event: { title: string; dates: string; location: string }; badges: PrintBadge[];
+  categories?: { value: string; label: string }[];
+}
 /** Téléchargement direct (lien) : la session de la Coordination accompagne la requête. */
+export const attendanceCsvUrl = () => `${import.meta.env.VITE_API_URL ?? "/api"}/coordination/checkin/presences.csv`;
 export const badgesZipUrl = (onlyNew: boolean) => `${import.meta.env.VITE_API_URL ?? "/api"}/coordination/badges/qr.zip${onlyNew ? "?nouveaux=1" : ""}`;

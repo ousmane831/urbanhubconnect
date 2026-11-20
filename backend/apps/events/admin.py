@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from apps.core.admin import PublishActionsMixin, SubmissionAdminMixin, TaxonomyAdmin
 from .models import (CheckIn, EventRequest, EventSection, AwardApplication, AwardCategory, BusinessConnectRegistration, Event, EventCategory,
-                     VolunteerApplication, VolunteerMission)
+                     StandRequest, VolunteerApplication, VolunteerMission)
 
 
 @admin.register(EventCategory)
@@ -30,7 +30,17 @@ class EventAdmin(PublishActionsMixin, admin.ModelAdmin):
 
 @admin.register(AwardCategory)
 class AwardCategoryAdmin(TaxonomyAdmin):
-    pass
+    """« candidatures jusqu'au » : vérifié pour chaque catégorie au dépôt (aucune ouverture ni fermeture implicite)."""
+    list_display = ("name", "closes_on", "display_order", "is_active")
+    list_editable = ("closes_on", "display_order", "is_active")
+
+
+@admin.register(StandRequest)
+class StandRequestAdmin(SubmissionAdminMixin, admin.ModelAdmin):
+    list_display = ("structure", "space", "commune", "manager", "team_size", "status_badge", "created_at")
+    list_filter = ("status", "space")
+    search_fields = ("structure", "manager", "email", "commune")
+    readonly_fields = ("created_at", "updated_at")
 
 
 @admin.register(VolunteerMission)
