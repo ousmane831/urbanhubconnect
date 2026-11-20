@@ -4,6 +4,12 @@
  *  pastille-sticker pour la date et bandeau d'informations en pied, sans dégradé. */
 export const W = 1080;
 export const H = 1350;
+/** Formats d'export : publication (1080 × 1350) et story ou statut (1080 × 1920). */
+export const FORMATS = {
+  post: { h: 1350, label: "Publication", size: "1080 × 1350" },
+  story: { h: 1920, label: "Story ou statut", size: "1080 × 1920" },
+} as const;
+export type Format = keyof typeof FORMATS;
 /** Cadre de la photo (arche : haut en demi-cercle). */
 export const PHOTO = { x: 250, y: 452, w: 580, h: 590 };
 
@@ -13,7 +19,7 @@ const HEAD = "Montserrat, system-ui, sans-serif", BODY = "Inter, system-ui, sans
 export interface PhotoState { img: HTMLImageElement; zoom: number; x: number; y: number }
 export interface Visual {
   logo: HTMLImageElement | null; photo: PhotoState | null;
-  name: string; detail: string; dates: string; location: string;
+  name: string; detail: string; dates: string; location: string; format?: Format;
 }
 
 /** Fontes chargées avant de dessiner (sinon le canevas prend la police système). */
@@ -68,7 +74,7 @@ export function clampPhoto(p: PhotoState): PhotoState {
   return { ...p, x: Math.min(mx, Math.max(-mx, p.x)), y: Math.min(my, Math.max(-my, p.y)) };
 }
 
-function photo(ctx: Ctx, p: PhotoState | null) {
+function photo(ctx: Ctx, p: PhotoState | null, logo: HTMLImageElement | null) {
   const { x, y, w, h } = PHOTO;
   // Aplat vert décalé derrière la photo et filet doré décalé de l'autre côté : profondeur sans ombre ni dégradé
   arch(ctx, x + 26, y + 26, w, h); ctx.fillStyle = GREEN; ctx.fill();
@@ -80,11 +86,12 @@ function photo(ctx: Ctx, p: PhotoState | null) {
     const s = coverScale(p.img) * p.zoom, iw = p.img.naturalWidth * s, ih = p.img.naturalHeight * s;
     ctx.drawImage(p.img, x + (w - iw) / 2 + p.x, y + (h - ih) / 2 + p.y, iw, ih);
   } else {
-    // Emplacement vide : silhouette discrète
-    ctx.fillStyle = "#E6DFCF"; ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = "rgba(14,34,64,0.12)";
-    ctx.beginPath(); ctx.arc(x + w / 2, y + 250, 95, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(x + w / 2, y + h + 40, 210, 230, 0, Math.PI, 0); ctx.fill();
+    // Version sans photo : le logo du réseau sur fond blanc
+    ctx.fillStyle = WHITE; ctx.fillRect(x, y, w, h);
+    if (logo) {
+      const lw = w - 120, lh = (logo.naturalHeight / logo.naturalWidth) * lw;
+      ctx.drawImage(logo, x + 60, y + (h - lh) / 2 + 30, lw, lh);
+    }
   }
   ctx.restore();
 }
@@ -119,15 +126,19 @@ function pin(ctx: Ctx, x: number, y: number, color: string) {
 
 export function draw(context: CanvasRenderingContext2D, v: Visual) {
   const ctx = context as Ctx;
+  const story = v.format === "story", H = FORMATS[v.format ?? "post"].h;
+  // Story : en-tête et bandeau éloignés des bords (barres des applications), contenu centré entre les deux
+  const hy = story ? 150 : 0, bandY = story ? H - 320 : 1200, dy = story ? (hy + bandY - 1200) / 2 : 0;
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = CREAM; ctx.fillRect(0, 0, W, H);
 
   // Formes de l'identité : quart de cercle vert en haut à droite, petit disque or, arc fin bleu nuit à gauche
-  ctx.beginPath(); ctx.arc(W, 0, 232, Math.PI / 2, Math.PI); ctx.lineTo(W, 0); ctx.closePath(); ctx.fillStyle = GREEN; ctx.fill();
-  ctx.beginPath(); ctx.arc(W - 232, 22, 16, 0, Math.PI * 2); ctx.fillStyle = GOLD; ctx.fill();
-  ctx.beginPath(); ctx.arc(0, 760, 170, -Math.PI / 2, Math.PI / 2); ctx.strokeStyle = NAVY; ctx.lineWidth = 3; ctx.stroke();
-  ctx.beginPath(); ctx.arc(0, 760, 130, -Math.PI / 2, Math.PI / 2); ctx.strokeStyle = GOLD; ctx.lineWidth = 3; ctx.stroke();
+  ctx.beginPath(); ctx.arc(W, 0, 232 + hy, Math.PI / 2, Math.PI); ctx.lineTo(W, 0); ctx.closePath(); ctx.fillStyle = GREEN; ctx.fill();
+  ctx.beginPath(); ctx.arc(W - 232 - hy, 22, 16, 0, Math.PI * 2); ctx.fillStyle = GOLD; ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 760 + dy, 170, -Math.PI / 2, Math.PI / 2); ctx.strokeStyle = NAVY; ctx.lineWidth = 3; ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 760 + dy, 130, -Math.PI / 2, Math.PI / 2); ctx.strokeStyle = GOLD; ctx.lineWidth = 3; ctx.stroke();
 
+  ctx.save(); ctx.translate(0, hy);
   // En-tête : logo, mention de l'édition
   if (v.logo) {
     // Cartouche blanc assumé (le logo a un fond blanc)
@@ -138,7 +149,9 @@ export function draw(context: CanvasRenderingContext2D, v: Visual) {
   }
   text(ctx, "ÉDITION", W - 58, 90, (s) => `700 ${s}px ${HEAD}`, 22, 220, GOLD_LIGHT, "right", 4);
   text(ctx, "2026", W - 58, 140, (s) => `800 ${s}px ${HEAD}`, 48, 220, WHITE, "right", 2);
+  ctx.restore();
 
+  ctx.save(); ctx.translate(0, dy);
   // Titre : « J'Y SERAI » bleu nuit, « ! » or
   const size = fit(ctx, "J'Y SERAI !", (s) => `800 ${s}px ${HEAD}`, 150, 880);
   ctx.font = `800 ${size}px ${HEAD}`;
@@ -154,21 +167,23 @@ export function draw(context: CanvasRenderingContext2D, v: Visual) {
   text(ctx, sub, W / 2, 396, (s) => `700 ${s}px ${HEAD}`, 28, 820, GREEN, "center", 5);
   ctx.fillStyle = GOLD; ctx.fillRect(W / 2 - sw / 2 - 74, 386, 50, 3); ctx.fillRect(W / 2 + sw / 2 + 24, 386, 50, 3);
 
-  photo(ctx, v.photo);
+  photo(ctx, v.photo, v.logo);
   const d = dateParts(v.dates);
   if (d) sticker(ctx, PHOTO.x + PHOTO.w - 6, PHOTO.y + 96, d);
 
-  // Nom et fonction
-  const named = !!v.name.trim();
-  text(ctx, named ? v.name.trim() : "Votre nom", W / 2, 1122, (s) => `800 ${s}px ${HEAD}`, 58, 920, named ? NAVY : "rgba(14,34,64,0.35)");
-  if (v.detail.trim()) text(ctx, v.detail.trim(), W / 2, 1164, (s) => `600 ${s}px ${BODY}`, 30, 920, GREEN);
+  // Nom et fonction : facultatifs, choisis par la personne (rien n'est écrit si le champ est vide)
+  if (v.name.trim()) text(ctx, v.name.trim(), W / 2, 1122, (s) => `800 ${s}px ${HEAD}`, 58, 920, NAVY);
+  if (v.detail.trim()) text(ctx, v.detail.trim(), W / 2, v.name.trim() ? 1164 : 1130, (s) => `600 ${s}px ${BODY}`, 30, 920, GREEN);
+  ctx.restore();
 
-  // Bandeau d'informations
-  ctx.fillStyle = NAVY; ctx.fillRect(0, 1200, W, H - 1200);
-  ctx.fillStyle = GOLD; ctx.fillRect(0, 1200, W, 6);
+  // Bandeau d'informations (ancré en bas)
+  ctx.fillStyle = NAVY; ctx.fillRect(0, bandY, W, H - bandY);
+  ctx.fillStyle = GOLD; ctx.fillRect(0, bandY, W, 6);
+  ctx.save(); ctx.translate(0, bandY - 1200);
   pin(ctx, 92, 1262, GOLD);
-  // Lieu de l'événement (fixe : le champ « lieu » de l'événement cite aussi le Lac Rose, site du reboisement)
+  // Lieu de l'événement, tel que demandé par la Coordination
   text(ctx, "The GROUND Dakar Diamniadio", 128, 1278, (s) => `800 ${s}px ${HEAD}`, 36, 560, WHITE, "left");
   text(ctx, d ? `${v.dates.replace(/\s+\d{4}$/, "")} ${d.year}` : "Pôle urbain de Diamniadio", 128, 1318, (s) => `600 ${s}px ${BODY}`, 26, 560, "rgba(255,255,255,0.75)", "left");
   text(ctx, "urbanhubconnect.com", W - 70, 1300, (s) => `700 ${s}px ${HEAD}`, 26, 340, GOLD_LIGHT, "right");
+  ctx.restore();
 }

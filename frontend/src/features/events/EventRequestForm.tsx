@@ -1,45 +1,32 @@
 import { useMemo } from "react";
 import { ConfigForm, type FieldDef } from "../../components/forms/ConfigForm";
 
-export type RequestKind = "registration" | "host_afterwork" | "caravan" | "challenge";
+export type RequestKind = "registration" | "host_afterwork" | "challenge";
 
-const WAIVER = "J'accepte la décharge de responsabilité pour le reboisement.";
-/** Mêmes clés que EventRequest.REGISTRATION_OPTIONS côté serveur. */
+/** Mêmes clés que EventRequest.REGISTRATION_OPTIONS côté serveur : jours prévus, facultatifs (le badge vaut pour les deux). */
 export const REGISTRATION_OPTIONS = [
-  { value: "vendredi-matin", label: "Vendredi matin : ouverture officielle et Forum du Pôle, panel 1" },
-  { value: "business-connect-vendredi", label: "Business Connect, vendredi" },
-  { value: "business-connect-samedi", label: "Business Connect, samedi" },
-  { value: "reboisement", label: "Vendredi après-midi : grand reboisement du Lac Rose, avec place dans le convoi de navettes" },
-  { value: "samedi-forum", label: "Samedi : Forum du Pôle, panels 2, 3 et 4" },
-  { value: "samedi-awards", label: "Samedi : cérémonie des Awards du Pôle" },
-  { value: "navette-vendredi", label: "Navette depuis Dakar, vendredi" },
-  { value: "navette-samedi", label: "Navette depuis Dakar, samedi" },
+  { value: "vendredi", label: "Vendredi 11 décembre" },
+  { value: "samedi", label: "Samedi 12 décembre" },
 ];
 
 const CONFIG: Record<RequestKind, { message: string; submit: string }> = {
-  registration: { message: "Précisions", submit: "M'inscrire" },
+  registration: { message: "Précisions (facultatif)", submit: "M'inscrire aux deux journées" },
   host_afterwork: { message: "Thème envisagé, pôle et date souhaitée", submit: "Proposer d'accueillir" },
-  caravan: { message: "Précisions (nombre de planteurs, organisation…)", submit: "M'inscrire au reboisement" },
   challenge: { message: "Défi concerné et solution que vous proposez", submit: "Envoyer ma solution" },
 };
 
 export function EventRequestForm({ kind }: { kind: RequestKind }) {
-  const badge = kind === "registration" || kind === "caravan";  // inscription avec badge imprimé : nom complet et fonction
+  const badge = kind === "registration";  // inscription avec badge imprimé : nom complet et fonction
   const fields = useMemo<FieldDef[]>(() => [
     { name: "name", label: badge ? "Prénom et nom" : "Nom", type: "text", required: true, ...(badge ? { hint: "Tel qu'il apparaîtra sur votre badge." } : {}) },
-    ...(badge ? [{ name: "job_title", label: "Fonction", type: "text" as const, hint: "Ex. Directrice générale, chargé de projet…" }] : []),
-    { name: "organization", label: "Organisation", type: "text" },
-    { name: "email", label: "E-mail", type: "email", required: true },
-    { name: "phone", label: "Téléphone", type: "tel" },
-    ...(kind === "registration" ? [
-      { name: "options", label: "Je participe à", type: "multi" as const, required: true, options: REGISTRATION_OPTIONS },
-      { name: "what_offers", label: "Business Connect : ce que je propose", type: "textarea" as const },
-      { name: "what_needs", label: "Business Connect : ce que je recherche", type: "textarea" as const },
-      { name: "accept_waiver", label: WAIVER, type: "check" as const, hint: "Obligatoire si vous participez au reboisement." },
-    ] : []),
+    ...(badge ? [{ name: "job_title", label: "Fonction (facultatif)", type: "text" as const, hint: "Ex. Directrice générale, chargé de projet…" }] : []),
+    { name: "organization", label: badge ? "Organisation (facultatif)" : "Organisation", type: "text" },
+    { name: "email", label: "E-mail", type: "email", required: true, ...(badge ? { hint: "Votre badge y sera envoyé. Une même adresse peut servir à inscrire plusieurs personnes." } : {}) },
+    { name: "phone", label: badge ? "Téléphone (facultatif)" : "Téléphone", type: "tel" },
+    ...(badge ? [{ name: "options", label: "Jours prévus (facultatif, pour préparer l'accueil)", type: "multi" as const, options: REGISTRATION_OPTIONS,
+      hint: "Votre badge reste valable pour les deux journées." }] : []),
     { name: "message", label: CONFIG[kind].message, type: "textarea" },
-    ...(kind === "caravan" ? [{ name: "accept_waiver", label: WAIVER, type: "consent" as const }] : []),
     { name: "accept_privacy", label: "J'accepte la politique de confidentialité.", type: "consent" },
-  ], [kind]);
+  ], [kind, badge]);
   return <ConfigForm endpoint="/event-requests/" extra={{ kind }} fields={fields} submitLabel={CONFIG[kind].submit} successFallback="Merci. Votre demande a bien été transmise." />;
 }

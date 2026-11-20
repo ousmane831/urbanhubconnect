@@ -106,17 +106,30 @@ class NewsletterView(SubmissionCreateView):
 
 
 class EventRequestCreate(SubmissionCreateView):
-    """Demandes liées aux événements. Une inscription au Grand Week-End (ou au reboisement) est confirmée d'office
-    et le badge (QR code) part aussitôt par e-mail."""
+    """Demandes liées aux événements. Une inscription au Grand Week-End est confirmée d'office et le badge part aussitôt
+    par e-mail. Une même adresse peut inscrire plusieurs personnes ; la même personne (même nom, même adresse) n'a qu'un
+    badge par édition."""
     success_message = "Merci. Votre demande a bien été transmise. La Coordination vous recontactera rapidement."
     serializer_class = build_serializer(
         EventRequest, ["kind", "name", "organization", "job_title", "email", "phone", "options", "what_offers", "what_needs", "message",
-                       "accept_waiver", "accept_privacy"],
+                       "accept_privacy"],
         extra={**CONSENT("accept_privacy"),
-               # Les anciens types (visite, portes ouvertes) restent en base pour l'historique mais ne sont plus acceptés.
+               # Les anciens types (reboisement, visite, portes ouvertes) restent en base pour l'historique mais ne sont plus acceptés.
                "kind": serializers.ChoiceField(choices=[(k.value, k.label) for k in EventRequest.OPEN_KINDS]),
                "options": serializers.ListField(child=serializers.ChoiceField(choices=list(EventRequest.REGISTRATION_OPTIONS)),
                                                 required=False)})
+
+    def existing(self, data):
+        if data.get("kind") not in EventRequest.BADGE_KINDS:
+            return None
+        from apps.events import badges
+        r = badges.same_person(data.get("name", ""), data.get("email", ""))
+        if r is None:
+            return None
+        resent = badges.resend_if_stale(r)
+        detail = ("Une inscription existe déjà à ce nom avec cette adresse e-mail : vous n'avez rien à refaire. "
+                  + (f"Votre badge vient de vous être renvoyé à {r.email}." if resent else "Votre badge vous a été envoyé par e-mail."))
+        return Response({"detail": detail, "duplicate": True}, status=200)
 
     def after_create(self, obj):
         if obj.kind not in EventRequest.BADGE_KINDS:
@@ -124,11 +137,12 @@ class EventRequestCreate(SubmissionCreateView):
             return
         from apps.events import badges
         if badges.issue(obj):
-            self.success_message = (f"Merci, votre inscription est confirmée. Votre badge (QR code) vient d'être envoyé à {obj.email} : "
-                                    "présentez-le à l'accueil, sur votre téléphone ou imprimé. Pensez à vérifier vos courriers indésirables.")
+            self.success_message = (f"Merci, votre inscription est confirmée (référence {badges.reference(obj)}). Votre badge vient d'être "
+                                    f"envoyé à {obj.email} : présentez-le à l'accueil, sur votre téléphone ou imprimé. "
+                                    "Pensez à vérifier vos courriers indésirables.")
         else:
-            self.success_message = ("Merci, votre inscription est enregistrée. Votre badge n'a pas pu être envoyé par e-mail pour le moment : "
-                                    "la Coordination vous le fera parvenir.")
+            self.success_message = (f"Merci, votre inscription est enregistrée (référence {badges.reference(obj)}). Votre badge n'a pas pu "
+                                    "être envoyé par e-mail pour le moment : la Coordination vous le fera parvenir.")
 
 
 urlpatterns = [

@@ -42,20 +42,25 @@ export const getMembershipCategories = () => get<MembershipCategoryItem[]>("/mem
 export const getTiers = () => get<Priced[]>("/partnerships/tiers/");
 export const getPartners = () => get<Partner[]>("/partnerships/partners/");
 export const getPartnerBand = () => get<BandPartner[]>("/partnerships/band/");
-export interface PlantingSeats { seats: number | null; remaining: number | null }
-export const getPlantingSeats = () => get<PlantingSeats>("/events-planting-seats/");
-export interface BadgeInfo {
-  name: string; organization: string; job_title?: string; number?: number | null; kind: string; options: string[]; planting: boolean; valid: boolean;
-  checkins: { day: string; at: string }[]; event: { title: string; dates: string; location: string };
-}
-export const getBadge = (token: string) => get<BadgeInfo>(`/badges/${encodeURIComponent(token)}/`);
+export interface BadgeEvent { title: string; dates: string; location: string }
+/** Sans la clé du titulaire (lien reçu par e-mail), l'API ne renvoie aucune identité : owner = false. */
+export type BadgeInfo =
+  | { owner: false; event: BadgeEvent }
+  | {
+    owner: true; name: string; organization: string; job_title?: string; number?: number | null; reference: string; kind: string;
+    days: string[]; valid: boolean; confirmed: boolean; checkins: { day: string; at: string }[]; event: BadgeEvent;
+  };
+export const getBadge = (token: string, key?: string | null) =>
+  get<BadgeInfo>(`/badges/${encodeURIComponent(token)}/`, key ? { cle: key } : undefined);
+export const resendBadge = (token: string) =>
+  http.post<{ detail: string }>(`/badges/${encodeURIComponent(token)}/renvoyer/`).then((r) => r.data.detail);
 export interface UnsubscribeState { email: string; unsubscribed: boolean }
 export const getUnsubscribe = (token: string) => get<UnsubscribeState>(`/unsubscribe/${encodeURIComponent(token)}/`);
 export const confirmUnsubscribe = (token: string) =>
   http.post<UnsubscribeState>(`/unsubscribe/${encodeURIComponent(token)}/`).then((r) => r.data);
-export const badgeImageUrl = (token: string, download = false) =>
-  `${import.meta.env.VITE_API_URL ?? "/api"}/badges/${encodeURIComponent(token)}/badge.png${download ? "?telecharger=1" : ""}`;
-export const badgeQrUrl = (token: string) => `${import.meta.env.VITE_API_URL ?? "/api"}/badges/${encodeURIComponent(token)}/qr.png`;
+/** Image du badge : réservée au titulaire (clé) ou à la Coordination connectée. */
+export const badgeImageUrl = (token: string, key: string, download = false) =>
+  `${import.meta.env.VITE_API_URL ?? "/api"}/badges/${encodeURIComponent(token)}/badge.png?cle=${encodeURIComponent(key)}${download ? "&telecharger=1" : ""}`;
 export const getPressReleases = () => get<PressRelease[]>("/press/");
 export const getDocuments = (category?: string) => get<DocumentItem[]>("/documents/", { category });
 export const getAwardCategories = () => get<RefItem[]>("/awards/categories/");

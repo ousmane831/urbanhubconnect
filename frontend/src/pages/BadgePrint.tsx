@@ -24,7 +24,7 @@ const PRINT_CSS = `
 
 /** Image du badge générée par le serveur : exactement celle reçue par e-mail par le participant. */
 function Badge({ b }: { b: PrintBadge }) {
-  return <img src={badgeImageUrl(b.token)} alt={`Badge n° ${b.number} : ${b.name}`} className="badge" />;
+  return <img src={badgeImageUrl(b.token, b.key)} alt={`Badge n° ${b.number} : ${b.name}`} className="badge" />;
 }
 
 const chunk = <T,>(items: T[], size: number) => Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, i * size + size));

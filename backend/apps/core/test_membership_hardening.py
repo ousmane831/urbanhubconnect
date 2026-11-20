@@ -131,6 +131,8 @@ class LinkingTests(Base):
     def test_a_new_application_after_a_refusal_opens_a_new_dossier(self):
         self.application()
         ms.reject(Membership.objects.get())
+        from apps.core.models import SubmissionReceipt
+        SubmissionReceipt.objects.all().delete()  # nouvelle demande, des jours plus tard (hors fenêtre anti-double clic)
         self.application()
         self.assertEqual(Membership.objects.count(), 2)
 

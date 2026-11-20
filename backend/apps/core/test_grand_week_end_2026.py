@@ -1,4 +1,5 @@
-"""Note de la Coordination du 5 novembre 2026 : Grand Week-End sur deux journées, formulaires, formules, bandeau."""
+"""Grand Week-End sur deux journées (note du 5 novembre 2026), mis à jour par le cahier des charges du 20 novembre 2026 :
+un seul lieu, pas d'horaires détaillés, plus de reboisement, de convoi ni de navette."""
 from datetime import datetime, timedelta
 from importlib import import_module
 from io import StringIO
@@ -16,10 +17,11 @@ from apps.partnerships.models import Partner, PartnershipTier
 
 DAKAR = ZoneInfo("Africa/Dakar")
 SLUG = "grand-week-end-du-pole-2026"
-RETIRED = ["13 décembre", "Caravane verte", "randonnée", "Challenge inter", "Portes Ouvertes", "circuit A", "Golden Chic",
+RETIRED = ["13 décembre", "Caravane verte", "randonnée", "Challenge inter", "Portes Ouvertes", "portes ouvertes", "circuit A",
            "Gala des Awards", "co-organis", "Rencontre des décideurs", "Vitrine des projets", "Agora Jeunesse", "31 octobre",
-           "trois jours", "Trois jours", "11 au 13"]
-migration = import_module("apps.events.migrations.0004_grand_week_end_update_nov_2026")
+           "trois jours", "Trois jours", "11 au 13", "reboisement", "convoi", "navette", "causerie", "arbres", " h 30", " h 45",
+           "à partir de 19 h"]
+migration = import_module("apps.events.migrations.0007_cahier_des_charges_20_novembre_2026")
 
 
 class Base(APITestCase):
@@ -37,11 +39,15 @@ class SeedTests(Base):
         self.assertEqual(e.start_date, datetime(2026, 12, 11, 9, 30, tzinfo=DAKAR))
         self.assertEqual(e.end_date.astimezone(DAKAR).date().isoformat(), "2026-12-12")
         slugs = set(e.sections.values_list("slug", flat=True))
-        self.assertTrue({"programme-vendredi", "programme-samedi", "reboisement", "gala", "experiences"} <= slugs)
-        self.assertFalse(slugs & {"programme-dimanche", "portes-ouvertes", "caravane-verte"})
+        self.assertTrue({"programme-vendredi", "programme-samedi", "gala", "experiences"} <= slugs)
+        self.assertFalse(slugs & {"programme-dimanche", "portes-ouvertes", "caravane-verte", "reboisement"})
+        self.assertEqual(e.location, "The Ground, Diamniadio")
+        self.assertIn("Gala du Pôle avec Youssou Ndour. Golden Chic, en partenariat avec The Ground.",
+                      e.sections.get(slug="programme-samedi").body)
 
     def test_no_retired_wording_in_event_texts(self):
-        texts = [s.title + s.body for s in EventSection.objects.all()] + [a.title + a.content for a in Article.objects.all()]
+        texts = ([s.title + s.body for s in EventSection.objects.filter(is_published=True)] + [a.title + a.content for a in Article.objects.all()]
+                 + [t.benefits for t in PartnershipTier.objects.all()])
         for word in RETIRED:
             self.assertFalse([t for t in texts if word in t], word)
 
@@ -50,59 +56,54 @@ class SeedTests(Base):
         self.assertEqual(amounts["partenaire-fondateur"], 5_000_000)
         self.assertEqual(amounts["pack-pme-du-pole"], 250_000)
 
-    def test_five_volunteer_missions(self):
-        self.assertEqual(VolunteerMission.objects.filter(is_active=True).count(), 5)
+    def test_four_volunteer_missions(self):
+        self.assertEqual(VolunteerMission.objects.filter(is_active=True).count(), 4)
 
 
 class MigrationTests(Base):
-    """Base créée avec l'ancien programme à trois jours : la migration remplace les textes."""
+    """Base créée avant le cahier des charges du 20 novembre : la migration retire l'ancien programme."""
 
     def test_updates_old_content(self):
         e = Event.objects.get(slug=SLUG)
-        e.end_date = datetime(2026, 12, 13, 23, 59, tzinfo=DAKAR)
+        e.location = "Diamniadio · Lac Rose"
         e.save()
-        e.sections.filter(slug="programme-vendredi").update(body="9 h 00 – 12 h 30 | Rencontre des décideurs")
-        EventSection.objects.create(event=e, slug="caravane-verte", title="Caravane verte", body="Dimanche 13 décembre")
+        e.sections.filter(slug="programme-vendredi").update(body="14 h 30 | Départ en convoi pour le Lac Rose")
+        EventSection.objects.create(event=e, slug="reboisement", title="Le grand reboisement", body="1 000 arbres")
         e.sections.filter(slug="awards").update(body="Texte modifié dans l'admin")
-        PartnershipTier.objects.filter(slug="partenaire-fondateur").update(amount_fcfa=7_500_000)
-        VolunteerMission.objects.all().delete()
-        for n in ["Orientation", "Portes Ouvertes", "Caravane verte et reboisement"]:
-            VolunteerMission.objects.create(name=n)
-        Article.objects.update(content="lancé du vendredi 11 au dimanche 13 décembre 2026 : bla")
+        PartnershipTier.objects.filter(slug="partenaire-associe").update(benefits="stand, 50 arbres")
+        VolunteerMission.objects.create(name="Convoi et reboisement du Lac Rose", slug="convoi", is_active=True)
+        Article.objects.update(content="rendez-vous d'affaires, grand reboisement du Lac Rose, Awards et Gala du Pôle.")
+        reg = EventRequest.objects.create(kind="registration", name="Awa", email="a@x.org", options=["reboisement"], status="accepted")
 
         migration.forwards(django_apps, None)
 
         e.refresh_from_db()
-        self.assertEqual(e.end_date.astimezone(DAKAR).day, 12)
-        self.assertIn("Café des décideurs", e.sections.get(slug="programme-vendredi").body)
-        self.assertFalse(e.sections.filter(slug="caravane-verte").exists())
+        self.assertEqual(e.location, "The Ground, Diamniadio")
+        self.assertNotIn("convoi", e.sections.get(slug="programme-vendredi").body)
+        self.assertFalse(e.sections.get(slug="reboisement").is_published)
         self.assertEqual(e.sections.get(slug="awards").body, "Texte modifié dans l'admin")
-        self.assertEqual(PartnershipTier.objects.get(slug="partenaire-fondateur").amount_fcfa, 5_000_000)
-        active = set(VolunteerMission.objects.filter(is_active=True).values_list("name", flat=True))
-        self.assertIn("Convoi et reboisement du Lac Rose", active)
-        self.assertNotIn("Portes Ouvertes", active)
-        self.assertIn("les vendredi 11 et samedi 12 décembre 2026", Article.objects.first().content)
+        self.assertNotIn("arbres", PartnershipTier.objects.get(slug="partenaire-associe").benefits)
+        self.assertFalse(VolunteerMission.objects.get(slug="convoi").is_active)
+        self.assertNotIn("reboisement", Article.objects.first().content)
+        reg.refresh_from_db()
+        self.assertEqual(reg.options, ["reboisement"])  # l'historique du dossier est conservé
 
 
 class RegistrationFormTests(Base):
-    def test_registration_with_options(self):
-        r = self.post({"kind": "registration", "options": ["vendredi-matin", "business-connect-samedi"], "what_offers": "Conseil"})
+    def test_registration_with_days(self):
+        r = self.post({"kind": "registration", "options": ["vendredi", "samedi"], "job_title": "Directrice"})
         self.assertEqual(r.status_code, 201, r.content)
-        self.assertEqual(EventRequest.objects.get().options, ["vendredi-matin", "business-connect-samedi"])
+        self.assertEqual(EventRequest.objects.get().options, ["vendredi", "samedi"])
 
-    def test_registration_requires_an_option(self):
-        self.assertEqual(self.post({"kind": "registration", "options": []}).status_code, 400)
+    def test_days_are_optional(self):
+        self.assertEqual(self.post({"kind": "registration", "options": []}).status_code, 201)
 
-    def test_unknown_option_rejected(self):
-        self.assertEqual(self.post({"kind": "registration", "options": ["caravane"]}).status_code, 400)
-
-    def test_planting_requires_waiver(self):
-        self.assertIn("accept_waiver", self.post({"kind": "registration", "options": ["reboisement"]}).json())
-        self.assertEqual(self.post({"kind": "registration", "options": ["reboisement"], "accept_waiver": True}).status_code, 201)
-        self.assertIn("accept_waiver", self.post({"kind": "caravan"}).json())
+    def test_unknown_or_retired_option_rejected(self):
+        for option in ("caravane", "reboisement", "navette-vendredi", "vendredi-matin"):
+            self.assertEqual(self.post({"kind": "registration", "options": [option]}).status_code, 400, option)
 
     def test_retired_kinds_rejected(self):
-        for kind in ("book_visit", "open_doors"):
+        for kind in ("book_visit", "open_doors", "caravan"):
             self.assertEqual(self.post({"kind": kind, "circuit": "A"}).status_code, 400, kind)
 
 

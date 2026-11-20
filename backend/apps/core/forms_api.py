@@ -1,5 +1,11 @@
+import hashlib
+import json
+from datetime import timedelta
+
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError, transaction
+from django.utils import timezone
 from django.core.mail import EmailMessage
 from rest_framework import generics, serializers, status
 from rest_framework.permissions import AllowAny
@@ -8,6 +14,33 @@ from rest_framework.throttling import ScopedRateThrottle
 
 CONSENT_FIELDS = ("accept_charter", "accept_privacy", "consent")
 HONEYPOT = "company_website"  # champ invisible : rempli uniquement par les robots
+REPLAY_WINDOW = timedelta(minutes=10)
+ALREADY_DONE = "Cette demande a déjà été enregistrée : vous n'avez rien à refaire."
+
+
+def _fingerprint(request):
+    """Empreinte d'un envoi : adresse du formulaire et données saisies (fichiers : nom et taille)."""
+    data = {}
+    for k in sorted(request.data.keys()):
+        values = request.data.getlist(k) if hasattr(request.data, "getlist") else [request.data[k]]
+        data[k] = [f"{v.name}:{v.size}" if hasattr(v, "read") else v for v in values]
+    raw = request.path + json.dumps(data, sort_keys=True, default=str, ensure_ascii=False)
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def first_submission(request):
+    """True si cet envoi est nouveau ; False si le même envoi a déjà été reçu dans les 10 dernières minutes."""
+    from .models import SubmissionReceipt
+    key, now = _fingerprint(request), timezone.now()
+    try:
+        with transaction.atomic():
+            SubmissionReceipt.objects.create(key=key, created_at=now)
+        if now.second == 0:  # ménage occasionnel
+            SubmissionReceipt.objects.filter(created_at__lt=now - REPLAY_WINDOW).delete()
+        return True
+    except IntegrityError:
+        # Même envoi plus ancien que la fenêtre : il s'agit d'une nouvelle demande volontaire.
+        return SubmissionReceipt.objects.filter(key=key, created_at__lt=now - REPLAY_WINDOW).update(created_at=now) == 1
 
 
 class CleanedModelSerializer(serializers.ModelSerializer):
@@ -51,8 +84,17 @@ class SubmissionCreateView(generics.CreateAPIView):
             return Response({"detail": self.success_message}, status=status.HTTP_201_CREATED)
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        if not first_submission(request):  # double clic ou relance après coupure : rien de nouveau
+            return Response({"detail": ALREADY_DONE, "duplicate": True}, status=status.HTTP_200_OK)
+        existing = self.existing(serializer.validated_data)
+        if existing is not None:
+            return existing
         self.after_create(serializer.save())
         return Response({"detail": self.success_message}, status=status.HTTP_201_CREATED)
+
+    def existing(self, data):
+        """Dossier déjà enregistré pour la même personne : retourner la réponse à donner (aucun nouveau dossier)."""
+        return None
 
     def after_create(self, obj):
         """Accusé de réception par e-mail au demandeur (voir confirmations.py)."""

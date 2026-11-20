@@ -14,7 +14,7 @@ EXCERPT = ("Institutions, entreprises, investisseurs, écoles, associations, com
            "de Diamniadio et du Lac Rose disposent désormais d'un réseau commun : Urban Hub Connect.")
 CONTENT = """Institutions, entreprises, investisseurs, écoles, associations, communautés et jeunes talents des pôles urbains de Diamniadio et du Lac Rose disposent désormais d'un réseau commun : Urban Hub Connect. Son ambition : créer un cadre permanent où les acteurs des deux pôles se connaissent, partagent l'information et construisent ensemble des coopérations utiles au territoire.
 
-Le réseau sera officiellement lancé lors de la première édition du Grand Week-End du Pôle, les vendredi 11 et samedi 12 décembre 2026 : ouverture officielle, Forum du Pôle en quatre panels, rendez-vous d'affaires, grand reboisement du Lac Rose, Awards et Gala du Pôle.
+Le réseau sera officiellement lancé lors de la première édition du Grand Week-End du Pôle, les vendredi 11 et samedi 12 décembre 2026 : ouverture officielle, Forum du Pôle en quatre panels, Village du Pôle, rendez-vous d'affaires, Awards et Gala du Pôle.
 
 Les organisations qui souhaitent devenir membres fondateurs ou partenaires peuvent dès à présent contacter la Coordination au +221 78 309 56 56 ou à infos@urbanhubconnect.com."""
 

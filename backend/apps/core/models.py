@@ -116,3 +116,14 @@ class ActionItem(Taxonomy):
     class Meta(Taxonomy.Meta):
         ordering = ["kind", "display_order", "name"]
         verbose_name, verbose_name_plural = "programme, cercle ou outil", "programmes, cercles et outils"
+
+
+class SubmissionReceipt(models.Model):
+    """Empreinte de chaque envoi de formulaire public : un double clic ou une relance après coupure réseau
+    (même formulaire, mêmes données, dans les 10 minutes) ne crée ni deuxième dossier, ni deuxième e-mail.
+    La contrainte d'unicité tient même avec plusieurs processus serveur."""
+    key = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        verbose_name, verbose_name_plural = "empreinte d'envoi", "empreintes d'envoi"

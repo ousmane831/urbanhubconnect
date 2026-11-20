@@ -25,7 +25,9 @@ admin.site.site_title = "Urban Hub Connect"
 admin.site.index_title = "Tableau de bord de la Coordination"
 
 def robots(request):
-    body = f"User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /api/\n\nSitemap: {settings.SITE_URL}/sitemap.xml\n"
+    # Pages privées (badges, désinscription, espaces réservés) : jamais indexées.
+    private = "".join(f"Disallow: {p}\n" for p in ("/admin/", "/api/", "/badge/", "/desinscription/", "/coordination", "/espace-membres"))
+    body = f"User-agent: *\nAllow: /\n{private}\nSitemap: {settings.SITE_URL}/sitemap.xml\n"
     return HttpResponse(body, content_type="text/plain")
 
 
@@ -87,7 +89,7 @@ urlpatterns = [
     path("api/badges/<str:token>/", bd.badge_detail, name="badge-detail"),
     path("api/badges/<str:token>/qr.png", bd.badge_qr, name="badge-qr"),
     path("api/badges/<str:token>/badge.png", bd.badge_image, name="badge-image"),
-    path("api/events-planting-seats/", bd.planting_seats, name="planting-seats"),
+    path("api/badges/<str:token>/renvoyer/", bd.badge_resend, name="badge-resend"),
     path("api/coordination/checkin/", bd.checkin, name="coord-checkin"),
     path("api/coordination/checkin/search/", bd.checkin_search, name="coord-checkin-search"),
     path("api/coordination/checkin/resend/", bd.checkin_resend, name="coord-checkin-resend"),

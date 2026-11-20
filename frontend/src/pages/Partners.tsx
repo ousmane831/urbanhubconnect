@@ -14,7 +14,7 @@ import { fmtFcfa } from "../utils/format";
 const WHY = [
   { title: "Gagner en visibilité", description: "Logo sur les supports de l'événement et du réseau, prise de parole et présence au Village du Pôle.", icon: Eye },
   { title: "Développer ses affaires", description: "Business Connect, rencontre Achetons Local et Mur des opportunités.", icon: Briefcase },
-  { title: "Fédérer ses équipes", description: "Reboisement du Lac Rose et rendez-vous d'affaires.", icon: Users },
+  { title: "Fédérer ses équipes", description: "Village du Pôle, Business Connect et rencontres avec les acteurs des deux pôles.", icon: Users },
   { title: "Agir pour le territoire", description: "Un bosquet dans la Forêt Urban Hub Connect et un engagement aux côtés des acteurs des deux pôles.", icon: Sprout },
 ];
 

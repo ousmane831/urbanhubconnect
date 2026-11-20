@@ -15,8 +15,10 @@ def signature():
     """Coordonnées lues dans les Paramètres du site : un changement dans l'admin s'applique aussi aux e-mails."""
     from .models import SiteSettings
     s = SiteSettings.load()
-    return (f"\n\nUrban Hub Connect · Coordination\n{s.phone} (appel et WhatsApp) · {s.email}\n{settings.SITE_URL.replace('https://', '')}\n\n"
-            "Cet e-mail confirme la réception de votre demande. Pour toute question, répondez simplement à ce message.")
+    site = getattr(settings, "FRONTEND_URL", settings.SITE_URL).rstrip("/")
+    return (f"\n\nUrban Hub Connect · Coordination\n{s.phone} (appel et WhatsApp) · {s.email}\n{site.replace('https://', '')}\n\n--\n"
+            "Ce message est automatique. Aucune réponse n'est nécessaire. "
+            f"Si vous avez besoin d'aide, utilisez le formulaire de contact : {site}/contact")
 
 
 def _lines(*pairs):
@@ -33,28 +35,31 @@ def _partnership(p):
     return (p.email, "Votre demande de partenariat avec Urban Hub Connect",
             f"Bonjour {p.contact_name},\n\nNous avons bien reçu la demande de partenariat de {p.company}"
             + (f" (formule envisagée : {p.tier.name})" if p.tier_id else "") + ".\n"
-            "La Coordination vous rappellera sous 72 heures pour en parler avec vous.")
+            "Votre dossier est en cours d'examen : la Coordination vous recontactera. "
+            "Cette demande ne vaut ni convention ni attribution de places.")
 
 
 def _press(a):
     return (a.email, "Votre demande d'accréditation presse",
             f"Bonjour {a.name},\n\nNous avons bien reçu votre demande d'accréditation pour {a.media}"
             + (f" (jours de présence : {a.attendance_days})" if a.attendance_days else "") + ".\n"
-            "La Coordination vous confirmera votre accréditation par e-mail.")
+            "Votre demande est en cours d'examen. Le badge n'est émis qu'après validation : vous recevrez un message distinct.")
 
 
 def _award(a):
     return (a.email, "Votre candidature aux Awards du Pôle",
             f"Bonjour {a.applicant_name},\n\nNous avons bien reçu votre candidature dans la catégorie « {a.category.name} ».\n\n"
             "Prochaines étapes :\n- jury du 23 au 28 novembre ;\n- annonce des nominés le 1er décembre ;\n"
-            "- vote du public du 1er au 10 décembre ;\n- remise des Awards le samedi 12 décembre à 14 h 30.")
+            "- vote du public du 1er au 10 décembre ;\n- remise des Awards le samedi 12 décembre.\n\n"
+            "Le dépôt d'une candidature ne vaut ni nomination ni badge d'accès.")
 
 
 def _business_connect(b):
     return (b.email, "Votre inscription au Business Connect",
             f"Bonjour {b.participant_name},\n\nVotre inscription au Business Connect du Grand Week-End du Pôle est bien enregistrée.\n"
             + (f"\n{_lines(('Ce que vous proposez', b.what_offers), ('Ce que vous recherchez', b.what_needs))}\n" if b.what_offers or b.what_needs else "")
-            + "\nVotre agenda de rendez-vous ciblés vous sera envoyé le 5 décembre.")
+            + "\nVotre demande de rendez-vous est reçue ; ce n'est pas encore un rendez-vous confirmé. "
+            "La Coordination vous enverra uniquement les créneaux effectivement attribués.")
 
 
 def _volunteer(v):
@@ -62,8 +67,8 @@ def _volunteer(v):
     return (v.email, "Votre candidature de bénévole",
             f"Bonjour {v.name},\n\nMerci de proposer votre aide pour le Grand Week-End du Pôle."
             + (f"\nMissions souhaitées : {missions}." if missions else "") + "\n\n"
-            "La Coordination vous recontactera pour confirmer votre mission. La formation des bénévoles est obligatoire "
-            "le samedi 5 décembre ; tenue officielle, repas et transport sont assurés pendant les jours de mission.")
+            "Votre candidature est en cours d'examen. Après sélection, la Coordination vous enverra votre mission, "
+            "l'adresse du rendez-vous et votre badge.")
 
 
 def _event_request(r):
@@ -73,7 +78,7 @@ def _event_request(r):
                            "pour convenir du thème et de la date."),
         "challenge": ("Votre solution aux Défis Partenaires",
                       "Nous avons bien reçu votre solution aux Défis Partenaires. Les finalistes présenteront leur solution devant un jury "
-                      "le samedi 12 décembre à 13 h 45, à l'Espace innovation. Vous restez propriétaire de votre idée."),
+                      "le samedi 12 décembre. Vous restez propriétaire de votre idée."),
     }
     subject, text = texts.get(r.kind, ("Votre demande à Urban Hub Connect",
                                        "Nous avons bien reçu votre demande. La Coordination vous recontactera rapidement."))

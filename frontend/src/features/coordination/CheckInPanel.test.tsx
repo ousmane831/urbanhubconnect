@@ -4,11 +4,11 @@ import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 
 const { person } = vi.hoisted(() => ({
-  person: { id: 7, name: "Awa Ndiaye", organization: "Exemple SA", email: "a@x.org", phone: "770000000", valid: true, planting: true, badge_sent: true, checkins: [] },
+  person: { id: 7, name: "Awa Ndiaye", organization: "Exemple SA", email: "a@x.org", phone: "770000000", valid: true, reference: "GWE-0007", badge_sent: true, checkins: [] },
 }));
 vi.mock("../../services/coordination", () => ({
   coordApi: {
-    checkinStats: vi.fn().mockResolvedValue({ registered: 12, today: 3, by_day: {}, planting_taken: 5, planting_seats: 40 }),
+    checkinStats: vi.fn().mockResolvedValue({ registered: 12, today: 3, by_day: {} }),
     checkinSearch: vi.fn().mockResolvedValue([person]),
     checkin: vi.fn().mockResolvedValue({ result: "ok", message: "Badge valide : arrivée enregistrée.", name: "Awa Ndiaye" }),
     checkinResend: vi.fn().mockResolvedValue("Badge renvoyé à a@x.org."),
@@ -20,11 +20,10 @@ import { coordApi } from "../../services/coordination";
 import { CheckInPanel } from "./CheckInPanel";
 
 describe("Accueil : scan des badges", () => {
-  it("affiche les compteurs du jour et du convoi", async () => {
+  it("affiche les compteurs du jour", async () => {
     render(<MemoryRouter><CheckInPanel /></MemoryRouter>);
     expect(await screen.findByText("arrivés aujourd'hui")).toBeInTheDocument();
     expect(screen.getByText("12")).toBeInTheDocument();
-    expect(screen.getByText("/ 40", { exact: false })).toBeInTheDocument();
   });
 
   it("propose les badges à imprimer et l'archive des QR codes", async () => {

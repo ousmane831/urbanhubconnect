@@ -134,27 +134,33 @@ class EventSection(models.Model):
 
 
 class EventRequest(Submission):
-    """Demandes liées aux événements : inscription au Grand Week-End, accueillir un After Work, reboisement, Défis.
-    Les types « visite » et « portes ouvertes » (édition à trois jours) ne sont plus proposés : conservés pour l'historique."""
+    """Demandes liées aux événements : inscription au Grand Week-End, accueillir un After Work, Défis Partenaires.
+    Les anciens types (reboisement, visite, portes ouvertes) ne sont plus proposés : conservés pour l'historique
+    (cahier des charges du 20 novembre 2026)."""
     class Kind(models.TextChoices):
         REGISTRATION = "registration", "Inscription au Grand Week-End du Pôle"
         HOST_AFTERWORK = "host_afterwork", "Accueillir un After Work Connect"
-        CARAVAN = "caravan", "Grand reboisement du Lac Rose"
+        CARAVAN = "caravan", "Reboisement du Lac Rose (ancien programme)"
         CHALLENGE = "challenge", "Défis Partenaires : proposer une solution"
         BOOK_VISIT = "book_visit", "Réserver une visite (ancien programme)"
         OPEN_DOORS = "open_doors", "Ouvrir ses portes (ancien programme)"
 
-    OPEN_KINDS = (Kind.REGISTRATION, Kind.HOST_AFTERWORK, Kind.CARAVAN, Kind.CHALLENGE)
-    # Choix du formulaire d'inscription (note de la Coordination du 5 novembre 2026).
+    OPEN_KINDS = (Kind.REGISTRATION, Kind.HOST_AFTERWORK, Kind.CHALLENGE)
+    # Jours prévus, facultatifs : servent à dimensionner l'accueil, le badge reste valable pour les deux journées.
     REGISTRATION_OPTIONS = {
+        "vendredi": "Vendredi 11 décembre",
+        "samedi": "Samedi 12 décembre",
+    }
+    # Choix des anciennes versions du formulaire : affichés dans l'administration pour l'historique, plus proposés.
+    LEGACY_OPTIONS = {
         "vendredi-matin": "Vendredi matin : ouverture officielle et Forum du Pôle, panel 1",
         "business-connect-vendredi": "Business Connect, vendredi",
         "business-connect-samedi": "Business Connect, samedi",
-        "reboisement": "Vendredi après-midi : grand reboisement du Lac Rose, avec place dans le convoi de navettes",
-        "samedi-forum": "Samedi : Forum du Pôle, panels 2, 3 et 4",
+        "reboisement": "Vendredi après-midi : reboisement du Lac Rose (ancien programme)",
+        "samedi-forum": "Samedi : Forum du Pôle",
         "samedi-awards": "Samedi : cérémonie des Awards du Pôle",
-        "navette-vendredi": "Navette depuis Dakar, vendredi",
-        "navette-samedi": "Navette depuis Dakar, samedi",
+        "navette-vendredi": "Navette depuis Dakar, vendredi (ancien programme)",
+        "navette-samedi": "Navette depuis Dakar, samedi (ancien programme)",
     }
 
     kind = models.CharField(max_length=20, choices=Kind.choices, db_index=True)
@@ -186,41 +192,23 @@ class EventRequest(Submission):
         return f"{self.name} — {self.get_kind_display()}"
 
     def options_display(self):
-        return [self.REGISTRATION_OPTIONS.get(o, o) for o in self.options or []]
+        return [self.REGISTRATION_OPTIONS.get(o) or self.LEGACY_OPTIONS.get(o, o) for o in self.options or []]
+
+    def days_display(self):
+        """Jours prévus (nouveau formulaire) ; vide pour les inscriptions faites avec l'ancien formulaire."""
+        return [self.REGISTRATION_OPTIONS[o] for o in self.options or [] if o in self.REGISTRATION_OPTIONS]
 
     @property
     def wants_planting(self):
+        """Ancien programme : conservé pour l'historique dans l'administration, n'ouvre plus aucun droit."""
         return self.kind == self.Kind.CARAVAN or "reboisement" in (self.options or [])
-
-    @classmethod
-    def planting_taken(cls):
-        """Places du convoi du reboisement déjà attribuées (inscriptions non annulées)."""
-        qs = cls.objects.filter(kind__in=cls.BADGE_KINDS).exclude(status="rejected").only("kind", "options")
-        return sum(1 for r in qs if r.wants_planting)
-
-    @classmethod
-    def planting_remaining(cls):
-        from apps.core.models import SiteSettings
-        seats = SiteSettings.load().planting_seats
-        return None if seats is None else max(0, seats - cls.planting_taken())
 
     def clean(self):
         super().clean()
-        errors = {}
-        if self.kind == self.Kind.REGISTRATION:
-            opts = self.options or []
-            if not isinstance(opts, list) or not opts:
-                errors["options"] = "Cochez au moins un temps du programme."
-            elif any(o not in self.REGISTRATION_OPTIONS for o in opts):
-                errors["options"] = "Choix inconnu."
-        if self.wants_planting and not self.accept_waiver:
-            errors["accept_waiver"] = "La décharge de responsabilité doit être acceptée pour le reboisement."
-        if self.wants_planting and self.pk is None and self.planting_remaining() == 0:
-            full = ("Le convoi du reboisement est complet. Décochez le reboisement pour vous inscrire aux autres temps du programme, "
-                    "ou contactez la Coordination pour être sur la liste d'attente.")
-            errors["options" if self.kind == self.Kind.REGISTRATION else "detail"] = full
-        if errors:
-            raise ValidationError(errors)
+        opts = self.options or []
+        if self.kind == self.Kind.REGISTRATION and self.pk is None and (
+                not isinstance(opts, list) or any(o not in self.REGISTRATION_OPTIONS for o in opts)):
+            raise ValidationError({"options": "Choix inconnu."})
 
 
 class CheckIn(models.Model):

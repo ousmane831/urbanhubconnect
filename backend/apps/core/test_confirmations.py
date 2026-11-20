@@ -35,7 +35,10 @@ class ConfirmationTests(APITestCase):
     def test_partnership(self):
         self.post("/api/partnerships/", {"company": "Exemple SA", "tier": PartnershipTier.objects.first().slug, "contact_name": "Awa",
                                          "phone": "77", "email": "p@x.org", "accept_privacy": True})
-        self.assertIn("72 heures", self.to("p@x.org")[0].body)
+        body = self.to("p@x.org")[0].body
+        self.assertIn("ni convention ni attribution de places", body)
+        self.assertIn("Aucune réponse n'est nécessaire", body)
+        self.assertNotIn("répondez", body.lower())
 
     def test_press_accreditation(self):
         self.post("/api/press/accreditation/", {"media": "RFM", "name": "Awa", "phone": "77", "email": "j@x.org", "attendance_days": "vendredi"})
@@ -50,7 +53,7 @@ class ConfirmationTests(APITestCase):
         self.post("/api/business-connect/", {"event": "grand-week-end-du-pole-2026", "participant_name": "Awa", "email": "bc@x.org",
                                              "what_offers": "Conseil", "accept_privacy": True})
         body = self.to("bc@x.org")[0].body
-        self.assertIn("5 décembre", body)
+        self.assertIn("pas encore un rendez-vous confirmé", body)
         self.assertIn("Conseil", body)
 
     def test_volunteer(self):
@@ -58,7 +61,7 @@ class ConfirmationTests(APITestCase):
         self.post("/api/volunteers/", {"name": "Awa", "email": "v@x.org", "phone": "77", "missions": [mission.slug]})
         body = self.to("v@x.org")[0].body
         self.assertIn(mission.name, body)
-        self.assertIn("5 décembre", body)
+        self.assertIn("Après sélection", body)
 
     def test_after_work_and_partner_challenge(self):
         self.post("/api/event-requests/", {"kind": "host_afterwork", "name": "Awa", "email": "h@x.org", "accept_privacy": True})
@@ -73,14 +76,15 @@ class ConfirmationTests(APITestCase):
 
     def test_newsletter_welcome_only_once(self):
         self.post("/api/newsletter/", {"email": "n@x.org"})
-        self.post("/api/newsletter/", {"email": "n@x.org"})
+        again = self.client.post("/api/newsletter/", {"email": "n@x.org"}, format="json")  # double clic : rien de nouveau
+        self.assertEqual(again.status_code, 200)
         self.assertEqual(len(self.to("n@x.org")), 1)
 
     def test_membership_and_registration_keep_a_single_email(self):
         self.post("/api/memberships/", {"organization_or_name": "Exemple SA", "category": MembershipCategory.objects.first().slug,
                                         "representative": "Awa", "phone": "77", "email": "m@x.org", "accept_charter": True, "accept_privacy": True})
         self.assertEqual(len(self.to("m@x.org")), 1)
-        self.post("/api/event-requests/", {"kind": "registration", "name": "Awa", "email": "r@x.org", "options": ["samedi-forum"], "accept_privacy": True})
+        self.post("/api/event-requests/", {"kind": "registration", "name": "Awa", "email": "r@x.org", "options": ["samedi"], "accept_privacy": True})
         self.assertEqual(len(self.to("r@x.org")), 1)  # le badge sert de confirmation
 
     def test_a_failing_mail_server_never_blocks_the_form(self):

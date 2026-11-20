@@ -1,6 +1,6 @@
 import {
   ArrowRight, Award, CalendarDays, Clock, Download, Drum, GraduationCap, HandHeart, Handshake, Info, Lightbulb, MapPin,
-  Megaphone, Quote, Sparkles, Store, Ticket, Trees, Video, type LucideIcon,
+  Megaphone, Quote, Sparkles, Store, Ticket, Video, type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useLocation } from "react-router-dom";
@@ -16,7 +16,7 @@ import { EventRequestForm } from "../features/events/EventRequestForm";
 import { PartnerBand } from "../features/events/PartnerBand";
 import { useAsync } from "../hooks/useAsync";
 import { useSeo } from "../hooks/useSeo";
-import { getAwardCategories, getDocuments, getEvent, getPlantingSeats, getVolunteerMissions } from "../services/api";
+import { getAwardCategories, getDocuments, getEvent, getVolunteerMissions } from "../services/api";
 import type { EventDetail } from "../types/api";
 import { fmtDate, fmtDays } from "../utils/format";
 import { parseBlocks } from "../utils/richtext";
@@ -136,7 +136,7 @@ function Timeline({ text }: { text: string }) {
             <span aria-hidden className={`absolute -left-[1.65rem] top-5 h-3 w-3 rounded-full ring-4 ring-offwhite sm:-left-[2.15rem] ${gala ? "bg-gold" : "bg-green"}`} />
             <div className={`rounded-xl p-4 shadow-soft sm:flex sm:gap-6 sm:p-5 ${gala ? "bg-navy text-white" : "bg-white"}`}>
               <p className={`flex shrink-0 items-center gap-1.5 text-sm font-bold tabular-nums sm:w-40 sm:text-base ${gala ? "text-gold-light" : "text-green"}`}>
-                <Clock className="h-4 w-4" aria-hidden />{time}
+                {/\d/.test(time) && <Clock className="h-4 w-4" aria-hidden />}{time}
               </p>
               {panel ? (
                 <div className="mt-1.5 sm:mt-0">
@@ -253,10 +253,9 @@ export default function GrandWeekEnd() {
   const dossier = useAsync(() => getDocuments("partnership"));
   const rules = useAsync(() => getDocuments("awards_rules"));
   const flyer = useAsync(() => getDocuments("flyer"));
-  const seats = useAsync(getPlantingSeats);
   const heroRef = useRef<HTMLElement>(null);
-  useSeo("Le Grand Week-End du Pôle 2026 – 11 et 12 décembre, Diamniadio et Lac Rose",
-    "Première édition : ouverture officielle du réseau, Forum du Pôle en quatre panels, Business Connect, grand reboisement du Lac Rose, Awards et Gala du Pôle.",
+  useSeo("Le Grand Week-End du Pôle 2026 – 11 et 12 décembre, The Ground, Diamniadio",
+    "Première édition : ouverture officielle du réseau, Forum du Pôle en quatre panels, Village du Pôle, Business Connect, Marché du terroir et Gala du Pôle, à The Ground, à Diamniadio.",
     undefined, true, ev.data?.image);
   const { hash } = useLocation();
   useEffect(() => { if (ev.data && hash) document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView(); }, [ev.data, hash]);
@@ -272,14 +271,13 @@ export default function GrandWeekEnd() {
   const dossierDoc = dossier.data?.[0], flyerDoc = flyer.data?.[0];
   const opens = e.registration_opens_at ? new Date(e.registration_opens_at) : null;
   const registrationOpen = !opens || opens.getTime() <= Date.now();
-  const reboisement = sec("reboisement"), award = sec("awards"), calendar = sec("awards-calendrier"), gala = sec("gala");
+  const award = sec("awards"), calendar = sec("awards-calendrier"), gala = sec("gala");
   const bcSec = sec("business-connect"), defis = sec("defis-partenaires"), exp = sec("experiences");
   const benevoles = sec("benevoles"), infos = sec("infos-pratiques");
   const [calendarSentence, ...grading] = paragraphs(calendar?.body ?? "");
 
   const nav = [
     { id: "programme", label: "Programme", on: days.length > 0 },
-    { id: "reboisement", label: "Reboisement", on: !!reboisement },
     { id: "awards", label: "Awards", on: !!award },
     { id: "business-connect", label: "Business Connect", on: !!bcSec },
     { id: "defis-partenaires", label: "Défis", on: !!defis },
@@ -324,7 +322,7 @@ export default function GrandWeekEnd() {
               </div>
               <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap">
                 {registrationOpen
-                  ? <Button to={e.registration_url || "#inscription"} variant="light" className="h-12 text-lg" {...(e.registration_url ? { target: "_blank", rel: "noopener noreferrer" } : {})}>S'inscrire<ArrowRight className="h-5 w-5" aria-hidden /></Button>
+                  ? <Button to={e.registration_url || "#inscription"} variant="light" className="h-12 text-lg" {...(e.registration_url ? { target: "_blank", rel: "noopener noreferrer" } : {})}>S'inscrire aux deux journées<ArrowRight className="h-5 w-5" aria-hidden /></Button>
                   : <button disabled aria-disabled className="h-12 cursor-not-allowed rounded-md bg-white/20 px-5 font-semibold text-white/90">S'inscrire (à partir du {opens && fmtDate(opens.toISOString()).replace(/ \d{4}$/, "")})</button>}
                 <Button to="/partenaires" variant="ghost" className="h-12">Devenir partenaire</Button>
                 <DocButton doc={dossierDoc} label="Télécharger le dossier" light />
@@ -359,26 +357,6 @@ export default function GrandWeekEnd() {
             <DocButton doc={flyerDoc} label="Télécharger le flyer" />
           </div>
           {!dossierDoc && <p className="text-navy/65">Le dossier de l'événement sera disponible prochainement.</p>}
-        </Section>)}
-
-      {/* ---- Reboisement ---- */}
-      {reboisement && (
-        <Section id="reboisement" className={ANCHOR}>
-          <div className="overflow-hidden rounded-3xl shadow-soft lg:grid lg:grid-cols-[2fr_3fr]">
-            <div className="relative flex flex-col justify-end gap-4 overflow-hidden bg-green p-6 text-white sm:p-10">
-              <Trees aria-hidden className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />
-              <IconBadge icon={Trees} className="bg-white/15 text-white" />
-              <h2 className="text-2xl leading-tight text-white sm:text-3xl">{reboisement.title}</h2>
-            </div>
-            <div className="space-y-6 border border-t-0 border-navy/10 bg-white p-6 sm:p-10 lg:border-l-0 lg:border-t">
-              <RichText text={reboisement.body} />
-              {seats.data?.remaining != null && (
-                <p className={`inline-flex rounded-full px-4 py-1.5 font-semibold ${seats.data.remaining > 0 ? "bg-green/10 text-green" : "bg-red-50 text-red-800"}`}>
-                  {seats.data.remaining > 0 ? `${seats.data.remaining} place${seats.data.remaining > 1 ? "s" : ""} restante${seats.data.remaining > 1 ? "s" : ""} dans le convoi`
-                    : "Convoi complet : contactez la Coordination pour la liste d'attente"}</p>)}
-              {seats.data?.remaining !== 0 && <Reveal label="M'inscrire au reboisement" block><EventRequestForm kind="caravan" /></Reveal>}
-            </div>
-          </div>
         </Section>)}
 
       {/* ---- Awards ---- */}
@@ -440,7 +418,7 @@ export default function GrandWeekEnd() {
           <Container className="relative">
             <div className="mx-auto max-w-3xl text-center">
               <Sparkles className="mx-auto mb-4 h-10 w-10 text-gold-light" aria-hidden />
-              <Eyebrow light>Samedi 12 décembre · à partir de 19 h</Eyebrow>
+              <Eyebrow light>Samedi 12 décembre · en soirée</Eyebrow>
               <h2 className="font-heading text-3xl text-gold-light sm:text-5xl">{gala.title}</h2>
               <div className="mx-auto mt-6 h-px w-24 bg-gold/60" />
               <p className="mt-6 text-left text-lg leading-relaxed text-white/90 sm:text-center">{gala.body}</p>
@@ -482,7 +460,6 @@ export default function GrandWeekEnd() {
               <H2 light>S'inscrire au Grand Week-End du Pôle</H2>
               <p className="mt-4 text-lg text-white/85">L'inscription donne droit à un badge nominatif valable pour les deux journées. Le Gala du Pôle ne fait pas l'objet d'une inscription : il est accessible sur invitation et par la billetterie commune avec The Ground.</p>
               <p className="mt-3 text-white/85">Dès votre inscription, votre badge (QR code) vous est envoyé par e-mail : présentez-le à l'accueil, sur votre téléphone ou imprimé.</p>
-              {seats.data?.remaining === 0 && <p className="mt-3 rounded-xl bg-white/10 p-3 font-semibold">Le convoi du reboisement est complet ; les autres temps du programme restent ouverts.</p>}
             </div>
             <div className="rounded-2xl bg-white p-4 shadow-lg sm:p-8">
               {registrationOpen ? <EventRequestForm kind="registration" /> : <p className="text-navy/75">Les inscriptions ouvriront le {opens && fmtDate(opens.toISOString())}.</p>}

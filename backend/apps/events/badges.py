@@ -1,7 +1,9 @@
 """Badges du Grand Week-End du Pôle : QR code envoyé à l'inscription, scanné à l'accueil (comptes Coordination).
 
-Le QR code contient seulement l'adresse de la page « Mon badge » (…/badge/<code>), avec un code aléatoire impossible à deviner :
-aucune donnée personnelle n'y figure. L'accueil scanne ce code ; le serveur vérifie le badge et enregistre l'arrivée du jour.
+Le QR code contient seulement l'adresse …/badge/<code>, avec un code aléatoire impossible à deviner : aucune donnée personnelle
+n'y figure, et une personne qui le scanne avec un téléphone ordinaire ne voit aucune identité. Le titulaire consulte son badge
+grâce à son lien personnel (…/badge/<code>?cle=<clé>), envoyé uniquement par e-mail. L'accueil scanne le code depuis
+l'Espace Coordination ; le serveur vérifie le badge et enregistre l'arrivée du jour.
 """
 import csv
 import io
@@ -10,6 +12,7 @@ import re
 import secrets
 import unicodedata
 import zipfile
+from datetime import timedelta
 from email.mime.image import MIMEImage
 
 import segno
@@ -18,14 +21,20 @@ from django.core.mail import EmailMultiAlternatives
 from django.db import IntegrityError, transaction
 from django.db.models import Max
 from django.utils import timezone
+from django.utils.crypto import constant_time_compare, salted_hmac
 from django.utils.html import escape
 
 from .models import CheckIn, Event, EventRequest
 
 logger = logging.getLogger(__name__)
 EVENT_SLUG = "grand-week-end-du-pole-2026"
-TOKEN_RE = re.compile(r"(?:/badge/)?([A-Za-z0-9_-]{16,32})/?$")
+TOKEN_RE = re.compile(r"(?:/badge/)?([A-Za-z0-9_-]{16,32})/?(?:\?.*)?$")
+RESEND_DELAY = timedelta(minutes=10)
 _date = lambda d: f"{d.day} {['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'][d.month - 1]} {d.year}"
+
+# Pied de tous les e-mails automatiques d'information (cahier des charges du 20 novembre 2026).
+AUTO_FOOTER = ("Ce message est automatique. Aucune réponse n'est nécessaire. Pour retrouver votre badge, utilisez le lien ci-dessus. "
+               "Si vous avez besoin d'aide, utilisez le formulaire de contact : {contact}")
 
 
 def frontend_url():
@@ -54,8 +63,44 @@ def ensure_number(r):
     return r.badge_number
 
 
+def reference(r):
+    """Référence communiquée à la personne : GWE-0007."""
+    return f"GWE-{ensure_number(r) or 0:04d}"
+
+
+# ---------- Liens ----------
+def owner_key(token):
+    """Clé du titulaire : dérivée du code du badge et de la clé secrète du site (rien à stocker)."""
+    return salted_hmac("badge-owner", token).hexdigest()[:24]
+
+
+def is_owner(token, key):
+    return bool(key) and constant_time_compare(owner_key(token), str(key))
+
+
 def badge_url(r):
+    """Contenu du QR code : sans la clé, donc sans accès à l'identité."""
     return f"{frontend_url()}/badge/{ensure_token(r)}"
+
+
+def owner_url(r):
+    """Lien personnel du titulaire (e-mail uniquement)."""
+    token = ensure_token(r)
+    return f"{frontend_url()}/badge/{token}?cle={owner_key(token)}"
+
+
+def download_url(r):
+    token = ensure_token(r)
+    return f"{frontend_url()}/api/badges/{token}/badge.png?cle={owner_key(token)}&telecharger=1"
+
+
+def visual_url(r):
+    token = ensure_token(r)
+    return f"{frontend_url()}/jy-serai?badge={token}&cle={owner_key(token)}"
+
+
+def is_confirmed(r):
+    return r.status == "accepted"
 
 
 def qr_png(r, scale=10):
@@ -69,7 +114,7 @@ def badge_png(r):
     from .badge_image import render
     info = event_info()
     return render(name=r.name, job_title=r.job_title, organization=r.organization, number=ensure_number(r),
-                  planting=r.wants_planting, event_title=re.sub(r"\s+\d{4}$", "", info["title"]), dates=info["dates"],
+                  event_title=re.sub(r"\s+\d{4}$", "", info["title"]), dates=info["dates"],
                   location=info["location"], qr_data=badge_url(r))
 
 
@@ -86,42 +131,50 @@ def event_info():
 
 
 def payload(r):
-    """Informations affichées sur la page « Mon badge » et à l'accueil (jamais l'e-mail ni le téléphone)."""
-    return {"name": r.name, "organization": r.organization, "job_title": r.job_title, "number": r.badge_number, "kind": r.get_kind_display(),
-            "options": r.options_display() if r.kind == r.Kind.REGISTRATION else ["Grand reboisement du Lac Rose (vendredi après-midi)"],
-            "planting": r.wants_planting, "valid": r.status != "rejected",
+    """Informations du badge pour son titulaire et pour l'accueil (jamais l'e-mail ni le téléphone)."""
+    return {"name": r.name, "organization": r.organization, "job_title": r.job_title, "number": r.badge_number,
+            "reference": reference(r), "kind": r.get_kind_display(), "days": r.days_display(),
+            "valid": r.status != "rejected", "confirmed": is_confirmed(r),
             "checkins": [{"day": c.day.isoformat(), "at": timezone.localtime(c.at).strftime("%H h %M")} for c in r.checkins.order_by("day")]}
 
 
+# ---------- E-mail ----------
+def _where(location):
+    """« The Ground, Diamniadio » → « à The Ground, à Diamniadio »."""
+    parts = [p.strip() for p in (location or "").split(",") if p.strip()]
+    return ", ".join(f"à {p}" for p in parts)
+
+
 def send_badge(r):
-    """Envoie (ou renvoie) le badge par e-mail : l'image du badge (celle qui sera imprimée) dans le message et en pièce jointe.
+    """Envoie (ou renvoie) le badge par e-mail : bouton de téléchargement, badge dans le message et en pièce jointe.
     Retourne True si l'e-mail est parti."""
-    info, url, png = event_info(), badge_url(r), badge_png(r)
+    info, png = event_info(), badge_png(r)
+    ref, mine, download, visual = reference(r), owner_url(r), download_url(r), visual_url(r)
+    contact = f"{frontend_url()}/contact"
     title = re.sub(r"^(le|la)\s+", "", info["title"], flags=re.I)  # « au Grand Week-End », pas « au Le Grand Week-End »
-    when = " · ".join(x for x in (info["dates"], info["location"]) if x)
-    visual = f"{frontend_url()}/jy-serai?badge={ensure_token(r)}"
-    text = (f"Bonjour {r.name},\n\nVotre inscription au {title} est confirmée.\n" + (f"{when}\n" if when else "") +
-            "\nVotre badge est joint à ce message. Présentez-le à l'accueil, sur votre téléphone ou imprimé : "
-            "il est valable pour les deux journées.\n\n"
-            f"Annoncez votre participation : créez votre visuel « J'y serai ! » avec votre photo et partagez-le sur vos réseaux :\n{visual}\n\n"
-            "Contact : +221 78 309 56 56 (appel et WhatsApp)\n\n"
-            f"Urban Hub Connect\n\nVotre badge en ligne : {url}")
+    title = re.sub(r"\s+\d{4}$", "", title)
+    sentence = (f"Votre inscription au {title}" + (f" des {info['dates']}" if info["dates"] else "")
+                + (f" {_where(info['location'])}" if info["location"] else "") + " est confirmée.")
+    footer = AUTO_FOOTER.format(contact=contact)
+    text = (f"Bonjour {r.name},\n\n{sentence}\n\n"
+            f"Téléchargez votre badge nominatif : {download}\n"
+            "Présentez-le à l'accueil, sur votre téléphone ou imprimé. Il est valable pour les deux journées.\n\n"
+            f"Référence : {ref}\nVotre badge en ligne : {mine}\n\n"
+            f"Facultatif : créez votre visuel « J'y serai ! » pour vos réseaux : {visual}\n\n"
+            f"Urban Hub Connect\n\n--\n{footer}")
     html = f"""<div style="font-family:Arial,sans-serif;color:#0E2240;max-width:560px">
 <p>Bonjour {escape(r.name)},</p>
-<p>Votre inscription au <strong>{escape(title)}</strong> est confirmée.{('<br>' + escape(when)) if when else ''}</p>
+<p>{escape(sentence)}</p>
+<p style="text-align:center;margin:22px 0"><a href="{download}" style="display:inline-block;background:#1E5C3F;color:#ffffff;text-decoration:none;font-weight:bold;padding:13px 24px;border-radius:8px">Télécharger mon badge</a></p>
+<p>Présentez-le à l’accueil, sur votre téléphone ou imprimé. Il est valable pour les deux journées.</p>
 <div style="text-align:center;margin:20px 0">
-<img src="cid:badge" alt="Votre badge pour le {escape(title)}" width="300" height="433" style="display:block;margin:0 auto;max-width:100%;height:auto;border:1px solid #d0d5dd;border-radius:8px">
-<p style="margin:10px 0 0;font-size:13px">À présenter à l’accueil, sur votre téléphone ou imprimé. Valable pour les deux journées.</p>
+<img src="cid:badge" alt="Votre badge nominatif" width="300" height="433" style="display:block;margin:0 auto;max-width:100%;height:auto;border:1px solid #d0d5dd;border-radius:8px">
 </div>
-<div style="margin:24px 0;padding:18px;border:1px solid #E2C27A;border-radius:12px;background:#FBF6EA;text-align:center">
-<p style="margin:0 0 12px;font-weight:bold">Annoncez votre participation !</p>
-<p style="margin:0 0 14px;font-size:14px">Créez votre visuel « J’y serai ! » avec votre photo et partagez-le sur vos réseaux.</p>
-<a href="{visual}" style="display:inline-block;background:#1E5C3F;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Créer mon visuel</a>
-</div>
-<p>Contact : +221 78 309 56 56 (appel et WhatsApp)</p>
+<p style="font-size:14px">Référence : <strong>{ref}</strong><br>Votre badge en ligne : <a href="{mine}">afficher mon badge</a></p>
+<p style="font-size:14px">Facultatif : <a href="{visual}">créer mon visuel « J’y serai ! »</a> pour l’annoncer sur vos réseaux.</p>
 <p>Urban Hub Connect</p>
-<p style="font-size:12px;color:#667085">L’image ne s’affiche pas ? <a href="{url}" style="color:#667085">Voir votre badge en ligne</a></p></div>"""
-    msg = EmailMultiAlternatives(f"Votre badge pour le {title}", text, settings.DEFAULT_FROM_EMAIL, [r.email])
+<p style="margin-top:24px;padding-top:12px;border-top:1px solid #e4e7ec;font-size:12px;color:#667085">Ce message est automatique. Aucune réponse n’est nécessaire. Pour retrouver votre badge, utilisez le lien ci-dessus. Si vous avez besoin d’aide, utilisez le <a href="{contact}" style="color:#667085">formulaire de contact</a>.</p></div>"""
+    msg = EmailMultiAlternatives(f"Votre inscription au {title} est confirmée", text, settings.DEFAULT_FROM_EMAIL, [r.email])
     msg.attach_alternative(html, "text/html")
     msg.mixed_subtype = "related"
     img = MIMEImage(png, "png")
@@ -146,6 +199,23 @@ def issue(r):
         r.status = "accepted"
         r.save(update_fields=["status", "updated_at"])
     ensure_number(r)  # le badge à imprimer est prêt dès l'inscription, dans l'ordre d'arrivée
+    return send_badge(r)
+
+
+def same_person(name, email):
+    """Inscription déjà enregistrée pour la même personne (même nom, même adresse, à la casse et aux espaces près).
+    Une même adresse peut servir à inscrire plusieurs personnes : seul le couple nom + adresse compte."""
+    norm = lambda s: re.sub(r"\s+", " ", s or "").strip().casefold()
+    for r in EventRequest.objects.filter(kind__in=EventRequest.BADGE_KINDS, email__iexact=(email or "").strip()).exclude(status="rejected"):
+        if norm(r.name) == norm(name):
+            return r
+    return None
+
+
+def resend_if_stale(r):
+    """Renvoie le badge sauf s'il est parti il y a moins de 10 minutes (pas de second envoi après un double clic)."""
+    if not is_confirmed(r) or (r.badge_sent_at and timezone.now() - r.badge_sent_at < RESEND_DELAY):
+        return False
     return send_badge(r)
 
 
@@ -174,12 +244,10 @@ def check_in(r, user=None, today=None):
 def stats(today=None):
     today = today or timezone.localdate()
     regs = EventRequest.objects.filter(kind__in=EventRequest.BADGE_KINDS).exclude(status="rejected")
-    from apps.core.models import SiteSettings
     days = {}
     for c in CheckIn.objects.filter(registration__in=regs).values_list("day", flat=True):
         days[c.isoformat()] = days.get(c.isoformat(), 0) + 1
-    return {"registered": regs.count(), "today": days.get(today.isoformat(), 0), "by_day": days,
-            "planting_taken": EventRequest.planting_taken(), "planting_seats": SiteSettings.load().planting_seats}
+    return {"registered": regs.count(), "today": days.get(today.isoformat(), 0), "by_day": days}
 
 
 # ---------- Badges à imprimer (Coordination) ----------
@@ -193,9 +261,9 @@ def printable(only_new=False):
 
 
 def print_row(r):
-    ensure_token(r)
+    token = ensure_token(r)
     return {"id": r.pk, "number": r.badge_number, "name": r.name, "job_title": r.job_title, "organization": r.organization,
-            "token": r.badge_token, "planting": r.wants_planting, "printed_at": r.badge_printed_at.isoformat() if r.badge_printed_at else None}
+            "token": token, "key": owner_key(token), "printed_at": r.badge_printed_at.isoformat() if r.badge_printed_at else None}
 
 
 def _slug(text):
@@ -204,17 +272,18 @@ def _slug(text):
 
 
 def qr_zip(only_new=False):
-    """Archive ZIP : le badge complet (dossier badges/) et le QR code seul (dossier qr/) de chaque inscrit (« 0007-Awa-Ndiaye.png », triés par numéro) et la liste correspondante (CSV)."""
+    """Archive ZIP : le badge complet (dossier badges/) et le QR code seul (dossier qr/) de chaque inscrit
+    (« 0007-Awa-Ndiaye.png », triés par numéro) et la liste correspondante (CSV, sans coordonnées)."""
     buf = io.BytesIO()
     rows = list(printable(only_new))
     listing = io.StringIO()
     writer = csv.writer(listing, delimiter=";")
-    writer.writerow(["N°", "Prénom et nom", "Fonction", "Organisation", "Reboisement", "Fichier QR"])
+    writer.writerow(["N°", "Référence", "Prénom et nom", "Fonction", "Organisation", "Fichier"])
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for r in rows:
             name = f"{r.badge_number:04d}-{_slug(r.name)}.png"
             z.writestr(f"qr/{name}", qr_png(r, scale=12))
             z.writestr(f"badges/{name}", badge_png(r))
-            writer.writerow([r.badge_number, r.name, r.job_title, r.organization, "oui" if r.wants_planting else "", name])
-        z.writestr("liste-des-badges.csv", "\ufeff" + listing.getvalue())  # BOM : accents corrects à l'ouverture dans Excel
+            writer.writerow([r.badge_number, reference(r), r.name, r.job_title, r.organization, name])
+        z.writestr("liste-des-badges.csv", "﻿" + listing.getvalue())  # BOM : accents corrects à l'ouverture dans Excel
     return buf.getvalue(), len(rows)

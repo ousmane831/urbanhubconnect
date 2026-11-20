@@ -149,7 +149,7 @@ class ReferenceEndpointsTests(FormsBase):
         AwardCategory.objects.create(name="Inactive", is_active=False)
         self.assertEqual(len(self.client.get("/api/events/categories/").json()), 4)
         self.assertEqual(len(self.client.get("/api/articles/categories/").json()), 4)
-        self.assertEqual(len(self.client.get("/api/volunteers/missions/").json()), 5)
+        self.assertEqual(len(self.client.get("/api/volunteers/missions/").json()), 4)
         names = [a["name"] for a in self.client.get("/api/awards/categories/").json()]
         self.assertIn("Award Exemple", names)  # + les 8 catégories créées par le seed
         self.assertNotIn("Inactive", names)

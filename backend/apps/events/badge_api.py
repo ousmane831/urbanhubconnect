@@ -1,11 +1,16 @@
-"""API des badges : page « Mon badge » (publique, par code secret) et accueil le jour J (comptes Coordination uniquement)."""
+"""API des badges : page « Mon badge » (publique, code secret + clé du titulaire) et accueil le jour J (Coordination).
+
+Sans la clé du titulaire (lien reçu par e-mail), la page publique ne montre aucune identité : c'est ce que voit une personne
+qui scanne le QR code avec un téléphone ordinaire."""
 from django.db.models import Q
 from django.http import Http404, HttpResponse
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.decorators import api_view, authentication_classes, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 
-from apps.core.coordination_api import audit, staff_api
+from apps.core.coordination_api import IsCoordinationStaff, audit, staff_api
 from . import badges
 from .models import EventRequest
 
@@ -17,42 +22,68 @@ def _get(token):
     return r
 
 
+def _owner(request, token):
+    return badges.is_owner(token, request.query_params.get("cle"))
+
+
+class ResendThrottle(ScopedRateThrottle):
+    scope = "form"
+
+
 # ---------- public ----------
 @api_view(["GET"])
 @authentication_classes([])
 @permission_classes([AllowAny])
 def badge_detail(request, token):
-    return Response({**badges.payload(_get(token)), "event": badges.event_info()})
+    """Titulaire (avec sa clé) : son badge. Sans clé : seulement l'événement, aucune donnée personnelle."""
+    r = _get(token)
+    if not _owner(request, token):
+        return Response({"owner": False, "event": badges.event_info()})
+    return Response({"owner": True, **badges.payload(r), "event": badges.event_info()})
+
+
+@api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+@throttle_classes([ResendThrottle])
+def badge_resend(request, token):
+    """« C'est mon badge » : renvoi à l'adresse de l'inscription. Même réponse dans tous les cas (rien n'est révélé)."""
+    r = EventRequest.objects.filter(badge_token=token, kind__in=EventRequest.BADGE_KINDS).first()
+    if r is not None:
+        badges.resend_if_stale(r)
+    return Response({"detail": "Si ce badge est valide, il vient d'être renvoyé à l'adresse e-mail utilisée lors de l'inscription. "
+                               "Pensez à vérifier vos courriers indésirables."})
+
+
+def _image_allowed(request, token):
+    return _owner(request, token) or IsCoordinationStaff().has_permission(request, None)
 
 
 @api_view(["GET"])
-@authentication_classes([])
+@authentication_classes([SessionAuthentication])
 @permission_classes([AllowAny])
 def badge_qr(request, token):
-    response = HttpResponse(badges.qr_png(_get(token)), content_type="image/png")
+    r = _get(token)
+    if not _image_allowed(request, token):
+        raise Http404
+    response = HttpResponse(badges.qr_png(r), content_type="image/png")
     response["Cache-Control"] = "private, max-age=86400"
     return response
 
 
 @api_view(["GET"])
-@authentication_classes([])
+@authentication_classes([SessionAuthentication])
 @permission_classes([AllowAny])
 def badge_image(request, token):
-    """Badge complet (PNG) : le même que dans l'e-mail et à l'impression."""
-    response = HttpResponse(badges.badge_png(_get(token)), content_type="image/png")
+    """Badge complet (PNG) : le même que dans l'e-mail et à l'impression. Titulaire (clé) ou Coordination uniquement."""
+    r = _get(token)
+    if not _image_allowed(request, token):
+        raise Http404
+    response = HttpResponse(badges.badge_png(r), content_type="image/png")
     response["Cache-Control"] = "private, max-age=300"  # court : la fonction ou l'organisation peuvent être corrigées
     if request.query_params.get("telecharger"):
-        response["Content-Disposition"] = 'attachment; filename="badge-grand-week-end.png"'
+        response["Content-Disposition"] = f'attachment; filename="badge-{r.badge_number or 0:04d}-grand-week-end.png"'
     return response
-
-
-@api_view(["GET"])
-@authentication_classes([])
-@permission_classes([AllowAny])
-def planting_seats(request):
-    seats = EventRequest.planting_remaining()
-    from apps.core.models import SiteSettings
-    return Response({"seats": SiteSettings.load().planting_seats, "remaining": seats})
 
 
 # ---------- accueil (Coordination) ----------
@@ -79,16 +110,23 @@ def checkin(request):
     return Response({"result": result, "message": RESULT_MESSAGES[result], "id": r.pk, **data})
 
 
+def _ref_number(q):
+    """« GWE-0007 », « 0007 » ou « 7 » : recherche aussi par référence."""
+    digits = q.upper().removeprefix("GWE-").strip()
+    return int(digits) if digits.isdigit() else -1
+
+
 @staff_api(["GET"])
 def checkin_search(request):
     q = str(request.query_params.get("q", "")).strip()
     if len(q) < 2:
         return Response([])
     qs = (EventRequest.objects.filter(kind__in=EventRequest.BADGE_KINDS)
-          .filter(Q(name__icontains=q) | Q(organization__icontains=q) | Q(email__icontains=q) | Q(phone__icontains=q))
+          .filter(Q(name__icontains=q) | Q(organization__icontains=q) | Q(email__icontains=q) | Q(phone__icontains=q)
+                  | Q(badge_number=_ref_number(q)))
           .prefetch_related("checkins")[:20])
     return Response([{"id": r.pk, "name": r.name, "organization": r.organization, "email": r.email, "phone": r.phone,
-                      "valid": r.status != "rejected", "planting": r.wants_planting, "badge_sent": bool(r.badge_sent_at),
+                      "valid": r.status != "rejected", "reference": badges.reference(r), "badge_sent": bool(r.badge_sent_at),
                       "checkins": [c.day.isoformat() for c in r.checkins.all()]} for r in qs])
 
 

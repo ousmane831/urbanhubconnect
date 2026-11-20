@@ -60,7 +60,7 @@ def _centered(draw, y, text, f, fill, max_w, line_gap=1.15, max_lines=2):
     return y
 
 
-def render(*, name, job_title="", organization="", number=None, planting=False, event_title="", dates="", location="", qr_data=""):
+def render(*, name, job_title="", organization="", number=None, event_title="", dates="", location="", qr_data=""):
     img = Image.new("RGB", (W, H), "white")
     d = ImageDraw.Draw(img)
     inner = W - 10 * MM
@@ -106,12 +106,10 @@ def render(*, name, job_title="", organization="", number=None, planting=False, 
         qr_y = max(y + round(4 * MM), bottom - q - max(0, (bottom - q - y - round(4 * MM)) // 2))  # centré dans l'espace libre
         img.paste(qr, ((W - q) // 2, min(qr_y, bottom - q)))
 
-    # Pied : numéro et reboisement
+    # Pied : numéro du badge
     small = font("semibold", 2.8)
     if number:
         d.text((5 * MM, footer), f"N° {number:04d}", font=small, fill=GREY)
-    if planting:
-        d.text((W - 5 * MM, footer), "Reboisement", font=small, fill=GREEN, anchor="ra")
 
     # Contour fin
     d.rectangle((0, 0, W - 1, H - 1), outline=(208, 213, 221), width=2)

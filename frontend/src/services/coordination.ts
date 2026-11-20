@@ -55,12 +55,12 @@ export const coordApi = {
 
 export interface CheckinResult {
   result: "ok" | "already" | "cancelled" | "invalid"; message: string; id?: number; name?: string; organization?: string;
-  options?: string[]; planting?: boolean; today_at?: string; checkins?: { day: string; at: string }[];
+  reference?: string; days?: string[]; today_at?: string; checkins?: { day: string; at: string }[];
 }
 export interface CheckinPerson {
-  id: number; name: string; organization: string; email: string; phone: string; valid: boolean; planting: boolean; badge_sent: boolean; checkins: string[];
+  id: number; name: string; organization: string; email: string; phone: string; valid: boolean; reference: string; badge_sent: boolean; checkins: string[];
 }
-export interface CheckinStats { registered: number; today: number; by_day: Record<string, number>; planting_taken: number; planting_seats: number | null }
+export interface CheckinStats { registered: number; today: number; by_day: Record<string, number> }
 
 export interface CampaignInput {
   title: string; subject: string; body: string; cta_label: string; cta_url: string; segments: string[]; activities: string[];
@@ -84,7 +84,7 @@ export interface ImportResult {
 export interface CampaignPreview { subject: string; html: string; recipients: number; schedule: string }
 
 export interface PrintBadge {
-  id: number; number: number; name: string; job_title: string; organization: string; token: string; planting: boolean; printed_at: string | null;
+  id: number; number: number; name: string; job_title: string; organization: string; token: string; key: string; printed_at: string | null;
 }
 export interface BadgePrintList { total: number; new: number; event: { title: string; dates: string; location: string }; badges: PrintBadge[] }
 /** Téléchargement direct (lien) : la session de la Coordination accompagne la requête. */

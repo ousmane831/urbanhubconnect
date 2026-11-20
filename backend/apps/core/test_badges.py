@@ -1,4 +1,4 @@
-"""Badges du Grand Week-End : QR code envoyé à l'inscription, scan à l'accueil, places du convoi du reboisement."""
+"""Badges du Grand Week-End : QR code envoyé à l'inscription, scan à l'accueil, identité protégée, pas de doublon."""
 from datetime import date
 from io import StringIO
 
@@ -6,7 +6,7 @@ from django.core import mail
 from django.core.management import call_command
 from rest_framework.test import APIClient, APITestCase
 
-from apps.core.models import SiteSettings
+from apps.core.models import SubmissionReceipt
 from apps.events import badges
 from apps.events.models import CheckIn, EventRequest
 from apps.users.models import User
@@ -18,11 +18,9 @@ class Base(APITestCase):
     def setUp(self):
         call_command("seed_initial_data", stdout=StringIO())
 
-    def register(self, email="a@x.org", options=("vendredi-matin",), **kw):
+    def register(self, email="a@x.org", options=("vendredi",), **kw):
         data = {"kind": "registration", "name": "Awa Ndiaye", "organization": "Exemple SA", "email": email, "phone": "770000000",
                 "options": list(options), "accept_privacy": True, **kw}
-        if "reboisement" in options:
-            data["accept_waiver"] = True
         return self.client.post("/api/event-requests/", data, format="json")
 
     def staff(self):
@@ -42,22 +40,49 @@ class RegistrationTests(Base):
         self.assertTrue(reg.badge_token and reg.badge_sent_at)
         msg = mail.outbox[-1]
         self.assertEqual(msg.to, ["a@x.org"])
-        self.assertIn("badge", msg.subject.lower())
-        self.assertIn(f"/badge/{reg.badge_token}", msg.body)
+        self.assertIn("confirmée", msg.subject)
+        self.assertIn("des 11 et 12 décembre 2026", msg.body)
+        self.assertIn(f"/badge/{reg.badge_token}?cle={badges.owner_key(reg.badge_token)}", msg.body)  # lien personnel
+        self.assertIn("Référence : GWE-0001", msg.body)
+        self.assertIn("Aucune réponse n'est nécessaire", msg.body)
+        self.assertIn("GWE-0001", r.json()["detail"])
         self.assertTrue(any(a.get_content_type() == "image/png" for a in msg.attachments))
         self.assertIn('cid:badge', msg.alternatives[0][0])
+        self.assertIn("Télécharger mon badge", msg.alternatives[0][0])
 
-    def test_badge_page_and_qr_image_are_public_but_need_the_secret_code(self):
+    def test_scanning_the_qr_code_without_the_owner_key_shows_no_identity(self):
         self.register()
         reg = EventRequest.objects.get()
-        data = self.client.get(f"/api/badges/{reg.badge_token}/").json()
-        self.assertEqual((data["name"], data["valid"]), ("Awa Ndiaye", True))
+        anonymous = self.client.get(f"/api/badges/{reg.badge_token}/").json()
+        self.assertFalse(anonymous["owner"])
+        self.assertNotIn("name", anonymous)
+        self.assertEqual(self.client.get(f"/api/badges/{reg.badge_token}/badge.png").status_code, 404)
+        self.assertEqual(self.client.get(f"/api/badges/{reg.badge_token}/qr.png").status_code, 404)
+        self.assertEqual(self.client.get("/api/badges/inventeAAAAAAAAAAAAAA/").status_code, 404)
+
+    def test_the_owner_link_shows_the_badge(self):
+        self.register()
+        reg = EventRequest.objects.get()
+        key = badges.owner_key(reg.badge_token)
+        data = self.client.get(f"/api/badges/{reg.badge_token}/", {"cle": key}).json()
+        self.assertEqual((data["owner"], data["name"], data["valid"], data["reference"]), (True, "Awa Ndiaye", True, "GWE-0001"))
         self.assertNotIn("email", data)
         self.assertNotIn("phone", data)
-        png = self.client.get(f"/api/badges/{reg.badge_token}/qr.png")
-        self.assertEqual(png["Content-Type"], "image/png")
+        self.assertEqual(self.client.get(f"/api/badges/{reg.badge_token}/", {"cle": "faux"}).json()["owner"], False)
+        png = self.client.get(f"/api/badges/{reg.badge_token}/qr.png", {"cle": key})
         self.assertTrue(png.content.startswith(b"\x89PNG"))
-        self.assertEqual(self.client.get("/api/badges/inventeAAAAAAAAAAAAAA/").status_code, 404)
+
+    def test_resend_from_the_public_page_reveals_nothing(self):
+        self.register()
+        reg = EventRequest.objects.get()
+        EventRequest.objects.update(badge_sent_at=None)
+        mail.outbox.clear()
+        known = self.client.post(f"/api/badges/{reg.badge_token}/renvoyer/").json()
+        unknown = self.client.post("/api/badges/inventeAAAAAAAAAAAAAA/renvoyer/").json()
+        self.assertEqual(known, unknown)  # même réponse : rien n'est révélé
+        self.assertEqual([m.to for m in mail.outbox], [["a@x.org"]])
+        self.client.post(f"/api/badges/{reg.badge_token}/renvoyer/")
+        self.assertEqual(len(mail.outbox), 1)  # pas de second envoi dans les 10 minutes
 
     def test_other_requests_get_no_badge(self):
         self.client.post("/api/event-requests/", {"kind": "challenge", "name": "X", "email": "x@x.org", "message": "Ma solution",
@@ -67,40 +92,43 @@ class RegistrationTests(Base):
         self.assertEqual(reg.status, "pending")
 
 
-class PlantingSeatsTests(Base):
-    def test_convoy_seats_are_limited(self):
-        SiteSettings.objects.update_or_create(pk=1, defaults={"planting_seats": 1})
-        self.assertEqual(self.register(options=["reboisement"]).status_code, 201)
-        self.assertEqual(self.client.get("/api/events-planting-seats/").json(), {"seats": 1, "remaining": 0})
-        full = self.register(email="b@x.org", options=["reboisement"])
-        self.assertEqual(full.status_code, 400)
-        self.assertIn("complet", full.json()["options"][0])
-        self.assertEqual(self.register(email="b@x.org", options=["samedi-forum"]).status_code, 201)  # les autres temps restent ouverts
-        caravan = self.client.post("/api/event-requests/", {"kind": "caravan", "name": "C", "email": "c@x.org", "accept_waiver": True,
-                                                            "accept_privacy": True}, format="json")
-        self.assertEqual(caravan.status_code, 400)
+class DuplicateTests(Base):
+    """Double clic ou relance après coupure : un seul dossier, un seul badge, un seul e-mail."""
 
-    def test_a_cancelled_registration_frees_its_seat(self):
-        SiteSettings.objects.update_or_create(pk=1, defaults={"planting_seats": 1})
-        self.register(options=["reboisement"])
-        EventRequest.objects.update(status="rejected")
-        self.assertEqual(self.register(email="b@x.org", options=["reboisement"]).status_code, 201)
+    def test_double_click_creates_a_single_registration(self):
+        first, again = self.register(), self.register()
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(again.status_code, 200)
+        self.assertTrue(again.json()["duplicate"])
+        self.assertEqual(EventRequest.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
 
-    def test_no_limit_by_default(self):
-        self.assertEqual(self.client.get("/api/events-planting-seats/").json()["remaining"], None)
+    def test_same_person_later_gets_no_second_badge(self):
+        self.register()
+        SubmissionReceipt.objects.all().delete()  # plus tard, hors fenêtre anti-double clic
+        r = self.register(name="  awa  NDIAYE ", job_title="Directrice")
+        self.assertTrue(r.json()["duplicate"])
+        self.assertEqual(EventRequest.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 1)  # badge envoyé il y a moins de 10 minutes : pas de renvoi
+
+    def test_one_address_can_register_several_people(self):
+        self.register()
+        self.register(name="Moussa Fall")
+        self.assertEqual(EventRequest.objects.count(), 2)
+        self.assertEqual(set(EventRequest.objects.values_list("badge_number", flat=True)), {1, 2})
 
 
 class CheckInTests(Base):
     def setUp(self):
         super().setUp()
-        self.register(options=["reboisement", "samedi-forum"])
+        self.register(options=["samedi"])
         self.reg = EventRequest.objects.get()
         self.url = badges.badge_url(self.reg)
 
     def test_scan_once_per_day(self):
         c = self.staff()
         first = c.post("/api/coordination/checkin/", {"code": self.url}, format="json").json()
-        self.assertEqual((first["result"], first["name"], first["planting"]), ("ok", "Awa Ndiaye", True))
+        self.assertEqual((first["result"], first["name"], first["reference"]), ("ok", "Awa Ndiaye", "GWE-0001"))
         again = c.post("/api/coordination/checkin/", {"code": self.reg.badge_token}, format="json").json()
         self.assertEqual(again["result"], "already")
         self.assertTrue(again["today_at"])
@@ -118,12 +146,13 @@ class CheckInTests(Base):
         c = self.staff()
         found = c.get("/api/coordination/checkin/search/", {"q": "awa"}).json()
         self.assertEqual(found[0]["name"], "Awa Ndiaye")
+        self.assertEqual(c.get("/api/coordination/checkin/search/", {"q": "GWE-0001"}).json()[0]["id"], found[0]["id"])
         self.assertEqual(c.post("/api/coordination/checkin/", {"id": found[0]["id"]}, format="json").json()["result"], "ok")
         mail.outbox.clear()
         self.assertEqual(c.post("/api/coordination/checkin/resend/", {"id": found[0]["id"]}, format="json").status_code, 200)
         self.assertEqual(len(mail.outbox), 1)
         stats = c.get("/api/coordination/checkin/stats/").json()
-        self.assertEqual((stats["registered"], stats["today"], stats["planting_taken"]), (1, 1, 1))
+        self.assertEqual((stats["registered"], stats["today"]), (1, 1))
 
     def test_scanning_is_reserved_to_the_coordination(self):
         self.assertIn(self.client.post("/api/coordination/checkin/", {"code": self.url}, format="json").status_code, (401, 403))
@@ -160,7 +189,9 @@ class PrintTests(Base):
 
         z = zipfile.ZipFile(_io.BytesIO(staff.get("/api/coordination/badges/qr.zip").content))
         self.assertEqual(sorted(n for n in z.namelist() if n.startswith("qr/")), ["qr/0001-Awa-Ndiaye.png", "qr/0002-Moussa-Fall.png"])
-        self.assertIn("Directrice générale", z.read("liste-des-badges.csv").decode("utf-8-sig"))
+        listing = z.read("liste-des-badges.csv").decode("utf-8-sig")
+        self.assertIn("Directrice générale", listing)
+        self.assertNotIn("@", listing)  # liste papier sans coordonnées
 
         staff.post("/api/coordination/badges/printed/", {"ids": [reg.pk]}, format="json")
         data = staff.get("/api/coordination/badges/print/?nouveaux=1").json()
@@ -183,7 +214,7 @@ class BadgeImageTests(Base):
         attached = next(a for a in msg.attachments if getattr(a, "get_content_type", lambda: "")() == "image/png")
         png = attached.get_payload(decode=True)
         self.assertEqual(Image.open(_io.BytesIO(png)).size, (970, 1400))
-        served = self.client.get(f"/api/badges/{reg.badge_token}/badge.png")
+        served = self.client.get(f"/api/badges/{reg.badge_token}/badge.png", {"cle": badges.owner_key(reg.badge_token)})
         self.assertEqual(served.status_code, 200)
         self.assertEqual(served["Content-Type"], "image/png")
         self.assertEqual(served.content, png)  # identique à l'e-mail
