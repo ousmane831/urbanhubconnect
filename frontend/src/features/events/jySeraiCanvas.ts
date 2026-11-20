@@ -167,8 +167,8 @@ export function draw(context: CanvasRenderingContext2D, v: Visual) {
   ctx.fillStyle = NAVY; ctx.fillRect(0, 1200, W, H - 1200);
   ctx.fillStyle = GOLD; ctx.fillRect(0, 1200, W, 6);
   pin(ctx, 92, 1262, GOLD);
-  const [place1, place2] = (v.location || "Diamniadio · Lac Rose").split(/\s*[·&]\s*/);
-  text(ctx, place2 ? `${place1} & ${place2}` : place1, 128, 1278, (s) => `800 ${s}px ${HEAD}`, 36, 560, WHITE, "left");
+  // Lieu de l'événement (fixe : le champ « lieu » de l'événement cite aussi le Lac Rose, site du reboisement)
+  text(ctx, "The GROUND Dakar Diamniadio", 128, 1278, (s) => `800 ${s}px ${HEAD}`, 36, 560, WHITE, "left");
   text(ctx, d ? `${v.dates.replace(/\s+\d{4}$/, "")} ${d.year}` : "Pôle urbain de Diamniadio", 128, 1318, (s) => `600 ${s}px ${BODY}`, 26, 560, "rgba(255,255,255,0.75)", "left");
   text(ctx, "urbanhubconnect.com", W - 70, 1300, (s) => `700 ${s}px ${HEAD}`, 26, 340, GOLD_LIGHT, "right");
 }
