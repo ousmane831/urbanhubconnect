@@ -1,7 +1,8 @@
 from django.contrib import admin
 
 from apps.core.admin import PublishActionsMixin, SubmissionAdminMixin, TaxonomyAdmin
-from .models import (CheckIn, EventRequest, EventSection, AwardApplication, AwardCategory, BusinessConnectRegistration, Event, EventCategory,
+from .models import (CheckIn, EventRequest, EventSection, AwardApplication, AwardCategory, BusinessConnectMeeting, BusinessConnectRegistration,
+                     BusinessConnectSlot, Event, EventCategory,
                      StandRequest, VolunteerApplication, VolunteerMission)
 
 
@@ -33,6 +34,25 @@ class AwardCategoryAdmin(TaxonomyAdmin):
     """« candidatures jusqu'au » : vérifié pour chaque catégorie au dépôt (aucune ouverture ni fermeture implicite)."""
     list_display = ("name", "closes_on", "display_order", "is_active")
     list_editable = ("closes_on", "display_order", "is_active")
+
+
+@admin.register(BusinessConnectSlot)
+class BusinessConnectSlotAdmin(admin.ModelAdmin):
+    """Créneaux Business Connect : ne cocher « publié » que pour un créneau approuvé par la Coordination."""
+    list_display = ("__str__", "day", "start", "end", "is_published")
+    list_editable = ("is_published",)
+    list_filter = ("day", "is_published")
+
+
+@admin.register(BusinessConnectMeeting)
+class BusinessConnectMeetingAdmin(admin.ModelAdmin):
+    """Consultation : les rendez-vous se créent, se confirment et se libèrent depuis l'Espace Coordination (e-mails et contrôles)."""
+    list_display = ("__str__", "table", "status", "confirmed_at")
+    list_filter = ("status", "slot")
+    readonly_fields = ("first", "second", "slot", "table", "status", "confirmed_at", "created_at", "updated_at")
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(StandRequest)

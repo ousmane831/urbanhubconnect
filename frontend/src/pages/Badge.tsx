@@ -101,6 +101,10 @@ export default function Badge() {
                   <p className="text-sm text-navy/70">Arrivée enregistrée : {d.checkins.map((c) => `${fmtDay(c.day)} à ${c.at}`).join(" · ")}.</p>)}
                 <p className="text-sm text-navy/60">Le badge ne donne pas accès au Gala du Pôle : accès sur invitation et par la billetterie commune avec The Ground.</p>
                 {d.confirmed && (
+                  <Link to={`/evenements/grand-week-end-du-pole-2026?badge=${encodeURIComponent(token)}&cle=${encodeURIComponent(key)}#business-connect`}
+                    className="flex min-h-[44px] items-center justify-center rounded-lg border border-navy/20 px-5 font-semibold hover:bg-offwhite">
+                    Demander des rendez-vous Business Connect</Link>)}
+                {d.confirmed && (
                   <div className="rounded-xl bg-offwhite p-4">
                     <Link to={`/jy-serai?badge=${encodeURIComponent(token)}&cle=${encodeURIComponent(key)}`}
                       className="flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-gold/60 bg-gold/10 px-5 font-semibold text-navy hover:bg-gold/20">

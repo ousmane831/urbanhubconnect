@@ -60,7 +60,9 @@ def _award(a):
 def _business_connect(b):
     return (b.email, "Votre inscription au Business Connect",
             f"Bonjour {b.participant_name},\n\nVotre inscription au Business Connect du Grand Week-End du Pôle est bien enregistrée.\n"
-            + (f"\n{_lines(('Ce que vous proposez', b.what_offers), ('Ce que vous recherchez', b.what_needs))}\n" if b.what_offers or b.what_needs else "")
+            + (f"\n{_lines(('Ce que vous proposez', b.what_offers), ('Ce que vous recherchez', b.what_needs), ('Objectif', b.objective))}\n"
+               if b.what_offers or b.what_needs or b.objective else "")
+            + (f"\nVos disponibilités : {', '.join(str(s) for s in b.slots.all())}.\n" if b.slots.exists() else "")
             + "\nVotre demande de rendez-vous est reçue ; ce n'est pas encore un rendez-vous confirmé. "
             "La Coordination vous enverra uniquement les créneaux effectivement attribués.")
 

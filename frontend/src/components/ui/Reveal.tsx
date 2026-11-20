@@ -8,8 +8,10 @@ const TONES = {
 
 /** Bouton qui déplie un formulaire sous le texte (accessible : aria-expanded / aria-controls).
  *  `tone="light"` pour un fond sombre ; `block` : bouton pleine largeur sur mobile. */
-export function Reveal({ label, children, tone = "green", block = false }: { label: string; children: ReactNode; tone?: keyof typeof TONES; block?: boolean }) {
-  const [open, setOpen] = useState(false);
+export function Reveal({ label, children, tone = "green", block = false, defaultOpen = false }: {
+  label: string; children: ReactNode; tone?: keyof typeof TONES; block?: boolean; defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   const id = useId();
   return (
     <div>

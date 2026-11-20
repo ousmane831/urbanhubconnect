@@ -226,6 +226,8 @@ KINDS = {
         title=lambda o: get(o, "participant_name"), subtitle=lambda o: label(o, "event"), actions=_status_actions,
         details=lambda o: rows(("Organisation", get(o, "organization")), ("E-mail", get(o, "email")), ("Téléphone", get(o, "phone")),
                                ("Propose", get(o, "what_offers")), ("Recherche", get(o, "what_needs")),
+                               ("Objectif", get(o, "objective")), ("Fonction", get(o, "job_title")),
+                               ("Disponibilités", ", ".join(str(x) for x in o.slots.all()) or " et ".join(get(o, "days", []) or [])),
                                ("Rencontres souhaitées", get(o, "preferred_meetings")))),
     "event-requests": dict(
         label="Demandes liées aux événements", model=EventRequest,

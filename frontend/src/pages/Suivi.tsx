@@ -112,8 +112,11 @@ function DossierCard({ token, d, onChange }: { token: string; d: DossierRow; onC
         <span className={`rounded-full px-3 py-1 text-sm font-bold ${TONES[d.status] ?? "bg-navy/5 text-navy"}`}>{d.status_label}</span>
       </div>
       {d.next_step && <p className="mt-3 text-navy/80">{d.next_step}</p>}
+      {!!d.meetings?.length && (
+        <ul className="mt-3 space-y-1 rounded-lg bg-offwhite p-3 text-sm">{d.meetings.map((m) => <li key={m}>• {m}</li>)}</ul>)}
       <div className="mt-4 flex flex-wrap gap-2">
         {d.badge_url && <a href={d.badge_url} className={`${btn} bg-green text-white hover:bg-green-2`}><BadgeCheck className="h-4 w-4" aria-hidden />Voir et télécharger mon badge</a>}
+        {d.business_connect_url && <a href={d.business_connect_url} className={`${btn} border border-navy/20 text-navy hover:bg-offwhite`}>Demander des rendez-vous Business Connect</a>}
         {d.visual_url && <a href={d.visual_url} className={`${btn} border border-gold/60 bg-gold/10 text-navy hover:bg-gold/20`}><Sparkles className="h-4 w-4 text-gold" aria-hidden />Créer mon visuel « J'y serai ! »</a>}
         {d.can_cancel && (
           <button type="button" disabled={busy} className={`${btn} border border-red-300 text-red-800 hover:bg-red-50 disabled:opacity-60`}

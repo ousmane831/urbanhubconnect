@@ -20,6 +20,7 @@ from apps.core import coordination_api as co
 from apps.core import members_network_api as mn
 from apps.core import suivi_api as sv
 from apps.events import badge_api as bd
+from apps.events import bc_api as bcx
 from apps.campaigns import api as cp
 admin.site.site_header = "Urban Hub Connect · Coordination"
 admin.site.site_title = "Urban Hub Connect"
@@ -100,6 +101,14 @@ urlpatterns = [
     path("api/coordination/checkin/unsent/", bd.checkin_unsent, name="coord-checkin-unsent"),
     path("api/coordination/checkin/presences.csv", bd.attendance_export, name="coord-checkin-export"),
     path("api/gwe/places/", bd.places, name="gwe-places"),
+    path("api/badges/<str:token>/coordonnees/", bd.badge_contact, name="badge-contact"),
+    # Business Connect : créneaux publiés et rendez-vous
+    path("api/business-connect/slots/", bcx.public_slots, name="bc-slots"),
+    path("api/coordination/business-connect/", bcx.board, name="coord-bc"),
+    path("api/coordination/business-connect/meetings/", bcx.meeting_create, name="coord-bc-create"),
+    path("api/coordination/business-connect/meetings/<int:pk>/confirm/", bcx.meeting_confirm, name="coord-bc-confirm"),
+    path("api/coordination/business-connect/meetings/<int:pk>/release/", bcx.meeting_release, name="coord-bc-release"),
+    path("api/coordination/business-connect/agenda/<int:pk>/", bcx.agenda, name="coord-bc-agenda"),
     path("api/coordination/checkin/stats/", bd.checkin_stats, name="coord-checkin-stats"),
     path("api/coordination/badges/print/", bd.print_list, name="coord-badges-print"),
     path("api/coordination/badges/printed/", bd.print_done, name="coord-badges-printed"),

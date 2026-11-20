@@ -3,7 +3,7 @@ from rest_framework import serializers, status
 from rest_framework.response import Response
 
 from apps.contact.models import ContactMessage
-from apps.events.models import (AwardApplication, AwardCategory, BusinessConnectRegistration, Event, EventRequest,
+from apps.events.models import (AwardApplication, AwardCategory, BusinessConnectRegistration, BusinessConnectSlot, Event, EventRequest,
                                 StandRequest, VolunteerApplication, VolunteerMission)
 from apps.map.models import MapCategory, PlaceSuggestion
 from apps.memberships.models import MembershipApplication, MembershipCategory
@@ -170,7 +170,8 @@ class EventRequestCreate(SubmissionCreateView):
                                     "Si une place vous est proposée, vous recevrez un message distinct.")
             return
         # Écran de confirmation : liens utiles pour la personne qui vient de s'inscrire (son propre dossier uniquement)
-        self.extra_response = {"badge_url": badges.owner_url(obj), "visual_url": badges.visual_url(obj)}
+        self.extra_response = {"badge_url": badges.owner_url(obj), "visual_url": badges.visual_url(obj),
+                               "business_connect_url": badges.business_connect_url(obj)}
         if sent:
             self.success_message = (f"Merci, votre inscription est confirmée (référence {badges.reference(obj)}). Votre badge vient d'être "
                                     f"envoyé à {obj.email} : présentez-le à l'accueil, sur votre téléphone ou imprimé. "
@@ -215,9 +216,16 @@ urlpatterns = [
         extra=CONSENT("accept_rules", "accept_privacy")),
         "Merci. Votre candidature est reçue. Le dépôt ne vaut ni nomination ni badge d'accès.", "AwardApply")),
     path("business-connect/", submission_view(build_serializer(
-        BusinessConnectRegistration, ["event", "participant_name", "organization", "email", "phone", "what_offers",
-                                      "what_needs", "preferred_meetings", "accept_privacy"],
-        slugs={"event": (Event.objects.public(), True)}, extra=CONSENT("accept_privacy")), name="BusinessConnect")),
+        BusinessConnectRegistration, ["event", "participant_name", "organization", "job_title", "email", "phone", "what_offers",
+                                      "what_needs", "objective", "slots", "days", "preferred_meetings", "accept_privacy"],
+        slugs={"event": (Event.objects.public(), True)},
+        extra={**CONSENT("accept_privacy"),
+               # Disponibilités : uniquement parmi les créneaux publiés (approuvés par la Coordination)
+               "slots": serializers.PrimaryKeyRelatedField(many=True, required=False,
+                                                           queryset=BusinessConnectSlot.objects.filter(is_published=True)),
+               "days": serializers.ListField(child=serializers.ChoiceField(choices=["vendredi", "samedi"]), required=False)}),
+        "Merci. Votre demande Business Connect est reçue : ce n'est pas encore un rendez-vous. La Coordination associe les "
+        "demandes et vous enverra uniquement les rendez-vous confirmés.", "BusinessConnect")),
     path("event-requests/", EventRequestCreate.as_view()),
     path("volunteers/", submission_view(build_serializer(
         VolunteerApplication, ["name", "email", "phone", "organization", "commune", "days", "missions", "availability", "message",

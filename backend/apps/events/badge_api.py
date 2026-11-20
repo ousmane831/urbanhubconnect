@@ -42,6 +42,18 @@ def badge_detail(request, token):
     return Response({"owner": True, **badges.payload(r), "event": badges.event_info()})
 
 
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def badge_contact(request, token):
+    """Coordonnées saisies à l'inscription, pour le titulaire (clé) : préremplir sa demande Business Connect."""
+    r = _get(token)
+    if not _owner(request, token) or not badges.is_confirmed(r):
+        raise Http404
+    return Response({"participant_name": r.name, "organization": r.organization, "job_title": r.job_title,
+                     "email": r.email, "phone": r.phone})
+
+
 @api_view(["POST"])
 @authentication_classes([])
 @permission_classes([AllowAny])

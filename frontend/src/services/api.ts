@@ -12,6 +12,7 @@ export const submitForm = (path: string, data: Record<string, unknown>) => submi
 /** Réponse complète : pour un dossier du Grand Week-End, référence, statut, prochaine étape et liens personnels. */
 export interface SubmitResult {
   detail: string; duplicate?: boolean; reference?: string; status?: string; next_step?: string; badge_url?: string; visual_url?: string;
+  business_connect_url?: string;
 }
 export const submitFormFull = (path: string, data: Record<string, unknown>) =>
   http.post<SubmitResult>(path, { company_website: "", ...data }).then((r) => r.data);
@@ -20,7 +21,12 @@ export const submitFormFull = (path: string, data: Record<string, unknown>) =>
 export interface DossierRow {
   kind: string; id: number; type: string; reference: string; name: string; status: string; status_label: string; next_step: string;
   created_at: string; can_complete: boolean; can_cancel: boolean; badge_url?: string; visual_url?: string;
+  business_connect_url?: string; meetings?: string[];
 }
+export const getBcSlots = () => http.get<{ id: number; label: string }[]>("/business-connect/slots/").then((r) => r.data);
+export type BadgeContact = { participant_name: string; organization: string; job_title: string; email: string; phone: string };
+export const getBadgeContact = (token: string, key: string) =>
+  http.get<BadgeContact>(`/badges/${encodeURIComponent(token)}/coordonnees/`, { params: { cle: key } }).then((r) => r.data);
 export const getGwePlaces = () => http.get<{ limited: boolean; full: boolean }>("/gwe/places/").then((r) => r.data);
 export interface AwardCategoryState { name: string; slug: string; description: string; closes_on: string | null; is_open: boolean }
 export const getAwardCategoryStates = () => http.get<AwardCategoryState[]>("/awards/categories/").then((r) => r.data);

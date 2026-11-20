@@ -98,6 +98,12 @@ def visual_url(r):
     return f"{frontend_url()}/jy-serai?badge={token}&cle={owner_key(token)}"
 
 
+def business_connect_url(r):
+    """Demande Business Connect préremplie avec les coordonnées de l'inscription (titulaire uniquement)."""
+    token = ensure_token(r)
+    return f"{frontend_url()}/evenements/{EVENT_SLUG}?badge={token}&cle={owner_key(token)}#business-connect"
+
+
 def is_confirmed(r):
     """Seule une inscription confirmée a un badge valide (pas en attente, refusée ni annulée)."""
     return r.status == "accepted"

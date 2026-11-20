@@ -20,7 +20,23 @@ export interface ActionDef {
 export interface QueueItem { id: number; title: string; subtitle: string; created_at: string; state: string | null; details: [string, string][]; actions: ActionDef[] }
 export interface ContentItem { id: number; title: string; state: string; actions: ActionDef[]; admin_url: string }
 
+export interface BcParticipant {
+  id: number; reference: string; name: string; organization: string; job_title: string; offers: string; needs: string; objective: string;
+  slots: number[]; days: string[]; status: string; meetings: number;
+}
+export interface BcMeeting {
+  id: number; first: number; second: number; first_name: string; second_name: string; slot: number; slot_label: string; table: string;
+  status: "proposed" | "confirmed" | "cancelled"; status_label: string; conflicts: string[];
+}
+export interface BcBoard { slots: { id: number; label: string; published: boolean }[]; participants: BcParticipant[]; meetings: BcMeeting[] }
+type BcResult = { detail: string; board?: BcBoard };
+
 export const coordApi = {
+  bcBoard: () => api.get<BcBoard>("/business-connect/").then((r) => r.data),
+  bcCreate: (body: { first: number; second: number; slot: number; table: string }) => api.post<BcResult>("/business-connect/meetings/", body).then((r) => r.data),
+  bcConfirm: (id: number) => api.post<BcResult>(`/business-connect/meetings/${id}/confirm/`).then((r) => r.data),
+  bcRelease: (id: number) => api.post<BcResult>(`/business-connect/meetings/${id}/release/`).then((r) => r.data),
+  bcAgenda: (id: number) => api.post<BcResult>(`/business-connect/agenda/${id}/`).then((r) => r.data),
   csrf: () => api.get("/csrf/"),
   login: (username: string, password: string) => api.post<Me>("/login/", { username, password }).then((r) => r.data),
   logout: () => api.post("/logout/"),

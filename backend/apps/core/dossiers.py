@@ -129,8 +129,15 @@ def public_row(obj):
     row = {"kind": s[1], "id": obj.pk, "type": kind_label(obj), "reference": reference(obj), "name": person_name(obj),
            "status": obj.status, "status_label": status_label(obj), "next_step": next_step(obj),
            "created_at": obj.created_at.isoformat(), "can_complete": obj.status == "incomplete", "can_cancel": False}
+    from apps.events.models import BusinessConnectRegistration
+    if isinstance(obj, BusinessConnectRegistration):
+        from apps.events import business_connect
+        row["meetings"] = business_connect.public_meetings(obj)
+        if row["meetings"]:
+            row["next_step"] = "Vos rendez-vous confirmés sont listés ci-dessous. Tout changement vous sera signalé par un message distinct."
     if isinstance(obj, EventRequest) and obj.kind in EventRequest.BADGE_KINDS and obj.status == "accepted" and obj.badge_token:
-        row.update(badge_url=badges.owner_url(obj), visual_url=badges.visual_url(obj), can_cancel=True)
+        row.update(badge_url=badges.owner_url(obj), visual_url=badges.visual_url(obj), can_cancel=True,
+                   business_connect_url=badges.business_connect_url(obj))
     return row
 
 

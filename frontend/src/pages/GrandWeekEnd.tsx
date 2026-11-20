@@ -16,7 +16,7 @@ import { EventRequestForm } from "../features/events/EventRequestForm";
 import { PartnerBand } from "../features/events/PartnerBand";
 import { useAsync } from "../hooks/useAsync";
 import { useSeo } from "../hooks/useSeo";
-import { getAwardCategoryStates, getDocuments, getEvent, getGwePlaces, getVolunteerMissions, type AwardCategoryState } from "../services/api";
+import { getAwardCategoryStates, getBadgeContact, getBcSlots, getDocuments, getEvent, getGwePlaces, getVolunteerMissions, type AwardCategoryState } from "../services/api";
 import type { EventDetail } from "../types/api";
 import { fmtDate, fmtDays } from "../utils/format";
 import { parseBlocks } from "../utils/richtext";
@@ -286,6 +286,11 @@ export default function GrandWeekEnd() {
   const ev = useAsync(() => getEvent(SLUG));
   const awards = useAsync(getAwardCategoryStates);
   const places = useAsync(getGwePlaces);
+  const bcSlots = useAsync(getBcSlots);
+  // Lien du badge (?badge=…&cle=…) : la demande Business Connect reprend les coordonnées déjà saisies à l'inscription
+  const search = new URLSearchParams(useLocation().search);
+  const badgeToken = search.get("badge"), badgeKey = search.get("cle");
+  const contact = useAsync(() => (badgeToken && badgeKey ? getBadgeContact(badgeToken, badgeKey) : Promise.resolve(null)), [badgeToken, badgeKey]);
   const missions = useAsync(getVolunteerMissions);
   const dossier = useAsync(() => getDocuments("partnership"));
   const rules = useAsync(() => getDocuments("awards_rules"));
@@ -326,10 +331,17 @@ export default function GrandWeekEnd() {
   ].filter((i) => i.on);
 
   const bc: FieldDef[] = [
-    { name: "participant_name", label: "Nom", type: "text", required: true }, { name: "organization", label: "Organisation", type: "text" },
-    { name: "email", label: "E-mail", type: "email", required: true }, { name: "phone", label: "Téléphone", type: "tel" },
-    { name: "what_offers", label: "Ce que vous proposez", type: "textarea" }, { name: "what_needs", label: "Ce que vous recherchez", type: "textarea" },
-    { name: "preferred_meetings", label: "Rencontres souhaitées (vendredi, samedi ou les deux)", type: "textarea" },
+    { name: "participant_name", label: "Prénom et nom", type: "text", required: true }, { name: "organization", label: "Organisation", type: "text" },
+    { name: "job_title", label: "Fonction", type: "text" }, { name: "email", label: "E-mail", type: "email", required: true },
+    { name: "phone", label: "Téléphone", type: "tel" },
+    // Créneaux publiés par la Coordination ; à défaut, seulement les jours
+    ...(bcSlots.data?.length
+      ? [{ name: "slots", label: "Mes disponibilités", type: "multi" as const, options: bcSlots.data.map((x) => ({ value: String(x.id), label: x.label })) }]
+      : [{ name: "days", label: "Jours disponibles", type: "multi" as const, options: [{ value: "vendredi", label: "Vendredi 11 décembre" }, { value: "samedi", label: "Samedi 12 décembre" }],
+          hint: "Les créneaux précis seront proposés par la Coordination." }]),
+    { name: "what_offers", label: "Ce que je propose", type: "textarea", max: 300 },
+    { name: "what_needs", label: "Ce que je recherche", type: "textarea", max: 300 },
+    { name: "objective", label: "Objectif de la rencontre", type: "textarea", max: 300 },
     { name: "accept_privacy", label: "J'accepte la politique de confidentialité.", type: "consent" }];
   // Awards : l'état de chaque catégorie est vérifié au dépôt (une catégorie close reste visible mais ne peut pas être choisie)
   const catOptions = (awards.data ?? []).map((c) => ({ value: c.slug, label: `${c.name}${awardState(c)}`, disabled: !c.is_open }));
@@ -470,7 +482,7 @@ export default function GrandWeekEnd() {
             {bcSec && (
               <Card id="business-connect" icon={Handshake} title={bcSec.title}>
                 <RichText text={bcSec.body} />
-                <div className="mt-auto"><Reveal label="M'inscrire au Business Connect" block><ConfigForm endpoint="/business-connect/" extra={{ event: SLUG }} fields={bc} submitLabel="Envoyer mon inscription" successFallback="Merci. Votre inscription a bien été transmise." /></Reveal></div>
+                <div className="mt-auto"><Reveal label="Demander des rendez-vous" block defaultOpen={!!contact.data}><ConfigForm key={contact.data ? "prerempli" : "vide"} initial={contact.data ?? undefined} endpoint="/business-connect/" extra={{ event: SLUG }} fields={bc} submitLabel="Envoyer mon inscription" successFallback="Merci. Votre inscription a bien été transmise." /></Reveal></div>
               </Card>)}
             {defis && (
               <Card id="defis-partenaires" icon={Lightbulb} iconClass="bg-purple text-white" title={defis.title}>

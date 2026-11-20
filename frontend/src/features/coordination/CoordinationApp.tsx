@@ -1,10 +1,11 @@
-import { ExternalLink, FileText, Inbox, LayoutDashboard, LogOut, Megaphone, ScanLine, type LucideIcon } from "lucide-react";
+import { ExternalLink, FileText, Handshake, Inbox, LayoutDashboard, LogOut, Megaphone, ScanLine, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import logo from "../../assets/logo.png";
 import { Async } from "../../components/ui/Async";
 import { Loading } from "../../components/ui/States";
 import { useAsync } from "../../hooks/useAsync";
 import { coordApi, type Me } from "../../services/coordination";
+import { BusinessConnectPanel } from "./BusinessConnectPanel";
 import { CampaignsPanel } from "./CampaignsPanel";
 import { CheckInPanel } from "./CheckInPanel";
 import { ContentPanel } from "./ContentPanel";
@@ -13,12 +14,13 @@ import { LoginForm } from "./LoginForm";
 import { QueuePanel } from "./QueuePanel";
 
 type Auth = { status: "loading" } | { status: "anon" } | { status: "in"; me: Me };
-export type Tab = "home" | "queue" | "content" | "campaigns" | "checkin";
+export type Tab = "home" | "queue" | "content" | "campaigns" | "bc" | "checkin";
 const TABS: { id: Tab; label: string; short: string; icon: LucideIcon }[] = [
   { id: "home", label: "Tableau de bord", short: "Accueil", icon: LayoutDashboard },
   { id: "queue", label: "À traiter", short: "À traiter", icon: Inbox },
   { id: "content", label: "Publications", short: "Contenus", icon: FileText },
   { id: "campaigns", label: "Campagnes", short: "Campagnes", icon: Megaphone },
+  { id: "bc", label: "Business Connect", short: "Rendez-vous", icon: Handshake },
   { id: "checkin", label: "Accueil et badges", short: "Badges", icon: ScanLine },
 ];
 const ROLE_LABEL: Record<string, string> = { ADMIN: "Administrateur", COORDINATION: "Coordination", ACCUEIL: "Accueil" };
@@ -106,13 +108,14 @@ function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
           {tab === "queue" && <Async state={summary}>{(s) => s && <QueuePanel kinds={s.queues} kind={kind} onKind={setKind} version={version} onChanged={refresh} />}</Async>}
           {tab === "content" && <ContentPanel me={me} onChanged={refresh} />}
           {tab === "campaigns" && <CampaignsPanel />}
+          {tab === "bc" && <BusinessConnectPanel />}
           {tab === "checkin" && <CheckInPanel full={!reception} />}
         </main>
       </div>
 
       {/* Onglets en bas d'écran (téléphone et tablette) : à portée de pouce */}
       <nav aria-label="Sections (mobile)" className="fixed inset-x-0 bottom-0 z-30 border-t border-navy/10 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgba(14,34,64,0.06)] lg:hidden">
-        <div className="mx-auto grid max-w-xl grid-cols-5">
+        <div className="mx-auto grid max-w-xl" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
           {tabs.map((t) => {
             const active = tab === t.id;
             return (

@@ -15,8 +15,14 @@ export interface FieldDef {
   showIf?: string;
   /** Fichiers acceptés (champ « file ») : ex. ".pdf,application/pdf". */
   accept?: string;
+  /** Longueur maximale (texte) : compteur affiché sous le champ. */
+  max?: number;
 }
-interface Props { endpoint: string; fields: FieldDef[]; submitLabel?: string; extra?: Record<string, unknown>; successFallback?: string }
+interface Props {
+  endpoint: string; fields: FieldDef[]; submitLabel?: string; extra?: Record<string, unknown>; successFallback?: string;
+  /** Valeurs déjà connues (ex. coordonnées reprises de l'inscription) : la personne peut les modifier. */
+  initial?: Record<string, unknown>;
+}
 
 const REQUIRED = "Ce champ est obligatoire.";
 
@@ -35,14 +41,15 @@ export function buildSchema(fields: FieldDef[]) {
     else if (f.type === "email") s = f.required ? z.string().trim().min(1, REQUIRED).email("Cette adresse e-mail n'est pas valide.") : z.string().trim().email("Cette adresse e-mail n'est pas valide.").or(z.literal(""));
     else if (f.type === "select") s = f.required ? z.string().min(1, "Faites un choix.") : z.string();
     else s = f.required ? z.string().trim().min(1, REQUIRED) : z.string().trim();
+    if (f.max && s instanceof z.ZodString) s = s.max(f.max, `${f.max} caractères au maximum.`);
     shape[f.name] = s;
   }
   return z.object(shape);
 }
 
-export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, successFallback }: Props) {
+export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, successFallback, initial }: Props) {
   const schema = useMemo(() => buildSchema(fields), [fields]);
-  const defaults = useMemo(() => Object.fromEntries(fields.filter((f) => f.type !== "file").map((f) => [f.name, f.type === "multi" ? [] : f.type === "consent" || f.type === "check" ? false : ""])), [fields]);
+  const defaults = useMemo(() => Object.fromEntries(fields.filter((f) => f.type !== "file").map((f) => [f.name, f.type === "multi" ? [] : f.type === "consent" || f.type === "check" ? false : (initial?.[f.name] as string | undefined) ?? ""])), [fields, initial]);
   const { register, handleSubmit, setError, watch, formState: { errors, isSubmitting } } = useForm<FieldValues>({ resolver: zodResolver(schema), defaultValues: defaults });
   const values = watch();
   const visible = (f: FieldDef) => !f.showIf || !!values[f.showIf];
@@ -104,7 +111,8 @@ export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, s
         const wide = f.full || f.type === "textarea";
         return (
           <FormField key={f.name} id={id} label={f.label} required={f.required} error={e} hint={f.hint} className={wide ? "sm:col-span-2" : ""}>
-            {f.type === "textarea" ? <textarea rows={5} className="field" {...fieldProps(id, e)} {...register(f.name)} />
+            {f.type === "textarea" ? <><textarea rows={f.max ? 3 : 5} maxLength={f.max} className="field" {...fieldProps(id, e)} {...register(f.name)} />
+                {f.max && <p className="mt-1 text-right text-xs text-navy/60">{String(values[f.name] ?? "").length} / {f.max}</p>}</>
               : f.type === "select" ? <select className="field" {...fieldProps(id, e)} {...register(f.name)}><option value="">Choisir…</option>{f.options?.map((o) => <option key={o.value} value={o.value} disabled={o.disabled}>{o.label}</option>)}</select>
               : f.type === "file" ? <input type="file" accept={f.accept} className="field py-2" {...fieldProps(id, e)} {...register(f.name)} />
               : f.type === "number" ? <input type="number" inputMode="numeric" min={0} className="field" {...fieldProps(id, e)} {...register(f.name)} />
@@ -137,6 +145,7 @@ function Confirmation({ r }: { r: SubmitResult }) {
       {(r.reference || r.duplicate) && (
         <div className="mt-4 flex flex-wrap gap-2">
           {r.badge_url && <a href={r.badge_url} className={`${btn} bg-green text-white hover:bg-green-2`}>Voir mon badge</a>}
+          {r.business_connect_url && <a href={r.business_connect_url} className={`${btn} border border-navy/20 text-navy hover:bg-white`}>Demander des rendez-vous Business Connect</a>}
           {r.visual_url && <a href={r.visual_url} className={`${btn} border border-gold/60 bg-gold/10 text-navy hover:bg-gold/20`}>Créer mon visuel « J'y serai ! »</a>}
           <a href="/suivi" className={`${btn} border border-navy/20 text-navy hover:bg-white`}>Retrouver mon inscription ou mon dossier</a>
         </div>)}

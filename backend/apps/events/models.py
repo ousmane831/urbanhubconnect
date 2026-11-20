@@ -109,14 +109,42 @@ class AwardApplication(Submission):
         return f"{self.applicant_name} — {self.category}"
 
 
+class BusinessConnectSlot(models.Model):
+    """Créneau de rendez-vous Business Connect. Seuls les créneaux publiés (approuvés par la Coordination) sont proposés."""
+    day = models.DateField("jour")
+    start = models.TimeField("début")
+    end = models.TimeField("fin")
+    is_published = models.BooleanField("publié", default=False, help_text="À cocher seulement pour un créneau approuvé.")
+
+    class Meta:
+        ordering = ["day", "start"]
+        verbose_name, verbose_name_plural = "créneau Business Connect", "créneaux Business Connect"
+
+    def __str__(self):
+        jours = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+        return f"{jours[self.day.weekday()].capitalize()} {self.day.day:02d}/{self.day.month:02d} · {self.start:%H:%M}–{self.end:%H:%M}"
+
+    def clean(self):
+        super().clean()
+        if self.start and self.end and self.end <= self.start:
+            raise ValidationError({"end": "La fin doit suivre le début."})
+
+
+BC_TEXT_MAX = 300
+
+
 class BusinessConnectRegistration(Submission):
     event = models.ForeignKey(Event, on_delete=models.PROTECT, related_name="business_connect_registrations")
     participant_name = models.CharField(max_length=150)
     organization = models.CharField(max_length=200, blank=True)
+    job_title = models.CharField("fonction", max_length=150, blank=True)
     email = models.EmailField()
     phone = models.CharField(max_length=30, blank=True)
     what_offers = models.TextField("ce que je propose", blank=True)
     what_needs = models.TextField("ce que je recherche", blank=True)
+    objective = models.TextField("objectif de la rencontre", blank=True)
+    slots = models.ManyToManyField(BusinessConnectSlot, blank=True, related_name="available", verbose_name="disponibilités")
+    days = models.JSONField("jours disponibles", default=list, blank=True)
     preferred_meetings = models.TextField("rencontres souhaitées", blank=True)
     accept_privacy = models.BooleanField(default=False)
 
@@ -124,7 +152,53 @@ class BusinessConnectRegistration(Submission):
         verbose_name, verbose_name_plural = "inscription Business Connect", "inscriptions Business Connect"
 
     def __str__(self):
-        return f"{self.participant_name} — {self.event}"
+        return f"{self.participant_name} — {self.organization}" if self.organization else self.participant_name
+
+    def clean(self):
+        super().clean()
+        errors = {f: f"{BC_TEXT_MAX} caractères au maximum." for f in ("what_offers", "what_needs")
+                  if len(getattr(self, f) or "") > BC_TEXT_MAX}
+        if errors:
+            raise ValidationError(errors)
+
+
+class BusinessConnectMeeting(models.Model):
+    """Rendez-vous entre deux participants, sur un créneau. Une demande reçue n'est pas un rendez-vous : seul un rendez-vous
+    confirmé est communiqué aux participants. Le système refuse les chevauchements (même personne ou même table)."""
+    class Status(models.TextChoices):
+        PROPOSED = "proposed", "Proposé (non communiqué)"
+        CONFIRMED = "confirmed", "Confirmé"
+        CANCELLED = "cancelled", "Libéré"
+
+    first = models.ForeignKey(BusinessConnectRegistration, on_delete=models.CASCADE, related_name="meetings_as_first", verbose_name="participant 1")
+    second = models.ForeignKey(BusinessConnectRegistration, on_delete=models.CASCADE, related_name="meetings_as_second", verbose_name="participant 2")
+    slot = models.ForeignKey(BusinessConnectSlot, on_delete=models.PROTECT, related_name="meetings", verbose_name="créneau")
+    table = models.CharField("table", max_length=20, blank=True)
+    status = models.CharField("statut", max_length=10, choices=Status.choices, default=Status.PROPOSED, db_index=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["slot__day", "slot__start", "table"]
+        verbose_name, verbose_name_plural = "rendez-vous Business Connect", "rendez-vous Business Connect"
+
+    def __str__(self):
+        return f"{self.first.participant_name} × {self.second.participant_name} · {self.slot}"
+
+    def conflicts(self):
+        """Chevauchements avec d'autres rendez-vous actifs du même créneau : participant déjà pris ou table occupée."""
+        same = BusinessConnectMeeting.objects.filter(slot=self.slot).exclude(status=self.Status.CANCELLED).exclude(pk=self.pk)
+        people = {self.first_id, self.second_id}
+        problems = []
+        for m in same.select_related("first", "second"):
+            busy = people & {m.first_id, m.second_id}
+            for pid in busy:
+                who = self.first if pid == self.first_id else self.second
+                problems.append(f"{who.participant_name} a déjà un rendez-vous sur ce créneau.")
+            if self.table and m.table and m.table.strip().lower() == self.table.strip().lower():
+                problems.append(f"La table {self.table} est déjà occupée sur ce créneau.")
+        return sorted(set(problems))
 
 
 class VolunteerMission(Taxonomy):
