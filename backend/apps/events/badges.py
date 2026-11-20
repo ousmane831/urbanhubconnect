@@ -99,9 +99,12 @@ def send_badge(r):
     info, url, png = event_info(), badge_url(r), badge_png(r)
     title = re.sub(r"^(le|la)\s+", "", info["title"], flags=re.I)  # « au Grand Week-End », pas « au Le Grand Week-End »
     when = " · ".join(x for x in (info["dates"], info["location"]) if x)
+    visual = f"{frontend_url()}/jy-serai?badge={ensure_token(r)}"
     text = (f"Bonjour {r.name},\n\nVotre inscription au {title} est confirmée.\n" + (f"{when}\n" if when else "") +
             "\nVotre badge est joint à ce message. Présentez-le à l'accueil, sur votre téléphone ou imprimé : "
-            "il est valable pour les deux journées.\n\nContact : +221 78 309 56 56 (appel et WhatsApp)\n\n"
+            "il est valable pour les deux journées.\n\n"
+            f"Annoncez votre participation : créez votre visuel « J'y serai ! » avec votre photo et partagez-le sur vos réseaux :\n{visual}\n\n"
+            "Contact : +221 78 309 56 56 (appel et WhatsApp)\n\n"
             f"Urban Hub Connect\n\nVotre badge en ligne : {url}")
     html = f"""<div style="font-family:Arial,sans-serif;color:#0E2240;max-width:560px">
 <p>Bonjour {escape(r.name)},</p>
@@ -109,6 +112,11 @@ def send_badge(r):
 <div style="text-align:center;margin:20px 0">
 <img src="cid:badge" alt="Votre badge pour le {escape(title)}" width="300" height="433" style="display:block;margin:0 auto;max-width:100%;height:auto;border:1px solid #d0d5dd;border-radius:8px">
 <p style="margin:10px 0 0;font-size:13px">À présenter à l’accueil, sur votre téléphone ou imprimé. Valable pour les deux journées.</p>
+</div>
+<div style="margin:24px 0;padding:18px;border:1px solid #E2C27A;border-radius:12px;background:#FBF6EA;text-align:center">
+<p style="margin:0 0 12px;font-weight:bold">Annoncez votre participation !</p>
+<p style="margin:0 0 14px;font-size:14px">Créez votre visuel « J’y serai ! » avec votre photo et partagez-le sur vos réseaux.</p>
+<a href="{visual}" style="display:inline-block;background:#1E5C3F;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px">Créer mon visuel</a>
 </div>
 <p>Contact : +221 78 309 56 56 (appel et WhatsApp)</p>
 <p>Urban Hub Connect</p>

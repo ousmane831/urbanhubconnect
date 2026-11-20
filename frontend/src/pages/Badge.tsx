@@ -1,5 +1,5 @@
-import { CalendarDays, CheckCircle2, Download, MapPin, Trees, XCircle } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { CalendarDays, CheckCircle2, Download, MapPin, Sparkles, Trees, XCircle } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
 import { Container } from "../components/ui/Container";
 import { ErrorState, Loading } from "../components/ui/States";
 import { useAsync } from "../hooks/useAsync";
@@ -38,6 +38,9 @@ export default function Badge() {
                 <a href={badgeImageUrl(token, true)} download
                   className="mt-4 inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-green px-5 font-semibold text-white hover:bg-green-2">
                   <Download className="h-4 w-4" aria-hidden />Télécharger mon badge</a>
+                <Link to={`/jy-serai?badge=${encodeURIComponent(token)}`}
+                  className="mt-3 flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-gold/60 bg-gold/10 px-5 font-semibold text-navy hover:bg-gold/20">
+                  <Sparkles className="h-4 w-4 text-gold" aria-hidden />Créer mon visuel « J'y serai ! »</Link>
                 <p className="mt-4 text-sm text-navy/75">Présentez ce badge à l'accueil, sur votre téléphone ou imprimé. Il est valable pour les deux journées.</p>
               </>
             ) : (
