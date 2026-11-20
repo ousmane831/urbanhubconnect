@@ -91,10 +91,18 @@ export default function Partners() {
       {!!partners.data?.length && (
         <Section>
           <SectionHeading eyebrow="Ils nous soutiennent" title="Nos partenaires" center />
-          <ul className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
+          {/* Cadres identiques (2 par ligne sur téléphone, 4 sur ordinateur) ; chaque logo occupe au mieux son cadre sans être déformé */}
+          <ul className="flex flex-wrap justify-center gap-4 sm:gap-6">
             {partners.data.map((p) => {
-              const img = <img src={p.logo} alt={p.name} loading="lazy" className="h-12 w-auto max-w-[10rem] object-contain sm:h-14" />;
-              return <li key={p.name} className="card flex h-24 items-center px-6">{p.website ? <a href={p.website} target="_blank" rel="noopener noreferrer">{img}</a> : img}</li>;
+              const tile = "card flex h-28 items-center justify-center p-4 sm:h-32 sm:p-5";
+              const img = <img src={p.logo} alt={p.name} loading="lazy" className="max-h-full max-w-full rounded-md object-contain" />;
+              return (
+                <li key={p.name} className="w-[calc(50%-0.5rem)] sm:w-[calc(50%-0.75rem)] lg:w-[calc(25%-1.125rem)]">
+                  {p.website
+                    ? <a href={p.website} target="_blank" rel="noopener noreferrer" title={p.name}
+                        className={`${tile} transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-green`}>{img}</a>
+                    : <div className={tile}>{img}</div>}
+                </li>);
             })}
           </ul>
         </Section>)}
