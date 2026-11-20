@@ -97,30 +97,23 @@ def send_badge(r):
     """Envoie (ou renvoie) le badge par e-mail : l'image du badge (celle qui sera imprimée) dans le message et en pièce jointe.
     Retourne True si l'e-mail est parti."""
     info, url, png = event_info(), badge_url(r), badge_png(r)
-    choices = payload(r)["options"]
-    planting = ("\nVotre place dans le convoi du reboisement (vendredi après-midi) est réservée. Pensez à des chaussures fermées, "
-                "un couvre-chef et de l'eau.\n") if r.wants_planting else ""
-    text = (f"Bonjour {r.name},\n\nVotre inscription au {info['title']} est confirmée"
-            + (f" ({info['dates']} · {info['location']})" if info["dates"] else "") + ".\n\n"
-            "Vos temps du programme :\n" + "\n".join(f"- {c}" for c in choices) + "\n" + planting +
-            f"\nVotre badge est joint à ce message. Présentez-le à l'accueil, sur votre téléphone ou imprimé : "
-            f"il est valable pour les deux journées.\nVous pouvez aussi l'afficher à tout moment ici : {url}\n\n"
-            "Le Gala du Pôle ne fait pas partie de cette inscription : il est accessible sur invitation et par la billetterie commune avec The Ground.\n\n"
-            "Contact : +221 78 309 56 56 (appel et WhatsApp)\n\nUrban Hub Connect")
-    items = "".join(f"<li>{escape(c)}</li>" for c in choices)
+    title = re.sub(r"^(le|la)\s+", "", info["title"], flags=re.I)  # « au Grand Week-End », pas « au Le Grand Week-End »
+    when = " · ".join(x for x in (info["dates"], info["location"]) if x)
+    text = (f"Bonjour {r.name},\n\nVotre inscription au {title} est confirmée.\n" + (f"{when}\n" if when else "") +
+            "\nVotre badge est joint à ce message. Présentez-le à l'accueil, sur votre téléphone ou imprimé : "
+            "il est valable pour les deux journées.\n\nContact : +221 78 309 56 56 (appel et WhatsApp)\n\n"
+            f"Urban Hub Connect\n\nVotre badge en ligne : {url}")
     html = f"""<div style="font-family:Arial,sans-serif;color:#0E2240;max-width:560px">
 <p>Bonjour {escape(r.name)},</p>
-<p>Votre inscription au <strong>{escape(info['title'])}</strong> est confirmée{(' (' + escape(info['dates']) + ' · ' + escape(info['location']) + ')') if info['dates'] else ''}.</p>
-<p style="margin-bottom:4px"><strong>Vos temps du programme :</strong></p><ul style="margin-top:0">{items}</ul>
-{'<p><strong>Votre place dans le convoi du reboisement est réservée.</strong> Pensez à des chaussures fermées, un couvre-chef et de l’eau.</p>' if r.wants_planting else ''}
+<p>Votre inscription au <strong>{escape(title)}</strong> est confirmée.{('<br>' + escape(when)) if when else ''}</p>
 <div style="text-align:center;margin:20px 0">
-<img src="cid:badge" alt="Votre badge pour le {escape(info['title'])}" width="300" height="433" style="display:block;margin:0 auto;max-width:100%;height:auto;border:1px solid #d0d5dd;border-radius:8px">
+<img src="cid:badge" alt="Votre badge pour le {escape(title)}" width="300" height="433" style="display:block;margin:0 auto;max-width:100%;height:auto;border:1px solid #d0d5dd;border-radius:8px">
 <p style="margin:10px 0 0;font-size:13px">À présenter à l’accueil, sur votre téléphone ou imprimé. Valable pour les deux journées.</p>
 </div>
-<p>Vous pouvez aussi afficher votre badge à tout moment : <a href="{url}">{url}</a></p>
-<p style="font-size:13px;color:#555">Le Gala du Pôle ne fait pas partie de cette inscription : il est accessible sur invitation et par la billetterie commune avec The Ground.<br>Contact : +221 78 309 56 56 (appel et WhatsApp)</p>
-<p>Urban Hub Connect</p></div>"""
-    msg = EmailMultiAlternatives(f"Votre badge pour le {info['title']}", text, settings.DEFAULT_FROM_EMAIL, [r.email])
+<p>Contact : +221 78 309 56 56 (appel et WhatsApp)</p>
+<p>Urban Hub Connect</p>
+<p style="font-size:12px;color:#667085">L’image ne s’affiche pas ? <a href="{url}" style="color:#667085">Voir votre badge en ligne</a></p></div>"""
+    msg = EmailMultiAlternatives(f"Votre badge pour le {title}", text, settings.DEFAULT_FROM_EMAIL, [r.email])
     msg.attach_alternative(html, "text/html")
     msg.mixed_subtype = "related"
     img = MIMEImage(png, "png")
