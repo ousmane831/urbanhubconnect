@@ -8,6 +8,7 @@ class ContactMessage(TimeStampedModel):
         MEMBERSHIP = "membership", "Adhésion"
         PARTNERSHIP = "partnership", "Partenariat"
         EVENTS = "events", "Événements"
+        EVENT_HELP = "event_help", "Grand Week-End : besoin d'aide"
         PRESS = "press", "Presse"
         VOLUNTEER = "volunteer", "Bénévolat"
         DIRECTORY = "directory", "Annuaire"

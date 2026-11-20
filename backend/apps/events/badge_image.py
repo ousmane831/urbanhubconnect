@@ -60,7 +60,7 @@ def _centered(draw, y, text, f, fill, max_w, line_gap=1.15, max_lines=2):
     return y
 
 
-def render(*, name, job_title="", organization="", number=None, event_title="", dates="", location="", qr_data=""):
+def render(*, name, job_title="", organization="", number=None, category="", event_title="", dates="", location="", qr_data=""):
     img = Image.new("RGB", (W, H), "white")
     d = ImageDraw.Draw(img)
     inner = W - 10 * MM
@@ -96,7 +96,8 @@ def render(*, name, job_title="", organization="", number=None, event_title="", 
         y = _centered(d, y + round(1.0 * MM), organization, font("bold", 4.2), NAVY, inner)
 
     # QR code (38 mm) au-dessus du pied du badge
-    footer = H - round(3 * MM) - round(2.8 * MM)
+    strip = round(11 * MM) if category else 0  # bandeau de la catégorie, en bas
+    footer = H - strip - round(3 * MM) - round(2.8 * MM)
     q = 38 * MM
     if qr_data:
         buf = io.BytesIO()
@@ -106,10 +107,13 @@ def render(*, name, job_title="", organization="", number=None, event_title="", 
         qr_y = max(y + round(4 * MM), bottom - q - max(0, (bottom - q - y - round(4 * MM)) // 2))  # centré dans l'espace libre
         img.paste(qr, ((W - q) // 2, min(qr_y, bottom - q)))
 
-    # Pied : numéro du badge
+    # Pied : numéro du badge, puis la catégorie en toutes lettres sur un bandeau vert
     small = font("semibold", 2.8)
     if number:
         d.text((5 * MM, footer), f"N° {number:04d}", font=small, fill=GREY)
+    if category:
+        d.rectangle((0, H - strip, W, H), fill=GREEN)
+        d.text((W / 2, H - strip / 2), category.upper(), font=font("title", 5.0), fill="white", anchor="mm")
 
     # Contour fin
     d.rectangle((0, 0, W - 1, H - 1), outline=(208, 213, 221), width=2)

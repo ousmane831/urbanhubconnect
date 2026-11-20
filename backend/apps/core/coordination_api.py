@@ -32,7 +32,7 @@ from apps.press.models import PressAccreditation
 from apps.users.models import User
 
 logger = logging.getLogger(__name__)
-OPEN = ("pending", "reviewing")
+OPEN = ("pending", "reviewing", "incomplete")
 
 
 def get(obj, path, default=""):
@@ -98,9 +98,12 @@ def rows(*pairs):
 
 # ---------- Files « à traiter » ----------
 def _status_actions(obj):
+    from . import dossiers
     acts = [{"id": "accept", "label": "Accepter", "tone": "primary"}, {"id": "reject", "label": "Refuser", "tone": "danger"}]
     if obj.status != "reviewing":
         acts.append({"id": "review", "label": "Marquer « en cours d'examen »", "tone": "neutral"})
+    if dossiers.is_dossier(obj) and obj.status != "incomplete":
+        acts.append({"id": "incomplete", "label": "Demander un complément", "tone": "neutral", "form": "complement"})
     return acts
 
 
@@ -396,7 +399,13 @@ def _apply_network(kind, obj, action, user):
 def _item(kind, o):
     k = KINDS[kind]
     return {"id": o.pk, "title": k["title"](o), "subtitle": k["subtitle"](o), "created_at": o.created_at.isoformat(),
-            "state": k["state"](o) if "state" in k else None, "details": k["details"](o), "actions": k["actions"](o)}
+            "state": k["state"](o) if "state" in k else _dossier_state(o), "details": k["details"](o), "actions": k["actions"](o)}
+
+
+def _dossier_state(o):
+    """Référence et statut des dossiers du Grand Week-End (ex. « BC-00012 · À compléter »)."""
+    from . import dossiers
+    return f"{dossiers.reference(o)} · {o.get_status_display()}" if dossiers.is_dossier(o) else None
 
 
 def _apply(kind, obj, action, user, data=None):
@@ -435,12 +444,21 @@ def _apply(kind, obj, action, user, data=None):
                 msg = ("Fiche acceptée et publiée : l'adhésion est à jour." if obj.is_published
                        else "Fiche acceptée : elle sera publiée quand la cotisation sera à jour.")
         return msg
-    status = {"accept": "accepted", "reject": "rejected", "review": "reviewing"}.get(action)
+    from . import dossiers
+    status = {"accept": "accepted", "reject": "rejected", "review": "reviewing", "incomplete": "incomplete"}.get(action)
     if not status:
         raise ValidationError("Action inconnue.")
+    note = str((data or {}).get("note", "")).strip()
+    if status == "incomplete" and not note:
+        raise ValidationError("Précisez l'élément attendu.")
     obj.status = status
-    obj.save(update_fields=["status", "updated_at"])
-    msg = {"accepted": "Demande acceptée.", "rejected": "Demande refusée.", "reviewing": "Demande marquée « en cours d'examen »."}[status]
+    if note:
+        obj.internal_notes = f"{obj.internal_notes}\n\n[Complément demandé le {timezone.localtime():%d/%m/%Y}] {note}".strip()
+    obj.save(update_fields=["status", "internal_notes", "updated_at"] if note else ["status", "updated_at"])
+    msg = {"accepted": "Demande acceptée.", "rejected": "Demande refusée.", "reviewing": "Demande marquée « en cours d'examen ».",
+           "incomplete": "Complément demandé."}[status]
+    if dossiers.is_dossier(obj) and status != "reviewing":
+        msg += " La personne est prévenue par e-mail." if dossiers.notify_decision(obj, note) else " L'e-mail n'a pas pu partir."
     if kind == "suggestions" and status == "accepted" and obj.latitude is not None and obj.longitude is not None:
         MapPlace.objects.create(name=obj.name, category=obj.category, address=obj.address, latitude=obj.latitude,
                                 longitude=obj.longitude, description=obj.description, website=obj.website, phone=obj.phone,

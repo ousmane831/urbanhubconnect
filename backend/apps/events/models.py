@@ -183,6 +183,18 @@ class EventRequest(Submission):
     badge_number = models.PositiveIntegerField("n° de badge", unique=True, null=True, blank=True, editable=False)
     badge_printed_at = models.DateTimeField("badge imprimé le", null=True, blank=True, editable=False)
 
+    class BadgeCategory(models.TextChoices):
+        PARTICIPANT = "participant", "Participant"
+        PARTNER = "partner", "Partenaire"
+        PRESS = "press", "Presse"
+        INSTITUTION = "institution", "Institution"
+        EXHIBITOR = "exhibitor", "Exposant"
+        VOLUNTEER = "volunteer", "Bénévole"
+        ORGANISATION = "organisation", "Organisation"
+
+    # Catégorie imprimée en toutes lettres sur le badge ; modifiable par la Coordination dans l'administration.
+    badge_category = models.CharField("catégorie du badge", max_length=15, choices=BadgeCategory.choices, default=BadgeCategory.PARTICIPANT)
+
     BADGE_KINDS = (Kind.REGISTRATION, Kind.CARAVAN)
 
     class Meta(Submission.Meta):

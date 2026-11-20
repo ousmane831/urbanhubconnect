@@ -15,7 +15,7 @@ export interface Me { username: string; name: string; role: string }
 export interface Summary { queues: { kind: string; label: string; count: number }[]; stats: { label: string; value: number }[]; to_handle: number }
 export interface ActionDef {
   id: string; label: string; tone: "primary" | "danger" | "neutral";
-  form?: "payment" | "category"; amount?: number | null; options?: { value: string; label: string }[];
+  form?: "payment" | "category" | "complement"; amount?: number | null; options?: { value: string; label: string }[];
 }
 export interface QueueItem { id: number; title: string; subtitle: string; created_at: string; state: string | null; details: [string, string][]; actions: ActionDef[] }
 export interface ContentItem { id: number; title: string; state: string; actions: ActionDef[]; admin_url: string }
@@ -34,6 +34,8 @@ export const coordApi = {
   checkin: (body: { code: string } | { id: number }) => api.post<CheckinResult>("/checkin/", body).then((r) => r.data),
   checkinSearch: (q: string) => api.get<CheckinPerson[]>("/checkin/search/", { params: { q } }).then((r) => r.data),
   checkinResend: (id: number) => api.post<{ detail: string }>("/checkin/resend/", { id }).then((r) => r.data.detail),
+  checkinReissue: (id: number) => api.post<{ detail: string }>("/checkin/reissue/", { id }).then((r) => r.data.detail),
+  checkinCancel: (id: number) => api.post<{ detail: string }>("/checkin/cancel/", { id }).then((r) => r.data.detail),
   checkinStats: () => api.get<CheckinStats>("/checkin/stats/").then((r) => r.data),
   badgesPrint: (onlyNew: boolean) =>
     api.get<BadgePrintList>("/badges/print/", { params: onlyNew ? { nouveaux: 1 } : undefined }).then((r) => r.data),
@@ -58,7 +60,7 @@ export interface CheckinResult {
   reference?: string; days?: string[]; today_at?: string; checkins?: { day: string; at: string }[];
 }
 export interface CheckinPerson {
-  id: number; name: string; organization: string; email: string; phone: string; valid: boolean; reference: string; badge_sent: boolean; checkins: string[];
+  id: number; name: string; organization: string; email: string; phone: string; valid: boolean; status: string; category: string; reference: string; badge_sent: boolean; checkins: string[];
 }
 export interface CheckinStats { registered: number; today: number; by_day: Record<string, number> }
 

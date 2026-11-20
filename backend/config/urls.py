@@ -18,6 +18,7 @@ from apps.organizations.api import OrganizationViewSet
 from apps.core import coordination_api as co
 
 from apps.core import members_network_api as mn
+from apps.core import suivi_api as sv
 from apps.events import badge_api as bd
 from apps.campaigns import api as cp
 admin.site.site_header = "Urban Hub Connect · Coordination"
@@ -26,7 +27,7 @@ admin.site.index_title = "Tableau de bord de la Coordination"
 
 def robots(request):
     # Pages privées (badges, désinscription, espaces réservés) : jamais indexées.
-    private = "".join(f"Disallow: {p}\n" for p in ("/admin/", "/api/", "/badge/", "/desinscription/", "/coordination", "/espace-membres"))
+    private = "".join(f"Disallow: {p}\n" for p in ("/admin/", "/api/", "/badge/", "/suivi/", "/desinscription/", "/coordination", "/espace-membres"))
     body = f"User-agent: *\nAllow: /\n{private}\nSitemap: {settings.SITE_URL}/sitemap.xml\n"
     return HttpResponse(body, content_type="text/plain")
 
@@ -89,10 +90,13 @@ urlpatterns = [
     path("api/badges/<str:token>/", bd.badge_detail, name="badge-detail"),
     path("api/badges/<str:token>/qr.png", bd.badge_qr, name="badge-qr"),
     path("api/badges/<str:token>/badge.png", bd.badge_image, name="badge-image"),
+    path("api/badges/<str:token>/badge.pdf", bd.badge_pdf, name="badge-pdf"),
     path("api/badges/<str:token>/renvoyer/", bd.badge_resend, name="badge-resend"),
     path("api/coordination/checkin/", bd.checkin, name="coord-checkin"),
     path("api/coordination/checkin/search/", bd.checkin_search, name="coord-checkin-search"),
     path("api/coordination/checkin/resend/", bd.checkin_resend, name="coord-checkin-resend"),
+    path("api/coordination/checkin/reissue/", bd.checkin_reissue, name="coord-checkin-reissue"),
+    path("api/coordination/checkin/cancel/", bd.checkin_cancel, name="coord-checkin-cancel"),
     path("api/coordination/checkin/stats/", bd.checkin_stats, name="coord-checkin-stats"),
     path("api/coordination/badges/print/", bd.print_list, name="coord-badges-print"),
     path("api/coordination/badges/printed/", bd.print_done, name="coord-badges-printed"),
@@ -106,6 +110,11 @@ urlpatterns = [
     path("api/coordination/campaigns/<int:pk>/", cp.campaign_update, name="coord-campaign-update"),
     path("api/coordination/campaigns/<int:pk>/<str:action>/", cp.campaign_action, name="coord-campaign-action"),
     path("api/unsubscribe/<uuid:token>/", cp.unsubscribe, name="campaign-unsubscribe"),
+    # Suivi des dossiers du Grand Week-End sans compte (lien personnel temporaire)
+    path("api/suivi/", sv.request_link, name="suivi-request"),
+    path("api/suivi/<str:token>/", sv.tracking, name="suivi"),
+    path("api/suivi/<str:token>/<slug:kind>/<int:pk>/annuler/", sv.cancel, name="suivi-cancel"),
+    path("api/suivi/<str:token>/<slug:kind>/<int:pk>/completer/", sv.complete, name="suivi-complete"),
     path("api/coordination/csrf/", co.csrf, name="coord-csrf"),
     path("api/coordination/login/", co.LoginView.as_view(), name="coord-login"),
     path("api/coordination/logout/", co.logout_view, name="coord-logout"),

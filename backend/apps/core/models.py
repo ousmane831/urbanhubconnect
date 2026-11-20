@@ -86,10 +86,14 @@ class Taxonomy(models.Model):
 
 
 class SubmissionStatus(models.TextChoices):
-    PENDING = "pending", "En attente"
+    """États d'un dossier (cahier des charges du 20 novembre 2026). Une inscription au Grand Week-End confirmée est « accepted »."""
+    PENDING = "pending", "Reçue"
     REVIEWING = "reviewing", "En cours d'examen"
+    INCOMPLETE = "incomplete", "À compléter"
+    WAITLIST = "waitlist", "En liste d'attente"
     ACCEPTED = "accepted", "Acceptée"
     REJECTED = "rejected", "Refusée"
+    CANCELLED = "cancelled", "Annulée"
 
 
 class Submission(TimeStampedModel):

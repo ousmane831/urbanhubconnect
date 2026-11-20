@@ -89,8 +89,13 @@ class SubmissionCreateView(generics.CreateAPIView):
         existing = self.existing(serializer.validated_data)
         if existing is not None:
             return existing
-        self.after_create(serializer.save())
-        return Response({"detail": self.success_message}, status=status.HTTP_201_CREATED)
+        obj = serializer.save()
+        self.after_create(obj)
+        from . import dossiers
+        if dossiers.is_dossier(obj):  # écran de confirmation : référence, statut et prochaine étape
+            self.extra_response = {"reference": dossiers.reference(obj), "status": dossiers.status_label(obj),
+                                   "next_step": dossiers.next_step(obj), **getattr(self, "extra_response", {})}
+        return Response({"detail": self.success_message, **getattr(self, "extra_response", {})}, status=status.HTTP_201_CREATED)
 
     def existing(self, data):
         """Dossier déjà enregistré pour la même personne : retourner la réponse à donner (aucun nouveau dossier)."""

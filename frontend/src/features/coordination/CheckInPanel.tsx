@@ -101,14 +101,18 @@ function ManualSearch({ onDone }: { onDone: () => void }) {
   const list = useAsync(() => (query.trim().length >= 2 ? coordApi.checkinSearch(query.trim()) : Promise.resolve([] as CheckinPerson[])), [query, version]);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
-  const run = async (p: CheckinPerson, action: "checkin" | "resend") => {
+  const run = async (p: CheckinPerson, action: "checkin" | "resend" | "reissue" | "cancel") => {
+    if (action === "reissue" && !window.confirm(`Réémettre le badge de ${p.name} ? L'ancien QR code ne sera plus valable.`)) return;
+    if (action === "cancel" && !window.confirm(`Annuler l'inscription de ${p.name} ? Son badge ne sera plus valable.`)) return;
     setBusy(p.id); setNotice(null);
     try {
       if (action === "checkin") {
         const r = await coordApi.checkin({ id: p.id });
         setNotice({ ok: r.result === "ok", text: `${p.name} : ${r.message}${r.today_at && r.result === "already" ? ` (à ${r.today_at})` : ""}` });
         onDone();
-      } else setNotice({ ok: true, text: await coordApi.checkinResend(p.id) });
+      } else if (action === "reissue") setNotice({ ok: true, text: await coordApi.checkinReissue(p.id) });
+      else if (action === "cancel") setNotice({ ok: true, text: await coordApi.checkinCancel(p.id) });
+      else setNotice({ ok: true, text: await coordApi.checkinResend(p.id) });
       setVersion((v) => v + 1);
     } catch (e) { setNotice({ ok: false, text: apiErrorMessage(e) }); }
     finally { setBusy(null); }
@@ -127,12 +131,15 @@ function ManualSearch({ onDone }: { onDone: () => void }) {
           const here = p.checkins.includes(todayIso());
           return (
             <li key={p.id} className="py-3">
-              <p className="font-semibold">{p.name} <span className="text-sm font-normal text-navy/60">{p.reference}</span>{!p.valid && <span className="ml-2 text-sm text-red-800">(annulée)</span>}</p>
+              <p className="font-semibold">{p.name} <span className="text-sm font-normal text-navy/60">{p.reference}</span>{!p.valid && <span className="ml-2 text-sm text-red-800">({p.status.toLowerCase()})</span>}</p>
+              <p className="text-sm text-navy/60">{p.category}</p>
               <p className="text-sm text-navy/70">{[p.organization, p.phone, p.email].filter(Boolean).join(" · ")}</p>
               <p className="mt-1 text-sm">{here ? "✅ Arrivé(e) aujourd'hui" : "Pas encore arrivé(e) aujourd'hui"}</p>
               <div className="mt-2 grid gap-2 sm:flex">
                 {p.valid && !here && <button disabled={busy === p.id} onClick={() => run(p, "checkin")} className="min-h-[44px] rounded-lg bg-green px-4 font-semibold text-white disabled:opacity-60">Valider l'arrivée</button>}
                 {p.valid && <button disabled={busy === p.id} onClick={() => run(p, "resend")} className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-navy/20 px-4 font-semibold disabled:opacity-60"><Send className="h-4 w-4" aria-hidden />Renvoyer le badge</button>}
+                {p.valid && <button disabled={busy === p.id} onClick={() => run(p, "reissue")} className="min-h-[44px] rounded-lg border border-navy/20 px-4 font-semibold disabled:opacity-60">Réémettre (nouveau QR)</button>}
+                {p.valid && <button disabled={busy === p.id} onClick={() => run(p, "cancel")} className="min-h-[44px] rounded-lg border border-red-300 px-4 font-semibold text-red-800 disabled:opacity-60">Annuler l'inscription</button>}
               </div>
             </li>);
         })}

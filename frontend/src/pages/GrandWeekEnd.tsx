@@ -1,9 +1,9 @@
 import {
-  ArrowRight, Award, CalendarDays, Clock, Download, Drum, GraduationCap, HandHeart, Handshake, Info, Lightbulb, MapPin,
+  ArrowRight, Award, CalendarDays, CircleHelp, Clock, Download, FileSearch, Newspaper, Drum, GraduationCap, HandHeart, Handshake, Info, Lightbulb, MapPin,
   Megaphone, Quote, Sparkles, Store, Ticket, Video, type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Countdown } from "../components/Countdown";
 import { ConfigForm, type FieldDef } from "../components/forms/ConfigForm";
 import { Button } from "../components/ui/Button";
@@ -221,6 +221,38 @@ function Card({ id, icon, iconClass, title, children }: { id: string; icon: Icon
     </article>);
 }
 
+/* ---------- Orientation : liens directs vers chaque démarche (cahier des charges du 20 novembre 2026) ---------- */
+function OtherSteps({ has }: { has: (id: string) => boolean }) {
+  const steps: { to: string; label: string; text: string; icon: Icon; on: boolean }[] = [
+    { to: "#business-connect", label: "Business Connect", text: "Demander des rendez-vous d'affaires", icon: Handshake, on: has("business-connect") },
+    { to: "/partenaires", label: "Partenariat", text: "Soutenir l'événement et le réseau", icon: Sparkles, on: true },
+    { to: "/presse", label: "Presse", text: "Demander une accréditation", icon: Newspaper, on: true },
+    { to: "#benevoles", label: "Bénévolat", text: "Proposer votre aide", icon: HandHeart, on: has("benevoles") },
+    { to: "#awards", label: "Awards du Pôle", text: "Déposer une candidature", icon: Award, on: has("awards") },
+    { to: "#gala", label: "Gala du Pôle", text: "Billetterie et invitations", icon: Ticket, on: has("gala") },
+  ];
+  const card = "flex items-start gap-3 rounded-xl border border-navy/10 bg-white p-4 shadow-soft transition hover:-translate-y-0.5 hover:shadow-lift";
+  const body = (st: (typeof steps)[number]) => (
+    <><IconBadge icon={st.icon} className="bg-green/10 text-green" />
+      <span><span className="block font-semibold text-navy">{st.label}</span><span className="block text-sm text-navy/70">{st.text}</span></span></>);
+  return (
+    <Section tone="offwhite" id="demarches" className={ANCHOR}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div><Eyebrow>Autres démarches</Eyebrow><H2>Vous venez pour autre chose ?</H2></div>
+        <div className="flex flex-wrap gap-2">
+          <Link to="/suivi" className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-navy/20 bg-white px-4 font-semibold hover:bg-offwhite">
+            <FileSearch className="h-4 w-4" aria-hidden />Retrouver mon inscription ou mon dossier</Link>
+          <Link to="/suivi#aide" className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-4 font-semibold text-green hover:underline">
+            <CircleHelp className="h-4 w-4" aria-hidden />J'ai besoin d'aide</Link>
+        </div>
+      </div>
+      <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {steps.filter((st) => st.on).map((st) => (
+          <li key={st.label}>{st.to.startsWith("#") ? <a href={st.to} className={card}>{body(st)}</a> : <Link to={st.to} className={card}>{body(st)}</Link>}</li>))}
+      </ul>
+    </Section>);
+}
+
 /* ---------- Bouton « S'inscrire » fixe sur mobile ---------- */
 
 function MobileCta({ hero, open }: { hero: RefObject<HTMLElement>; open: boolean }) {
@@ -338,6 +370,8 @@ export default function GrandWeekEnd() {
       </section>
 
       <SectionNav items={nav} />
+
+      <OtherSteps has={(id) => !!sec(id)} />
 
       {/* ---- Présentation ---- */}
       {presentationRest.length > 0 && (
@@ -460,6 +494,7 @@ export default function GrandWeekEnd() {
               <H2 light>S'inscrire au Grand Week-End du Pôle</H2>
               <p className="mt-4 text-lg text-white/85">L'inscription donne droit à un badge nominatif valable pour les deux journées. Le Gala du Pôle ne fait pas l'objet d'une inscription : il est accessible sur invitation et par la billetterie commune avec The Ground.</p>
               <p className="mt-3 text-white/85">Dès votre inscription, votre badge (QR code) vous est envoyé par e-mail : présentez-le à l'accueil, sur votre téléphone ou imprimé.</p>
+              <p className="mt-3"><Link to="/suivi" className="font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white">Déjà inscrit ? Retrouver mon inscription ou mon dossier</Link></p>
             </div>
             <div className="rounded-2xl bg-white p-4 shadow-lg sm:p-8">
               {registrationOpen ? <EventRequestForm kind="registration" /> : <p className="text-navy/75">Les inscriptions ouvriront le {opens && fmtDate(opens.toISOString())}.</p>}

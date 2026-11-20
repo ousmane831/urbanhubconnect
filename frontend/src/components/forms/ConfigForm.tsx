@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMemo, useState } from "react";
 import { useForm, type FieldValues } from "react-hook-form";
 import { z } from "zod";
-import { submitForm } from "../../services/api";
+import { submitFormFull, type SubmitResult } from "../../services/api";
 import { apiErrorMessage, applyServerErrors } from "../../utils/errors";
 import { FormField, fieldProps } from "./FormField";
 import { Honeypot } from "./Honeypot";
@@ -35,7 +35,7 @@ export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, s
   const schema = useMemo(() => buildSchema(fields), [fields]);
   const defaults = useMemo(() => Object.fromEntries(fields.map((f) => [f.name, f.type === "multi" ? [] : f.type === "consent" || f.type === "check" ? false : ""])), [fields]);
   const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<FieldValues>({ resolver: zodResolver(schema), defaultValues: defaults });
-  const [done, setDone] = useState("");
+  const [done, setDone] = useState<SubmitResult | null>(null);
   const [failure, setFailure] = useState("");
   const err = (n: string) => errors[n]?.message as string | undefined;
 
@@ -43,11 +43,14 @@ export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, s
     setFailure("");
     const payload: Record<string, unknown> = { ...extra };
     for (const [k, val] of Object.entries(v)) if (val !== "" && val !== undefined) payload[k] = val;
-    try { setDone(await submitForm(endpoint, payload) || successFallback || "Merci."); }
+    try {
+      const r = await submitFormFull(endpoint, payload);
+      setDone({ ...r, detail: r.detail || successFallback || "Merci." });
+    }
     catch (e) { if (!applyServerErrors(e, setError as never)) setFailure(apiErrorMessage(e)); }
   };
 
-  if (done) return <SuccessMessage>{done}</SuccessMessage>;
+  if (done) return <Confirmation r={done} />;
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="relative grid gap-5 sm:grid-cols-2">
       <Honeypot register={register} />
@@ -86,5 +89,28 @@ export function ConfigForm({ endpoint, fields, submitLabel = "Envoyer", extra, s
         </button>
       </div>
     </form>
+  );
+}
+
+/** Écran de confirmation : message, puis pour un dossier du Grand Week-End la référence, le statut, la prochaine étape
+ *  et les boutons utiles (cahier des charges du 20 novembre 2026). */
+function Confirmation({ r }: { r: SubmitResult }) {
+  const btn = "inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 text-base font-semibold";
+  return (
+    <SuccessMessage>
+      <p>{r.detail}</p>
+      {r.reference && (
+        <dl className="mt-3 grid gap-x-6 gap-y-1 text-base sm:grid-cols-[auto_1fr]">
+          <dt className="font-semibold">Référence</dt><dd>{r.reference}</dd>
+          {r.status && <><dt className="font-semibold">Statut</dt><dd>{r.status}</dd></>}
+          {r.next_step && <><dt className="font-semibold">Prochaine étape</dt><dd>{r.next_step}</dd></>}
+        </dl>)}
+      {(r.reference || r.duplicate) && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {r.badge_url && <a href={r.badge_url} className={`${btn} bg-green text-white hover:bg-green-2`}>Voir mon badge</a>}
+          {r.visual_url && <a href={r.visual_url} className={`${btn} border border-gold/60 bg-gold/10 text-navy hover:bg-gold/20`}>Créer mon visuel « J'y serai ! »</a>}
+          <a href="/suivi" className={`${btn} border border-navy/20 text-navy hover:bg-white`}>Retrouver mon inscription ou mon dossier</a>
+        </div>)}
+    </SuccessMessage>
   );
 }

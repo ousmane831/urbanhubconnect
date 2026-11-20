@@ -26,7 +26,8 @@ export function EventRequestForm({ kind }: { kind: RequestKind }) {
     ...(badge ? [{ name: "options", label: "Jours prévus (facultatif, pour préparer l'accueil)", type: "multi" as const, options: REGISTRATION_OPTIONS,
       hint: "Votre badge reste valable pour les deux journées." }] : []),
     { name: "message", label: CONFIG[kind].message, type: "textarea" },
-    { name: "accept_privacy", label: "J'accepte la politique de confidentialité.", type: "consent" },
+    { name: "accept_privacy", label: "J'accepte la politique de confidentialité : mes données servent à traiter mon inscription.", type: "consent" },
+    { name: "newsletter", label: "Je souhaite aussi recevoir La Lettre du Hub (facultatif).", type: "check" },
   ], [kind, badge]);
   return <ConfigForm endpoint="/event-requests/" extra={{ kind }} fields={fields} submitLabel={CONFIG[kind].submit} successFallback="Merci. Votre demande a bien été transmise." />;
 }

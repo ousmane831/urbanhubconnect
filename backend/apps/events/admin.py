@@ -75,12 +75,27 @@ class CheckInInline(admin.TabularInline):
 
 @admin.register(EventRequest)
 class EventRequestAdmin(SubmissionAdminMixin, admin.ModelAdmin):
-    list_display = ("name", "kind", "organization", "email", "status_badge", "badge_envoye", "arrivees", "created_at")
-    list_filter = ("status", "kind")
-    search_fields = ("name", "organization", "email", "phone")
+    list_display = ("reference", "name", "kind", "badge_category", "organization", "email", "status_badge", "badge_envoye", "arrivees", "created_at")
+    list_filter = ("status", "kind", "badge_category")
+    search_fields = ("name", "organization", "email", "phone", "badge_number")
     readonly_fields = ("created_at", "updated_at", "choix", "badge_sent_at", "lien_badge")
     inlines = [CheckInInline]
-    actions = ["send_badges"]
+    actions = ["send_badges", "reissue_badges"]
+
+    @admin.display(description="référence", ordering="badge_number")
+    def reference(self, obj):
+        from apps.core import dossiers
+        return dossiers.reference(obj)
+
+    @admin.action(description="Réémettre le badge (nouveau QR code, l'ancien n'est plus valable) et l'envoyer")
+    def reissue_badges(self, request, queryset):
+        from django.contrib import messages
+        from . import badges
+        done = 0
+        for r in queryset.filter(kind__in=EventRequest.BADGE_KINDS, status="accepted"):
+            badges.reissue(r)
+            done += 1
+        messages.success(request, f"{done} badge(s) réémis : les anciens QR codes ne sont plus valables.")
 
     @admin.display(description="badge", boolean=True)
     def badge_envoye(self, obj):
@@ -96,15 +111,15 @@ class EventRequestAdmin(SubmissionAdminMixin, admin.ModelAdmin):
         from . import badges
         if obj.kind not in EventRequest.BADGE_KINDS:
             return "—"
-        url = badges.badge_url(obj)
-        return format_html('<a href="{}" target="_blank" rel="noopener">{}</a>', url, url)
+        url = badges.owner_url(obj)
+        return format_html('<a href="{}" target="_blank" rel="noopener">Ouvrir le badge (lien personnel)</a>', url)
 
     @admin.action(description="Envoyer ou renvoyer le badge (QR code) par e-mail")
     def send_badges(self, request, queryset):
         from django.contrib import messages
         from . import badges
         sent = failed = 0
-        for r in queryset.filter(kind__in=EventRequest.BADGE_KINDS).exclude(status="rejected"):
+        for r in queryset.filter(kind__in=EventRequest.BADGE_KINDS, status="accepted"):
             if badges.send_badge(r):
                 sent += 1
             else:

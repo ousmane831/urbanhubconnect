@@ -105,19 +105,45 @@ class NewsletterView(SubmissionCreateView):
             super().after_create(sub)
 
 
+_EventRequestBase = build_serializer(
+    EventRequest, ["kind", "name", "organization", "job_title", "email", "phone", "options", "what_offers", "what_needs", "message",
+                   "accept_privacy"],
+    extra={**CONSENT("accept_privacy"),
+           # Les anciens types (reboisement, visite, portes ouvertes) restent en base pour l'historique mais ne sont plus acceptés.
+           "kind": serializers.ChoiceField(choices=[(k.value, k.label) for k in EventRequest.OPEN_KINDS]),
+           "options": serializers.ListField(child=serializers.ChoiceField(choices=list(EventRequest.REGISTRATION_OPTIONS)),
+                                            required=False)})
+
+
+class EventRequestSerializer(_EventRequestBase):
+    """Option distincte, facultative et non cochée : recevoir La Lettre du Hub (jamais une condition de l'inscription)."""
+    newsletter = serializers.BooleanField(required=False, default=False, write_only=True)
+
+    class Meta(_EventRequestBase.Meta):
+        fields = _EventRequestBase.Meta.fields + ["newsletter"]
+
+    def create(self, data):
+        wants = data.pop("newsletter", False)
+        obj = super().create(data)
+        obj.wants_newsletter = wants
+        return obj
+
+
+def subscribe_newsletter(obj):
+    """Inscription à la newsletter demandée dans un formulaire de l'événement (sans second e-mail)."""
+    sub, created = NewsletterSubscriber.objects.get_or_create(
+        email=obj.email.strip().lower(), defaults={"name": obj.name, "organization": getattr(obj, "organization", "")})
+    if not created and not sub.is_active:
+        sub.is_active = True
+        sub.save(update_fields=["is_active", "updated_at"])
+
+
 class EventRequestCreate(SubmissionCreateView):
     """Demandes liées aux événements. Une inscription au Grand Week-End est confirmée d'office et le badge part aussitôt
     par e-mail. Une même adresse peut inscrire plusieurs personnes ; la même personne (même nom, même adresse) n'a qu'un
     badge par édition."""
     success_message = "Merci. Votre demande a bien été transmise. La Coordination vous recontactera rapidement."
-    serializer_class = build_serializer(
-        EventRequest, ["kind", "name", "organization", "job_title", "email", "phone", "options", "what_offers", "what_needs", "message",
-                       "accept_privacy"],
-        extra={**CONSENT("accept_privacy"),
-               # Les anciens types (reboisement, visite, portes ouvertes) restent en base pour l'historique mais ne sont plus acceptés.
-               "kind": serializers.ChoiceField(choices=[(k.value, k.label) for k in EventRequest.OPEN_KINDS]),
-               "options": serializers.ListField(child=serializers.ChoiceField(choices=list(EventRequest.REGISTRATION_OPTIONS)),
-                                                required=False)})
+    serializer_class = EventRequestSerializer
 
     def existing(self, data):
         if data.get("kind") not in EventRequest.BADGE_KINDS:
@@ -132,11 +158,16 @@ class EventRequestCreate(SubmissionCreateView):
         return Response({"detail": detail, "duplicate": True}, status=200)
 
     def after_create(self, obj):
+        if getattr(obj, "wants_newsletter", False):
+            subscribe_newsletter(obj)
         if obj.kind not in EventRequest.BADGE_KINDS:
             super().after_create(obj)  # accusé de réception (After Work, Défis Partenaires)
             return
         from apps.events import badges
-        if badges.issue(obj):
+        sent = badges.issue(obj)
+        # Écran de confirmation : liens utiles pour la personne qui vient de s'inscrire (son propre dossier uniquement)
+        self.extra_response = {"badge_url": badges.owner_url(obj), "visual_url": badges.visual_url(obj)}
+        if sent:
             self.success_message = (f"Merci, votre inscription est confirmée (référence {badges.reference(obj)}). Votre badge vient d'être "
                                     f"envoyé à {obj.email} : présentez-le à l'accueil, sur votre téléphone ou imprimé. "
                                     "Pensez à vérifier vos courriers indésirables.")

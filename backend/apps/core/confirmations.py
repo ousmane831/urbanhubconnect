@@ -11,14 +11,17 @@ from django.core.mail import send_mail
 
 logger = logging.getLogger(__name__)
 
-def signature():
-    """Coordonnées lues dans les Paramètres du site : un changement dans l'admin s'applique aussi aux e-mails."""
+def signature(obj=None):
+    """Coordonnées lues dans les Paramètres du site : un changement dans l'admin s'applique aussi aux e-mails.
+    Dossiers du Grand Week-End : le pied renvoie au lien de suivi et au formulaire d'assistance."""
+    from . import dossiers
     from .models import SiteSettings
     s = SiteSettings.load()
     site = getattr(settings, "FRONTEND_URL", settings.SITE_URL).rstrip("/")
-    return (f"\n\nUrban Hub Connect · Coordination\n{s.phone} (appel et WhatsApp) · {s.email}\n{site.replace('https://', '')}\n\n--\n"
-            "Ce message est automatique. Aucune réponse n'est nécessaire. "
-            f"Si vous avez besoin d'aide, utilisez le formulaire de contact : {site}/contact")
+    end = (dossiers.footer() if obj is not None and dossiers.is_dossier(obj) else
+           "Ce message est automatique. Aucune réponse n'est nécessaire. "
+           f"Si vous avez besoin d'aide, utilisez le formulaire de contact : {site}/contact")
+    return f"\n\nUrban Hub Connect · Coordination\n{s.phone} (appel et WhatsApp) · {s.email}\n{site.replace('https://', '')}\n\n--\n{end}"
 
 
 def _lines(*pairs):
@@ -113,7 +116,10 @@ def send_confirmation(obj):
         to, subject, body = build(obj)
         if not to:
             return False
-        send_mail(subject, body + signature(), settings.DEFAULT_FROM_EMAIL, [to], fail_silently=False)
+        from . import dossiers
+        if dossiers.is_dossier(obj):  # référence et lien de suivi (cahier des charges du 20 novembre 2026)
+            body += dossiers.received_text(obj)
+        send_mail(subject, body + signature(obj), settings.DEFAULT_FROM_EMAIL, [to], fail_silently=False)
         return True
     except Exception:
         logger.exception("Confirmation non envoyée (%s %s)", type(obj).__name__, getattr(obj, "pk", ""))

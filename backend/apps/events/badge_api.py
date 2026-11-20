@@ -86,6 +86,20 @@ def badge_image(request, token):
     return response
 
 
+@api_view(["GET"])
+@authentication_classes([SessionAuthentication])
+@permission_classes([AllowAny])
+def badge_pdf(request, token):
+    """Badge PDF (97 × 140 mm) à télécharger : titulaire (clé) ou Coordination uniquement."""
+    r = _get(token)
+    if not _image_allowed(request, token) or not badges.is_confirmed(r):
+        raise Http404
+    response = HttpResponse(badges.badge_pdf(r), content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="badge-{r.badge_number or 0:04d}-grand-week-end.pdf"'
+    response["Cache-Control"] = "private, max-age=300"
+    return response
+
+
 # ---------- accueil (Coordination) ----------
 RESULT_MESSAGES = {
     "ok": "Badge valide : arrivée enregistrée.",
@@ -126,8 +140,31 @@ def checkin_search(request):
                   | Q(badge_number=_ref_number(q)))
           .prefetch_related("checkins")[:20])
     return Response([{"id": r.pk, "name": r.name, "organization": r.organization, "email": r.email, "phone": r.phone,
-                      "valid": r.status != "rejected", "reference": badges.reference(r), "badge_sent": bool(r.badge_sent_at),
+                      "valid": badges.is_confirmed(r), "status": r.get_status_display(), "category": badges.category_label(r),
+                      "reference": badges.reference(r), "badge_sent": bool(r.badge_sent_at),
                       "checkins": [c.day.isoformat() for c in r.checkins.all()]} for r in qs])
+
+
+@staff_api(["POST"])
+def checkin_reissue(request):
+    """Badge perdu ou compromis : nouveau QR code (l'ancien ne passe plus à l'accueil) et nouvel envoi."""
+    r = EventRequest.objects.filter(pk=request.data.get("id"), kind__in=EventRequest.BADGE_KINDS, status="accepted").first()
+    if r is None:
+        return Response({"detail": "Inscription introuvable ou non confirmée."}, status=404)
+    sent = badges.reissue(r)
+    audit(request.user, r, "Accueil : badge réémis (nouveau QR code)")
+    return Response({"detail": f"Nouveau badge émis : l'ancien QR code n'est plus valable. "
+                               + (f"Envoyé à {r.email}." if sent else "L'e-mail n'a pas pu partir : renvoyez-le plus tard.")})
+
+
+@staff_api(["POST"])
+def checkin_cancel(request):
+    r = EventRequest.objects.filter(pk=request.data.get("id"), kind__in=EventRequest.BADGE_KINDS, status="accepted").first()
+    if r is None:
+        return Response({"detail": "Inscription introuvable ou déjà annulée."}, status=404)
+    badges.cancel(r)
+    audit(request.user, r, "Accueil : inscription annulée")
+    return Response({"detail": f"Inscription {badges.reference(r)} annulée : le badge n'est plus valable."})
 
 
 @staff_api(["POST"])

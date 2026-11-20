@@ -7,8 +7,27 @@ export const getFeaturedEvents = () =>
 export const getOrganizationFilters = () => http.get<OrganizationFilters>("/organizations/filters/").then((r) => r.data);
 
 /** POST public d'un formulaire ; le champ piège anti-spam est envoyé vide. */
-export const submitForm = (path: string, data: Record<string, unknown>) =>
-  http.post<{ detail: string }>(path, { company_website: "", ...data }).then((r) => r.data.detail);
+export const submitForm = (path: string, data: Record<string, unknown>) => submitFormFull(path, data).then((r) => r.detail);
+
+/** Réponse complète : pour un dossier du Grand Week-End, référence, statut, prochaine étape et liens personnels. */
+export interface SubmitResult {
+  detail: string; duplicate?: boolean; reference?: string; status?: string; next_step?: string; badge_url?: string; visual_url?: string;
+}
+export const submitFormFull = (path: string, data: Record<string, unknown>) =>
+  http.post<SubmitResult>(path, { company_website: "", ...data }).then((r) => r.data);
+
+// ---------- Suivi des dossiers sans compte ----------
+export interface DossierRow {
+  kind: string; id: number; type: string; reference: string; name: string; status: string; status_label: string; next_step: string;
+  created_at: string; can_complete: boolean; can_cancel: boolean; badge_url?: string; visual_url?: string;
+}
+export const requestTrackingLink = (email: string) => http.post<{ detail: string }>("/suivi/", { email }).then((r) => r.data.detail);
+export const getTracking = (token: string) =>
+  http.get<{ email: string; dossiers: DossierRow[] }>(`/suivi/${encodeURIComponent(token)}/`).then((r) => r.data);
+export const cancelDossier = (token: string, d: DossierRow) =>
+  http.post<{ detail: string; dossier: DossierRow }>(`/suivi/${encodeURIComponent(token)}/${d.kind}/${d.id}/annuler/`).then((r) => r.data);
+export const completeDossier = (token: string, d: DossierRow, message: string) =>
+  http.post<{ detail: string; dossier: DossierRow }>(`/suivi/${encodeURIComponent(token)}/${d.kind}/${d.id}/completer/`, { message }).then((r) => r.data);
 
 const clean = <T extends object>(o: T) =>
   Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== "" && v !== false));
@@ -48,7 +67,7 @@ export type BadgeInfo =
   | { owner: false; event: BadgeEvent }
   | {
     owner: true; name: string; organization: string; job_title?: string; number?: number | null; reference: string; kind: string;
-    days: string[]; valid: boolean; confirmed: boolean; checkins: { day: string; at: string }[]; event: BadgeEvent;
+    days: string[]; valid: boolean; confirmed: boolean; category: string; status: string; checkins: { day: string; at: string }[]; event: BadgeEvent;
   };
 export const getBadge = (token: string, key?: string | null) =>
   get<BadgeInfo>(`/badges/${encodeURIComponent(token)}/`, key ? { cle: key } : undefined);
@@ -58,6 +77,8 @@ export interface UnsubscribeState { email: string; unsubscribed: boolean }
 export const getUnsubscribe = (token: string) => get<UnsubscribeState>(`/unsubscribe/${encodeURIComponent(token)}/`);
 export const confirmUnsubscribe = (token: string) =>
   http.post<UnsubscribeState>(`/unsubscribe/${encodeURIComponent(token)}/`).then((r) => r.data);
+export const badgePdfUrl = (token: string, key: string) =>
+  `${import.meta.env.VITE_API_URL ?? "/api"}/badges/${encodeURIComponent(token)}/badge.pdf?cle=${encodeURIComponent(key)}`;
 /** Image du badge : réservée au titulaire (clé) ou à la Coordination connectée. */
 export const badgeImageUrl = (token: string, key: string, download = false) =>
   `${import.meta.env.VITE_API_URL ?? "/api"}/badges/${encodeURIComponent(token)}/badge.png?cle=${encodeURIComponent(key)}${download ? "&telecharger=1" : ""}`;

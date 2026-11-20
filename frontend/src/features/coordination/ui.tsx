@@ -32,7 +32,7 @@ const todayIso = () => new Date().toISOString().slice(0, 10);
 export function ActionForm({ action, busy, onSubmit, onCancel }: {
   action: ActionDef; busy: boolean; onSubmit: (data: Record<string, string>) => void; onCancel: () => void;
 }) {
-  const [v, setV] = useState({ amount: String(action.amount ?? ""), method: "wave", reference: "", paid_on: todayIso(), category: "" });
+  const [v, setV] = useState({ amount: String(action.amount ?? ""), method: "wave", reference: "", paid_on: todayIso(), category: "", note: "" });
   const [error, setError] = useState("");
   const set = (k: keyof typeof v) => (e: { target: { value: string } }) => setV({ ...v, [k]: e.target.value });
 
@@ -42,6 +42,10 @@ export function ActionForm({ action, busy, onSubmit, onCancel }: {
       if (!v.category) return setError("Choisissez une catégorie.");
       return onSubmit({ category: v.category });
     }
+    if (action.form === "complement") {
+      if (!v.note.trim()) return setError("Précisez l'élément attendu.");
+      return onSubmit({ note: v.note.trim() });
+    }
     const amount = Number(v.amount.replace(/\s/g, ""));
     if (!Number.isInteger(amount) || amount <= 0) return setError("Saisissez un montant valide, en FCFA.");
     onSubmit({ amount: String(amount), method: v.method, reference: v.reference.trim(), paid_on: v.paid_on });
@@ -49,7 +53,12 @@ export function ActionForm({ action, busy, onSubmit, onCancel }: {
   const field = "field";
   return (
     <form onSubmit={submit} className="mt-4 grid gap-4 rounded-md border border-navy/15 bg-offwhite p-4 sm:grid-cols-2" aria-label={action.label}>
-      {action.form === "category" ? (
+      {action.form === "complement" ? (
+        <div className="sm:col-span-2"><label className="mb-1 block font-semibold" htmlFor="note">Élément attendu</label>
+          <textarea id="note" rows={3} className={field} value={v.note} onChange={set("note")}
+            placeholder="Ex. une copie de votre carte de presse" />
+          <p className="mt-1 text-sm text-navy/60">La personne reçoit un e-mail avec un bouton « Compléter mon dossier ».</p></div>
+      ) : action.form === "category" ? (
         <div className="sm:col-span-2"><label className="mb-1 block font-semibold" htmlFor="cat">Catégorie d'adhésion</label>
           <select id="cat" className={field} value={v.category} onChange={set("category")}>
             <option value="">Choisir…</option>{action.options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>

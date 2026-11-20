@@ -59,7 +59,7 @@ class PageContentAdmin(PublishActionsMixin, admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
 
 
-STATUS_COLORS = {"pending": GOLD, "reviewing": PURPLE, "accepted": GREEN, "rejected": RED}
+STATUS_COLORS = {"pending": GOLD, "reviewing": PURPLE, "incomplete": GOLD, "waitlist": PURPLE, "accepted": GREEN, "rejected": RED, "cancelled": RED}
 
 
 class SubmissionAdminMixin:
