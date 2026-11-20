@@ -1,10 +1,13 @@
 /** Visuel « J'y serai ! » du Grand Week-End (1080 × 1350, format portrait des réseaux sociaux), dessiné dans le navigateur :
- *  la photo de la personne ne quitte jamais son téléphone. */
+ *  la photo de la personne ne quitte jamais son téléphone.
+ *  Parti pris : fond crème uni, aplats de couleur de l'identité (bleu nuit, vert, or), grande photo en arche,
+ *  pastille-sticker pour la date et bandeau d'informations en pied, sans dégradé. */
 export const W = 1080;
 export const H = 1350;
-export const PHOTO = { cx: W / 2, cy: 685, r: 225 };
+/** Cadre de la photo (arche : haut en demi-cercle). */
+export const PHOTO = { x: 250, y: 452, w: 580, h: 590 };
 
-const NAVY = "#0E2240", NAVY_2 = "#16305A", GOLD = "#C39A3E", GOLD_LIGHT = "#E2C27A", WHITE = "#FFFFFF";
+const NAVY = "#0E2240", GREEN = "#1E5C3F", GOLD = "#C39A3E", GOLD_LIGHT = "#E2C27A", CREAM = "#F7F3EA", WHITE = "#FFFFFF";
 const HEAD = "Montserrat, system-ui, sans-serif", BODY = "Inter, system-ui, sans-serif";
 
 export interface PhotoState { img: HTMLImageElement; zoom: number; x: number; y: number }
@@ -18,120 +21,154 @@ export const loadFonts = () => Promise.all([
   `800 100px Montserrat`, `700 40px Montserrat`, `600 30px Inter`, `400 30px Inter`,
 ].map((f) => document.fonts?.load(f).catch(() => undefined)));
 
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+type Ctx = CanvasRenderingContext2D & { letterSpacing?: string };
+
+function roundRect(ctx: Ctx, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
   ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
 }
 
-/** Texte centré, réduit jusqu'à tenir dans la largeur donnée. */
-function centered(ctx: CanvasRenderingContext2D, text: string, y: number, font: (size: number) => string, size: number, maxW: number, color: string) {
-  let s = size;
-  ctx.font = font(s);
-  while (s > 18 && ctx.measureText(text).width > maxW) { s -= 2; ctx.font = font(s); }
-  ctx.fillStyle = color; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-  ctx.fillText(text, W / 2, y);
+/** Arche : rectangle dont le haut est un demi-cercle, bas légèrement arrondi. */
+function arch(ctx: Ctx, x: number, y: number, w: number, h: number) {
+  const r = w / 2, b = 28;
+  ctx.beginPath();
+  ctx.moveTo(x, y + r);
+  ctx.arc(x + r, y + r, r, Math.PI, 0);
+  ctx.lineTo(x + w, y + h - b); ctx.arcTo(x + w, y + h, x + w - b, y + h, b);
+  ctx.lineTo(x + b, y + h); ctx.arcTo(x, y + h, x, y + h - b, b);
+  ctx.closePath();
 }
 
-function hexGrid(ctx: CanvasRenderingContext2D) {
-  const r = 46, h = Math.sqrt(3) * r;
-  ctx.save(); ctx.strokeStyle = "rgba(255,255,255,0.045)"; ctx.lineWidth = 2;
-  for (let row = -1; row * h < H + h; row++) for (let col = -1; col * 1.5 * r < W + r; col++) {
-    const cx = col * 1.5 * r, cy = row * h + (col % 2 ? h / 2 : 0);
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) { const a = (Math.PI / 3) * i; ctx[i ? "lineTo" : "moveTo"](cx + r * Math.cos(a), cy + r * Math.sin(a)); }
-    ctx.closePath(); ctx.stroke();
-  }
+/** Texte réduit jusqu'à tenir dans la largeur donnée ; retourne la taille retenue. */
+function fit(ctx: Ctx, text: string, font: (s: number) => string, size: number, maxW: number) {
+  let s = size;
+  ctx.font = font(s);
+  while (s > 16 && ctx.measureText(text).width > maxW) { s -= 2; ctx.font = font(s); }
+  return s;
+}
+
+function text(ctx: Ctx, t: string, x: number, y: number, font: (s: number) => string, size: number, maxW: number, color: string,
+  align: CanvasTextAlign = "center", spacing = 0) {
+  ctx.save();
+  ctx.letterSpacing = `${spacing}px`;
+  fit(ctx, t, font, size, maxW);
+  ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = "alphabetic";
+  ctx.fillText(t, x, y);
   ctx.restore();
 }
 
-/** Échelle minimale pour que la photo couvre tout le cercle. */
-export const coverScale = (img: HTMLImageElement) => (2 * PHOTO.r) / Math.min(img.naturalWidth, img.naturalHeight);
+/** Échelle minimale pour que la photo couvre tout le cadre. */
+export const coverScale = (img: HTMLImageElement) => Math.max(PHOTO.w / img.naturalWidth, PHOTO.h / img.naturalHeight);
 
-/** Garde la photo dans le cercle : impossible de faire apparaître un bord vide en la déplaçant. */
+/** Garde la photo dans le cadre : impossible de faire apparaître un bord vide en la déplaçant. */
 export function clampPhoto(p: PhotoState): PhotoState {
   const s = coverScale(p.img) * p.zoom;
-  const mx = Math.max(0, (p.img.naturalWidth * s) / 2 - PHOTO.r), my = Math.max(0, (p.img.naturalHeight * s) / 2 - PHOTO.r);
+  const mx = Math.max(0, (p.img.naturalWidth * s - PHOTO.w) / 2), my = Math.max(0, (p.img.naturalHeight * s - PHOTO.h) / 2);
   return { ...p, x: Math.min(mx, Math.max(-mx, p.x)), y: Math.min(my, Math.max(-my, p.y)) };
 }
 
-function photo(ctx: CanvasRenderingContext2D, p: PhotoState | null) {
-  const { cx, cy, r } = PHOTO;
-  // Halo et anneaux dorés
-  ctx.save();
-  ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 40; ctx.shadowOffsetY = 12;
-  ctx.beginPath(); ctx.arc(cx, cy, r + 18, 0, Math.PI * 2); ctx.fillStyle = GOLD; ctx.fill();
-  ctx.restore();
-  ctx.beginPath(); ctx.arc(cx, cy, r + 8, 0, Math.PI * 2); ctx.fillStyle = WHITE; ctx.fill();
+function photo(ctx: Ctx, p: PhotoState | null) {
+  const { x, y, w, h } = PHOTO;
+  // Aplat vert décalé derrière la photo et filet doré décalé de l'autre côté : profondeur sans ombre ni dégradé
+  arch(ctx, x + 26, y + 26, w, h); ctx.fillStyle = GREEN; ctx.fill();
+  arch(ctx, x - 22, y - 22, w, h); ctx.strokeStyle = GOLD; ctx.lineWidth = 4; ctx.stroke();
 
   ctx.save();
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
+  arch(ctx, x, y, w, h); ctx.clip();
   if (p) {
-    const s = coverScale(p.img) * p.zoom, w = p.img.naturalWidth * s, h = p.img.naturalHeight * s;
-    ctx.drawImage(p.img, cx - w / 2 + p.x, cy - h / 2 + p.y, w, h);
+    const s = coverScale(p.img) * p.zoom, iw = p.img.naturalWidth * s, ih = p.img.naturalHeight * s;
+    ctx.drawImage(p.img, x + (w - iw) / 2 + p.x, y + (h - ih) / 2 + p.y, iw, ih);
   } else {
     // Emplacement vide : silhouette discrète
-    ctx.fillStyle = NAVY_2; ctx.fillRect(cx - r, cy - r, 2 * r, 2 * r);
-    ctx.fillStyle = "rgba(255,255,255,0.14)";
-    ctx.beginPath(); ctx.arc(cx, cy - 55, 78, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx, cy + 165, 150, 120, 0, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = "#E6DFCF"; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = "rgba(14,34,64,0.12)";
+    ctx.beginPath(); ctx.arc(x + w / 2, y + 250, 95, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x + w / 2, y + h + 40, 210, 230, 0, Math.PI, 0); ctx.fill();
   }
   ctx.restore();
 }
 
-export function draw(ctx: CanvasRenderingContext2D, v: Visual) {
-  ctx.clearRect(0, 0, W, H);
-  // Fond bleu nuit, léger dégradé et motif hexagonal du réseau
-  const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, NAVY_2); bg.addColorStop(1, NAVY);
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-  hexGrid(ctx);
-  // Lueur dorée derrière la photo
-  const glow = ctx.createRadialGradient(PHOTO.cx, PHOTO.cy, PHOTO.r * 0.6, PHOTO.cx, PHOTO.cy, PHOTO.r * 2.1);
-  glow.addColorStop(0, "rgba(195,154,62,0.28)"); glow.addColorStop(1, "rgba(195,154,62,0)");
-  ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
-  // Filets dorés en haut et en bas
-  ctx.fillStyle = GOLD; ctx.fillRect(0, 0, W, 12); ctx.fillRect(0, H - 12, W, 12);
+/** « 11-12 » + « DÉC. 2026 » à partir de « 11 et 12 décembre 2026 ». */
+function dateParts(dates: string) {
+  const m = dates.match(/^(\d{1,2})(?:\s+(?:et|au)\s+(\d{1,2}))?\s+(\S+)\s+(\d{4})$/i);
+  if (!m) return null;
+  return { days: m[2] ? `${m[1]}-${m[2]}` : m[1], month: `${m[3].slice(0, 3).toUpperCase()}${m[3].length > 3 ? "." : ""}`, year: m[4] };
+}
 
-  // Logo sur cartouche blanc
-  if (v.logo) {
-    const lh = 96, lw = Math.min(360, (v.logo.naturalWidth / v.logo.naturalHeight) * lh);
-    roundRect(ctx, 60, 50, lw + 48, lh + 28, 20); ctx.fillStyle = WHITE; ctx.fill();
-    ctx.drawImage(v.logo, 84, 64, lw, lh);
-  }
-  // Pastille de date : « 11-12 » en grand, « DÉC. 2026 » dessous
-  if (v.dates) {
-    const m = v.dates.match(/^(\d{1,2})(?:\s+(?:et|au)\s+(\d{1,2}))?\s+(\S+)\s+(\d{4})$/i);
-    const big = m ? (m[2] ? `${m[1]}-${m[2]}` : m[1]) : "";
-    const small = m ? `${m[3].slice(0, 3).toUpperCase()}${m[3].length > 3 ? "." : ""} ${m[4]}` : "";
-    if (big) {
-      const bw = 190, bx = W - 60 - bw;
-      roundRect(ctx, bx, 50, bw, 124, 20); ctx.fillStyle = GOLD; ctx.fill();
-      ctx.fillStyle = NAVY; ctx.textAlign = "center";
-      ctx.font = `800 54px ${HEAD}`; ctx.fillText(big, bx + bw / 2, 112);
-      ctx.font = `700 26px ${HEAD}`; ctx.fillText(small, bx + bw / 2, 152);
-    }
-  }
-
-  // Titre
-  ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
-  centered(ctx, "J'Y SERAI !", 340, (s) => `800 ${s}px ${HEAD}`, 150, 940, WHITE);
+/** Pastille ronde inclinée, façon sticker. */
+function sticker(ctx: Ctx, cx: number, cy: number, d: { days: string; month: string; year: string }) {
+  ctx.save();
+  ctx.translate(cx, cy); ctx.rotate(-0.16);
+  ctx.beginPath(); ctx.arc(0, 0, 112, 0, Math.PI * 2); ctx.fillStyle = GOLD; ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 0, 98, 0, Math.PI * 2); ctx.strokeStyle = "rgba(14,34,64,0.35)"; ctx.lineWidth = 2; ctx.setLineDash([6, 6]); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = NAVY; ctx.textAlign = "center";
+  fit(ctx, d.days, (s) => `800 ${s}px ${HEAD}`, 62, 170); ctx.fillText(d.days, 0, 8);
+  ctx.font = `700 26px ${HEAD}`; ctx.fillText(`${d.month} ${d.year}`, 0, 48);
   ctx.restore();
-  centered(ctx, "au Grand Week-End du Pôle", 400, (s) => `700 ${s}px ${HEAD}`, 42, 900, GOLD_LIGHT);
+}
+
+function pin(ctx: Ctx, x: number, y: number, color: string) {
+  ctx.save(); ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(x, y, 15, Math.PI, 0); ctx.lineTo(x, y + 30); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, 15, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fillStyle = NAVY; ctx.fill();
+  ctx.restore();
+}
+
+export function draw(context: CanvasRenderingContext2D, v: Visual) {
+  const ctx = context as Ctx;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = CREAM; ctx.fillRect(0, 0, W, H);
+
+  // Formes de l'identité : quart de cercle vert en haut à droite, petit disque or, arc fin bleu nuit à gauche
+  ctx.beginPath(); ctx.arc(W, 0, 232, Math.PI / 2, Math.PI); ctx.lineTo(W, 0); ctx.closePath(); ctx.fillStyle = GREEN; ctx.fill();
+  ctx.beginPath(); ctx.arc(W - 232, 22, 16, 0, Math.PI * 2); ctx.fillStyle = GOLD; ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 760, 170, -Math.PI / 2, Math.PI / 2); ctx.strokeStyle = NAVY; ctx.lineWidth = 3; ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 760, 130, -Math.PI / 2, Math.PI / 2); ctx.strokeStyle = GOLD; ctx.lineWidth = 3; ctx.stroke();
+
+  // En-tête : logo, mention de l'édition
+  if (v.logo) {
+    // Cartouche blanc assumé (le logo a un fond blanc)
+    const lh = 88, lw = Math.min(340, (v.logo.naturalWidth / v.logo.naturalHeight) * lh);
+    roundRect(ctx, 60, 52, lw + 40, lh + 28, 18); ctx.fillStyle = WHITE; ctx.fill();
+    ctx.strokeStyle = "rgba(14,34,64,0.08)"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.drawImage(v.logo, 80, 66, lw, lh);
+  }
+  text(ctx, "ÉDITION", W - 58, 90, (s) => `700 ${s}px ${HEAD}`, 22, 220, GOLD_LIGHT, "right", 4);
+  text(ctx, "2026", W - 58, 140, (s) => `800 ${s}px ${HEAD}`, 48, 220, WHITE, "right", 2);
+
+  // Titre : « J'Y SERAI » bleu nuit, « ! » or
+  const size = fit(ctx, "J'Y SERAI !", (s) => `800 ${s}px ${HEAD}`, 150, 880);
+  ctx.font = `800 ${size}px ${HEAD}`;
+  const main = "J'Y SERAI ", bang = "!";
+  const total = ctx.measureText(main + bang).width, x0 = (W - total) / 2;
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = NAVY; ctx.fillText(main, x0, 338);
+  ctx.fillStyle = GOLD; ctx.fillText(bang, x0 + ctx.measureText(main).width, 338);
+  // Sous-titre encadré de filets
+  ctx.font = `700 28px ${HEAD}`;
+  const sub = "AU GRAND WEEK-END DU PÔLE";
+  ctx.save(); ctx.letterSpacing = "5px"; const sw = ctx.measureText(sub).width; ctx.restore();
+  text(ctx, sub, W / 2, 396, (s) => `700 ${s}px ${HEAD}`, 28, 820, GREEN, "center", 5);
+  ctx.fillStyle = GOLD; ctx.fillRect(W / 2 - sw / 2 - 74, 386, 50, 3); ctx.fillRect(W / 2 + sw / 2 + 24, 386, 50, 3);
 
   photo(ctx, v.photo);
+  const d = dateParts(v.dates);
+  if (d) sticker(ctx, PHOTO.x + PHOTO.w - 6, PHOTO.y + 96, d);
 
-  // Nom et fonction / organisation
-  const name = v.name.trim() || "Votre nom";
-  centered(ctx, name, 1005, (s) => `800 ${s}px ${HEAD}`, 60, 940, v.name.trim() ? WHITE : "rgba(255,255,255,0.45)");
-  if (v.detail.trim()) centered(ctx, v.detail.trim(), 1054, (s) => `600 ${s}px ${BODY}`, 32, 940, GOLD_LIGHT);
+  // Nom et fonction
+  const named = !!v.name.trim();
+  text(ctx, named ? v.name.trim() : "Votre nom", W / 2, 1122, (s) => `800 ${s}px ${HEAD}`, 58, 920, named ? NAVY : "rgba(14,34,64,0.35)");
+  if (v.detail.trim()) text(ctx, v.detail.trim(), W / 2, 1164, (s) => `600 ${s}px ${BODY}`, 30, 920, GREEN);
 
-  // Bandeau du lieu
-  roundRect(ctx, 90, 1100, W - 180, 140, 28);
-  ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.fill();
-  ctx.strokeStyle = "rgba(226,194,122,0.55)"; ctx.lineWidth = 2; ctx.stroke();
-  centered(ctx, v.dates ? `Les ${v.dates}` : "Grand Week-End du Pôle", 1162, (s) => `700 ${s}px ${HEAD}`, 40, W - 260, WHITE);
-  if (v.location) centered(ctx, v.location, 1212, (s) => `400 ${s}px ${BODY}`, 32, W - 260, "rgba(255,255,255,0.8)");
-
-  centered(ctx, "urbanhubconnect.com", 1300, (s) => `600 ${s}px ${BODY}`, 28, 900, "rgba(255,255,255,0.6)");
+  // Bandeau d'informations
+  ctx.fillStyle = NAVY; ctx.fillRect(0, 1200, W, H - 1200);
+  ctx.fillStyle = GOLD; ctx.fillRect(0, 1200, W, 6);
+  pin(ctx, 92, 1262, GOLD);
+  const [place1, place2] = (v.location || "Diamniadio · Lac Rose").split(/\s*[·&]\s*/);
+  text(ctx, place2 ? `${place1} & ${place2}` : place1, 128, 1278, (s) => `800 ${s}px ${HEAD}`, 36, 560, WHITE, "left");
+  text(ctx, d ? `${v.dates.replace(/\s+\d{4}$/, "")} ${d.year}` : "Pôle urbain de Diamniadio", 128, 1318, (s) => `600 ${s}px ${BODY}`, 26, 560, "rgba(255,255,255,0.75)", "left");
+  text(ctx, "urbanhubconnect.com", W - 70, 1300, (s) => `700 ${s}px ${HEAD}`, 26, 340, GOLD_LIGHT, "right");
 }

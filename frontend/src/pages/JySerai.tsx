@@ -105,7 +105,7 @@ export default function JySerai() {
           <div className="mx-auto w-full max-w-[26rem]">
             <canvas ref={canvas} width={W} height={H} role="img" aria-label="Aperçu de votre visuel « J'y serai ! »"
               onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
-              className={`h-auto w-full touch-none rounded-2xl bg-navy shadow-lift ${photo ? "cursor-grab active:cursor-grabbing" : ""}`} />
+              className={`h-auto w-full touch-none rounded-2xl bg-offwhite shadow-lift ${photo ? "cursor-grab active:cursor-grabbing" : ""}`} />
             {photo && <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-navy/65"><Move className="h-4 w-4" aria-hidden />Faites glisser la photo pour la cadrer.</p>}
           </div>
 
